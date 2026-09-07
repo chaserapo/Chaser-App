@@ -42,7 +42,7 @@ export default function NewSprayJob() {
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [fa, pa, ma, ch] = await Promise.all([repo.farms.list(), repo.paddocks.list(), repo.machinery.list(), repo.chemicals.list()]);
+      const [fa, pa, ma, ch] = await Promise.all([repo.farms.active(), repo.paddocks.active(), repo.machinery.list(), repo.chemicals.list()]);
       setFarms(fa); setPaddocks(pa); setMachs(ma); setChems(ch);
     })();
   }, []));
@@ -219,6 +219,7 @@ export default function NewSprayJob() {
             <Input label="Crop" value={f.crop} onChangeText={(v) => setF({ ...f, crop: v })} testID="input-crop" />
             <Input label="Target weed / pest" value={f.target} onChangeText={(v) => setF({ ...f, target: v })} testID="input-target" />
             <Input label="Area to be treated" value={f.area_ha} onChangeText={(v) => setF({ ...f, area_ha: v })} keyboardType="decimal-pad" suffix="ha" testID="input-area" />
+            {f.paddock_id ? <Text style={styles.overrideHint}>Auto-filled from paddock — you can override for this job without changing the paddock record.</Text> : null}
           </Card>
 
           <Text style={styles.section}>Operator & Machine</Text>
@@ -345,5 +346,6 @@ const styles = StyleSheet.create({
   totalQty: { fontSize: 12, color: colors.brandPrimary, marginTop: 6, fontWeight: "700" },
   discl: { fontSize: 12, color: colors.muted, marginTop: 8, lineHeight: 17 },
   metaText: { fontSize: 12, color: colors.muted, marginBottom: 8, fontWeight: "600" },
+  overrideHint: { fontSize: 11, color: colors.muted, fontStyle: "italic", marginTop: -4, marginBottom: 4, lineHeight: 15 },
   empty: { color: colors.muted, textAlign: "center", paddingVertical: 12, fontStyle: "italic" },
 });

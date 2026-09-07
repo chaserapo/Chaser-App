@@ -13,7 +13,7 @@ export const EXTERNAL_LINKS: ExternalLink[] = [
   // Spray Application
   { category: "Spray Application", name: "SprayWise", url: "https://www.spraywise.com.au/", description: "Nufarm SprayWise tools" },
   { category: "Spray Application", name: "SnapCard Spray Calculator", url: "https://www.agric.wa.gov.au/spray-application/spray-application-technology", description: "DPIRD WA spray guidance" },
-  { category: "Spray Application", name: "TeeJet Nozzle Selector", url: "https://www.teejet.com/", description: "Nozzle selection tool" },
+  { category: "Spray Application", name: "Fantastic Nozzles", url: "https://fantasticnozzles.com.au", description: "Nozzle selection & supply" },
   { category: "Spray Application", name: "Hardi Nozzle Guide", url: "https://www.hardi-australia.com/", description: "Nozzle manufacturer" },
 
   // Agronomy

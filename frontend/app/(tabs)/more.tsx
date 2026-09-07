@@ -11,6 +11,7 @@ const TOOLS = [
   { title: "Spray Rate Calculator", icon: "calculator", route: "/calculators/spray-rate" },
   { title: "Tank Mix Calculator", icon: "beaker-outline", route: "/calculators/tank-mix" },
   { title: "Nozzle Flow Calculator", icon: "sprinkler-variant", route: "/calculators/spray-rate" },
+  { title: "Farms & Paddocks", icon: "tractor", route: "/farms" },
   { title: "Machinery Maintenance", icon: "wrench-outline", route: "/(tabs)/machinery" },
   { title: "Chemical Register", icon: "flask-outline", route: "/chemicals" },
 ];

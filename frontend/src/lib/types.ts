@@ -10,7 +10,11 @@ export type Farm = {
   id: ID;
   business_id: ID;
   name: string;
+  property_name?: string;
   region?: string;
+  address?: string;
+  notes?: string;
+  archived_at?: string;
   created_at: string;
 };
 
@@ -21,6 +25,9 @@ export type Paddock = {
   name: string;
   area_ha?: number;
   crop?: string;
+  variety?: string;
+  notes?: string;
+  archived_at?: string;
   created_at: string;
 };
 

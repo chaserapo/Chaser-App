@@ -39,6 +39,7 @@ export const repo = {
 
   farms: {
     list: () => readList<Farm>(KEYS.farms),
+    active: async () => (await readList<Farm>(KEYS.farms)).filter((f) => !f.archived_at),
     save: async (f: Farm) => {
       const list = await readList<Farm>(KEYS.farms);
       const idx = list.findIndex((x) => x.id === f.id);
@@ -53,6 +54,7 @@ export const repo = {
   },
   paddocks: {
     list: () => readList<Paddock>(KEYS.paddocks),
+    active: async () => (await readList<Paddock>(KEYS.paddocks)).filter((p) => !p.archived_at),
     save: async (p: Paddock) => {
       const list = await readList<Paddock>(KEYS.paddocks);
       const idx = list.findIndex((x) => x.id === p.id);
