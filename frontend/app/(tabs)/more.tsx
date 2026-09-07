@@ -68,6 +68,29 @@ export default function More() {
                 <Text style={styles.signOutText}>Sign out</Text>
               </Pressable>
             </Card>
+
+            <Text style={styles.sectionTitle}>Team</Text>
+            <Card style={{ padding: 0, overflow: "hidden" }}>
+              <Pressable onPress={() => router.push("/team")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-team-btn">
+                <Icon name="account-group-outline" size={22} color={colors.brandPrimary} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.rowText, { marginLeft: 0 }]}>Team Members</Text>
+                  <Text style={styles.rowSub}>
+                    {business?.role === "owner"
+                      ? "Invite and manage the people on your farm"
+                      : "View who's on this farm"}
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={22} color={colors.muted} />
+              </Pressable>
+              {business?.role === "owner" ? (
+                <Pressable onPress={() => router.push("/team")} style={({ pressed }) => [styles.row, styles.rowBorder, { borderBottomWidth: 0, borderTopWidth: 1, borderTopColor: colors.border }, pressed && { backgroundColor: colors.surface }]} testID="invite-team-btn">
+                  <Icon name="email-plus-outline" size={22} color={colors.brandPrimary} />
+                  <Text style={styles.rowText}>Invite team member</Text>
+                  <Icon name="chevron-right" size={22} color={colors.muted} />
+                </Pressable>
+              ) : null}
+            </Card>
           </>
         ) : null}
 

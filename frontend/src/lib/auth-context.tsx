@@ -4,6 +4,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { setBackend } from "./backend";
 import { isMigrated, runMigration, MigrationProgress } from "./migrate";
+import { acceptPendingInvitations } from "./members";
 
 export type ActiveBusiness = { id: string; name: string; role: "owner" | "manager" | "operator" };
 export type MigrationState =
@@ -42,6 +43,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Resolve or create the business for the signed-in user, then run migration if needed.
   const bootstrapBusiness = useCallback(async (u: User) => {
+    // 0) Redeem any pending invitations for this user's email — this may add a
+    //    membership row before we probe below. Safe idempotent RPC.
+    let acceptedInvites = 0;
+    try { acceptedInvites = await acceptPendingInvitations(); }
+    catch (e) { console.warn("accept invites failed", e); }
+
     // 1) Do we already have a membership?
     const { data: members, error: memErr } = await supabase
       .from("business_members")
@@ -76,11 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isFreshBusiness = true;
     }
 
-    // 2) Migration — ONLY on the device where the business was just created (signup).
-    //    On a new device that signs in to an existing business, we skip migration to avoid
-    //    uploading that device's local seed data as duplicates.
+    // 2) Migration — ONLY on the device where the business was just created (signup as an owner).
+    //    Invited users (acceptedInvites > 0) join an existing business and MUST NOT
+    //    upload their local seed data into someone else's workspace.
     const already = await isMigrated(u.id, biz.id);
-    if (isFreshBusiness && !already) {
+    if (isFreshBusiness && acceptedInvites === 0 && !already) {
       setMigration({ kind: "running", progress: { step: "Starting…", uploaded: 0, totalTables: 0, completedTables: 0 } });
       try {
         const result = await runMigration(u.id, biz.id, (p) => setMigration({ kind: "running", progress: p }));
