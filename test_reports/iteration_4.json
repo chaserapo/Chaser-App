@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend testing of Chemical Register overhaul + New Spray Job tank-mix. All 5 seeded chemicals render with correct coloured type badges, category filter chips work (Herbicide→3 items: Axial/Estercide/Roundup, Adjuvant→Hasten, Insecticide→Talstar), search by name ('glypho'→Roundup PowerMAX) and APVMA number ('58207'→Talstar) both work. Archived toggle switches lists correctly; Archive Product moves the item to Archived and Unarchive restores it. Chemical detail shows product name, type badge, AI, APVMA, group, manufacturer, current stock, default rate as '300 mL/ha' plus disclaimer 'HectareHQ never suggests application rates. This is your saved default.'. Add Chemical form has selectable product-type chips and requires product name. Add Product modal (add-product-btn) opens with search, filters by name/AI/APVMA, and adding a chemical closes the modal and inserts a product card. All rate-unit calculations verified with area=50 ha, water=100 L/ha: 1.5 L/ha→75 L, 400 mL/ha→20 L (auto mL→L), 200 g/ha→10 kg (auto g→kg), 100 mL/100 L→5 L, 0.5 L/100 L→25 L, 1 %v/v→50 L. Custom shows 'Custom unit label' input. Tank Capacity card for Big Rig (4500 L) shows Total 5000 L, ha/tank 45, Tanks 1 full + 500 L partial, and per-tank product amounts. Case 340 (no tank_capacity) correctly hides the Tank Capacity card. No React Native red-screen errors, no console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "records/new", "issues": ["Selecting a sprayer overwrites a user-entered water_rate with the sprayer's default_water_rate_lha, which can silently change tank-capacity math after the user has entered a value. Consider only applying the default when the field is empty."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional UX polish: guard the machinery-default fill in /app/frontend/app/records/new.tsx so it does not overwrite water_rate the user has already typed (only fill when the field is empty)."
+  ],
+  "critical_code_review_comments": [
+    "filter-type-All chip uses lowercase testID ('filter-type-all') while other category chips use PascalCase ('filter-type-Herbicide'). Not a bug but inconsistent — consider unifying.",
+    "records/new.tsx is 616 lines; consider splitting the Add-Product modal and Tank-Capacity summary into small sub-components for maintainability."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100%"},
+  "seed_data_creation": "None. The app auto-seeds via seed key v5 on first load; 5 chemicals + 3 sprayers were present as expected.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Chemical Register at /chemicals, chemical detail at /chemicals/[id], New Spray Job at /records/new. Big Rig has 4500 L tank + default_water_rate_lha=80 which auto-fills when the sprayer chip is tapped — set area/water AFTER selecting sprayer if a specific water rate is required for tank-capacity math. Add Product modal test id: add-product-btn; picker search: picker-search; product row: spray-product-{idx}; unit chips: prod-unit-{idx}-{unit}. Archived chemicals are filtered from the picker via repo.chemicals.active().",
+  "rca_of_issue": "N/A — no bugs surfaced during this testing pass."
+}

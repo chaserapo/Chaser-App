@@ -4,9 +4,12 @@ import type {
   Farm,
   Paddock,
   Chemical,
+  ChemicalBatch,
   Machinery,
   Maintenance,
   SprayJob,
+  ExternalLink,
+  Operator,
 } from "./types";
 
 const KEYS = {
@@ -14,10 +17,14 @@ const KEYS = {
   farms: "as.farms",
   paddocks: "as.paddocks",
   chemicals: "as.chemicals",
+  chemical_batches: "as.chemical_batches",
   machinery: "as.machinery",
   maintenance: "as.maintenance",
   spray_jobs: "as.spray_jobs",
-  seeded: "as.seeded_v3",
+  links: "as.links",
+  operators: "as.operators",
+  seeded: "as.seeded_v5",
+  seeded_links: "as.seeded_links_v1",
 } as const;
 
 async function readList<T>(key: string): Promise<T[]> {
@@ -69,6 +76,7 @@ export const repo = {
   },
   chemicals: {
     list: () => readList<Chemical>(KEYS.chemicals),
+    active: async () => (await readList<Chemical>(KEYS.chemicals)).filter((c) => !c.archived_at),
     save: async (c: Chemical) => {
       const list = await readList<Chemical>(KEYS.chemicals);
       const idx = list.findIndex((x) => x.id === c.id);
@@ -81,6 +89,21 @@ export const repo = {
       await writeList(KEYS.chemicals, list);
     },
     get: async (id: string) => (await readList<Chemical>(KEYS.chemicals)).find((c) => c.id === id) ?? null,
+  },
+  chemicalBatches: {
+    list: () => readList<ChemicalBatch>(KEYS.chemical_batches),
+    forChemical: async (chemId: string) => (await readList<ChemicalBatch>(KEYS.chemical_batches)).filter((b) => b.chemical_id === chemId),
+    save: async (b: ChemicalBatch) => {
+      const list = await readList<ChemicalBatch>(KEYS.chemical_batches);
+      const idx = list.findIndex((x) => x.id === b.id);
+      if (idx >= 0) list[idx] = b;
+      else list.push(b);
+      await writeList(KEYS.chemical_batches, list);
+    },
+    remove: async (id: string) => {
+      const list = (await readList<ChemicalBatch>(KEYS.chemical_batches)).filter((x) => x.id !== id);
+      await writeList(KEYS.chemical_batches, list);
+    },
   },
   machinery: {
     list: () => readList<Machinery>(KEYS.machinery),
@@ -135,6 +158,44 @@ export const repo = {
   },
   async markSeeded() {
     await AsyncStorage.setItem(KEYS.seeded, "1");
+  },
+  async isLinksSeeded(): Promise<boolean> {
+    return (await AsyncStorage.getItem(KEYS.seeded_links)) === "1";
+  },
+  async markLinksSeeded() {
+    await AsyncStorage.setItem(KEYS.seeded_links, "1");
+  },
+  links: {
+    list: () => readList<ExternalLink>(KEYS.links),
+    save: async (l: ExternalLink) => {
+      const list = await readList<ExternalLink>(KEYS.links);
+      const idx = list.findIndex((x) => x.id === l.id);
+      if (idx >= 0) list[idx] = l;
+      else list.push(l);
+      await writeList(KEYS.links, list);
+    },
+    remove: async (id: string) => {
+      const list = (await readList<ExternalLink>(KEYS.links)).filter((x) => x.id !== id);
+      await writeList(KEYS.links, list);
+    },
+    get: async (id: string) => (await readList<ExternalLink>(KEYS.links)).find((l) => l.id === id) ?? null,
+    saveAll: async (list: ExternalLink[]) => writeList(KEYS.links, list),
+  },
+  operators: {
+    list: () => readList<Operator>(KEYS.operators),
+    active: async () => (await readList<Operator>(KEYS.operators)).filter((o) => !o.archived_at),
+    defaultUser: async () => (await readList<Operator>(KEYS.operators)).find((o) => o.is_default_user && !o.archived_at) ?? null,
+    save: async (o: Operator) => {
+      const list = await readList<Operator>(KEYS.operators);
+      const idx = list.findIndex((x) => x.id === o.id);
+      if (idx >= 0) list[idx] = o;
+      else list.push(o);
+      await writeList(KEYS.operators, list);
+    },
+    remove: async (id: string) => {
+      const list = (await readList<Operator>(KEYS.operators)).filter((x) => x.id !== id);
+      await writeList(KEYS.operators, list);
+    },
   },
   async clearAll() {
     await AsyncStorage.multiRemove(Object.values(KEYS));

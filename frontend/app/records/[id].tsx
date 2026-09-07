@@ -159,7 +159,7 @@ export default function RecordDetail() {
             <Card key={p.id} style={{ marginBottom: spacing.sm }}>
               <Text style={styles.prodName}>{p.chemical_name}</Text>
               <Text style={styles.prodMeta}>Rate: {p.rate} {p.unit}</Text>
-              {p.total_qty != null ? <Text style={styles.prodMeta}>Total: {p.total_qty.toFixed(2)} {p.unit === "%v/v" ? "L water" : p.unit.replace("/ha", "")}</Text> : null}
+              {p.total_qty != null ? <Text style={styles.prodMeta}>Total: {p.total_qty.toFixed(2)} {p.total_qty_unit ?? (p.unit === "%v/v" ? "L water" : p.unit.replace("/ha", ""))}</Text> : null}
             </Card>
           ))
         )}

@@ -31,21 +31,51 @@ export type Paddock = {
   created_at: string;
 };
 
+export type ChemicalCategory = "Herbicide" | "Fungicide" | "Insecticide" | "Adjuvant" | "Fertiliser" | "Other";
+export const CHEMICAL_CATEGORIES: ChemicalCategory[] = ["Herbicide", "Fungicide", "Insecticide", "Adjuvant", "Fertiliser", "Other"];
+
 export type Chemical = {
   id: ID;
   business_id: ID;
   product_name: string;
+  product_type?: ChemicalCategory;
   active_ingredient?: string;
   apvma_number?: string;
   chemical_group?: string;
   formulation?: string;
+  manufacturer?: string;
   default_rate?: number;
   default_unit?: RateUnit;
   pack_size?: string;
   stock_qty?: number;
+  stock_unit?: string;
+  storage_location?: string;
   label_url?: string;
   sds_url?: string;
   notes?: string;
+  archived_at?: string;
+  created_at: string;
+};
+
+export type ChemicalBatch = {
+  id: ID;
+  business_id: ID;
+  chemical_id: ID;
+  batch_number?: string;
+  quantity?: number;
+  unit?: string;
+  purchase_date?: string;
+  expiry_date?: string;
+  notes?: string;
+  created_at: string;
+};
+
+export type Operator = {
+  id: ID;
+  business_id: ID;
+  name: string;
+  is_default_user?: boolean;
+  archived_at?: string;
   created_at: string;
 };
 
@@ -61,6 +91,13 @@ export type Machinery = {
   current_hours?: number;
   purchase_date?: string;
   notes?: string;
+  tank_capacity_l?: number;
+  boom_width_m?: number;
+  nozzle_spacing_m?: number;
+  nozzle_positions?: number;
+  default_nozzle?: string;
+  default_speed_kmh?: number;
+  default_water_rate_lha?: number;
   created_at: string;
 };
 
@@ -81,7 +118,8 @@ export type Maintenance = {
   created_at: string;
 };
 
-export type RateUnit = "L/ha" | "mL/ha" | "kg/ha" | "g/ha" | "%v/v";
+export type RateUnit = "L/ha" | "mL/ha" | "kg/ha" | "g/ha" | "mL/100 L" | "L/100 L" | "%v/v" | "Custom";
+export const RATE_UNITS: RateUnit[] = ["L/ha", "mL/ha", "kg/ha", "g/ha", "mL/100 L", "L/100 L", "%v/v", "Custom"];
 
 export type SprayJobProduct = {
   id: ID;
@@ -89,7 +127,9 @@ export type SprayJobProduct = {
   chemical_name: string;
   rate: number;
   unit: RateUnit;
+  custom_unit_label?: string;
   total_qty?: number;
+  total_qty_unit?: string;
 };
 
 export type SprayJobStatus = "draft" | "active" | "completed";
@@ -103,10 +143,12 @@ export type SprayJob = {
   paddock_id?: ID;
   paddock_name?: string;
   crop?: string;
+  variety?: string;
   target?: string;
   date: string;
   start_time?: string;
   finish_time?: string;
+  operator_id?: ID;
   operator?: string;
   machinery_id?: ID;
   machinery_name?: string;
@@ -124,6 +166,12 @@ export type SprayJob = {
   wind_speed?: number;
   wind_direction?: string;
   weather_captured_at?: string;
+  temperature_c_auto?: number;
+  humidity_auto?: number;
+  delta_t_auto?: number;
+  wind_speed_auto?: number;
+  wind_direction_auto?: string;
+  weather_edited?: boolean;
   gps_lat?: number;
   gps_lon?: number;
   finish_temperature_c?: number;
@@ -139,8 +187,11 @@ export type SprayJob = {
 };
 
 export type ExternalLink = {
+  id: ID;
+  business_id: ID;
   category: string;
   name: string;
   url: string;
   description?: string;
+  created_at: string;
 };

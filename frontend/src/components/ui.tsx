@@ -105,6 +105,7 @@ export function Input({
   suffix,
   testID,
   multiline,
+  error,
 }: {
   label?: string;
   value: string;
@@ -114,12 +115,13 @@ export function Input({
   suffix?: string;
   testID?: string;
   multiline?: boolean;
+  error?: boolean;
 }) {
   const { TextInput } = require("react-native");
   return (
     <View style={styles.inputWrap}>
-      {label ? <Text style={styles.inputLabel}>{label}</Text> : null}
-      <View style={[styles.inputBox, multiline && { minHeight: 88, alignItems: "flex-start" }]}>
+      {label ? <Text style={[styles.inputLabel, error && { color: colors.error }]}>{label}{error ? " *" : ""}</Text> : null}
+      <View style={[styles.inputBox, multiline && { minHeight: 88, alignItems: "flex-start" }, error && { borderColor: colors.error, borderWidth: 1.5 }]}>
         <TextInput
           testID={testID}
           value={value}

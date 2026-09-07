@@ -1,6 +1,7 @@
 import { v4 as uuid } from "uuid";
 import { repo } from "./storage";
-import type { Business, Farm, Paddock, Chemical, Machinery, Maintenance, SprayJob } from "./types";
+import { seedLinksIfNeeded } from "./links";
+import type { Business, Farm, Paddock, Chemical, Machinery, Maintenance, SprayJob, Operator } from "./types";
 
 const nowIso = () => new Date().toISOString();
 const daysAgo = (n: number) => {
@@ -10,7 +11,10 @@ const daysAgo = (n: number) => {
 };
 
 export async function seedIfNeeded() {
-  if (await repo.isSeeded()) return;
+  if (await repo.isSeeded()) {
+    await seedLinksIfNeeded();
+    return;
+  }
 
   const business: Business = {
     id: uuid(),
@@ -26,24 +30,26 @@ export async function seedIfNeeded() {
   await repo.farms.save(farm2);
 
   const paddocks: Paddock[] = [
-    { id: uuid(), business_id: bid, farm_id: farm1.id, name: "North 40", area_ha: 42, crop: "Wheat", created_at: nowIso() },
-    { id: uuid(), business_id: bid, farm_id: farm1.id, name: "South Ridge", area_ha: 68, crop: "Canola", created_at: nowIso() },
-    { id: uuid(), business_id: bid, farm_id: farm1.id, name: "Homestead", area_ha: 25, crop: "Barley", created_at: nowIso() },
-    { id: uuid(), business_id: bid, farm_id: farm2.id, name: "River Flat", area_ha: 120, crop: "Wheat", created_at: nowIso() },
-    { id: uuid(), business_id: bid, farm_id: farm2.id, name: "Boundary", area_ha: 55, crop: "Lupins", created_at: nowIso() },
+    { id: uuid(), business_id: bid, farm_id: farm1.id, name: "North 40", area_ha: 42, crop: "Wheat", variety: "Scepter", created_at: nowIso() },
+    { id: uuid(), business_id: bid, farm_id: farm1.id, name: "South Ridge", area_ha: 68, crop: "Canola", variety: "43Y92 CL", created_at: nowIso() },
+    { id: uuid(), business_id: bid, farm_id: farm1.id, name: "Homestead", area_ha: 25, crop: "Barley", variety: "RGT Planet", created_at: nowIso() },
+    { id: uuid(), business_id: bid, farm_id: farm2.id, name: "River Flat", area_ha: 120, crop: "Wheat", variety: "Scepter", created_at: nowIso() },
+    { id: uuid(), business_id: bid, farm_id: farm2.id, name: "Boundary", area_ha: 55, crop: "Lupins", variety: "Mandelup", created_at: nowIso() },
   ];
   for (const p of paddocks) await repo.paddocks.save(p);
 
   const chemicals: Chemical[] = [
     {
       id: uuid(), business_id: bid,
-      product_name: "Roundup PowerMAX",
+      product_name: "Roundup PowerMAX", product_type: "Herbicide",
       active_ingredient: "Glyphosate 540 g/L (potassium salt)",
       apvma_number: "62506",
       chemical_group: "M (Glycines)",
       formulation: "Soluble concentrate",
+      manufacturer: "Bayer",
       default_rate: 1.5, default_unit: "L/ha",
-      pack_size: "20 L", stock_qty: 4,
+      pack_size: "20 L", stock_qty: 4, stock_unit: "packs",
+      storage_location: "Chem shed A",
       label_url: "https://portal.apvma.gov.au/pubcris",
       sds_url: "",
       notes: "Non-selective knockdown herbicide.",
@@ -51,49 +57,54 @@ export async function seedIfNeeded() {
     },
     {
       id: uuid(), business_id: bid,
-      product_name: "Estercide Xtra 680",
+      product_name: "Estercide Xtra 680", product_type: "Herbicide",
       active_ingredient: "2,4-D ester 680 g/L",
       apvma_number: "63536",
       chemical_group: "4 (Phenoxy)",
       formulation: "Emulsifiable concentrate",
+      manufacturer: "Nufarm",
       default_rate: 700, default_unit: "mL/ha",
-      pack_size: "20 L", stock_qty: 2,
+      pack_size: "20 L", stock_qty: 2, stock_unit: "packs",
+      storage_location: "Chem shed A",
       notes: "Broadleaf herbicide. Observe temperature inversions.",
       created_at: nowIso(),
     },
     {
       id: uuid(), business_id: bid,
-      product_name: "Axial",
+      product_name: "Axial", product_type: "Herbicide",
       active_ingredient: "Pinoxaden 100 g/L",
       apvma_number: "63151",
       chemical_group: "1 (ACCase)",
       formulation: "Emulsifiable concentrate",
+      manufacturer: "Syngenta",
       default_rate: 300, default_unit: "mL/ha",
-      pack_size: "10 L", stock_qty: 1,
+      pack_size: "10 L", stock_qty: 1, stock_unit: "packs",
       notes: "Selective grass herbicide in wheat & barley.",
       created_at: nowIso(),
     },
     {
       id: uuid(), business_id: bid,
-      product_name: "Talstar 250 EC",
+      product_name: "Talstar 250 EC", product_type: "Insecticide",
       active_ingredient: "Bifenthrin 250 g/L",
       apvma_number: "58207",
       chemical_group: "3A (Pyrethroid)",
       formulation: "Emulsifiable concentrate",
+      manufacturer: "FMC",
       default_rate: 40, default_unit: "mL/ha",
-      pack_size: "5 L", stock_qty: 3,
+      pack_size: "5 L", stock_qty: 3, stock_unit: "packs",
       notes: "Insecticide for RLEM, aphids.",
       created_at: nowIso(),
     },
     {
       id: uuid(), business_id: bid,
-      product_name: "Hasten Spray Adjuvant",
+      product_name: "Hasten Spray Adjuvant", product_type: "Adjuvant",
       active_ingredient: "Ethyl and methyl esters 704 g/L",
       apvma_number: "50387",
       chemical_group: "Adjuvant",
       formulation: "Oil",
+      manufacturer: "Victorian Chemicals",
       default_rate: 1, default_unit: "%v/v",
-      pack_size: "20 L", stock_qty: 6,
+      pack_size: "20 L", stock_qty: 6, stock_unit: "packs",
       notes: "Oil-based adjuvant.",
       created_at: nowIso(),
     },
@@ -105,6 +116,8 @@ export async function seedIfNeeded() {
     name: "Big Rig", make: "John Deere", model: "R4045", year: 2020,
     serial_number: "JD-R4045-8821", registration: "AGRI-01",
     current_hours: 2380, purchase_date: "2020-05-14",
+    tank_capacity_l: 4500, boom_width_m: 36, nozzle_spacing_m: 0.5, nozzle_positions: 72,
+    default_nozzle: "AIXR 110-02", default_speed_kmh: 22, default_water_rate_lha: 80,
     notes: "Self-propelled sprayer, 36m boom.",
     created_at: nowIso(),
   };
@@ -121,10 +134,19 @@ export async function seedIfNeeded() {
     name: "Hardi Commander", make: "Hardi", model: "Commander 6600", year: 2016,
     serial_number: "HC-6600-2210",
     current_hours: 1980,
+    tank_capacity_l: 6600, boom_width_m: 30, nozzle_spacing_m: 0.5, nozzle_positions: 60,
+    default_nozzle: "TT 110-03", default_speed_kmh: 18, default_water_rate_lha: 100,
     notes: "Trailing boom sprayer, 30m.",
     created_at: nowIso(),
   };
   for (const m of [m1, m2, m3]) await repo.machinery.save(m);
+
+  const operators: Operator[] = [
+    { id: uuid(), business_id: bid, name: "You (Manager)", is_default_user: true, created_at: nowIso() },
+    { id: uuid(), business_id: bid, name: "Sam", created_at: nowIso() },
+    { id: uuid(), business_id: bid, name: "Jess", created_at: nowIso() },
+  ];
+  for (const o of operators) await repo.operators.save(o);
 
   const maints: Maintenance[] = [
     {
@@ -203,4 +225,5 @@ export async function seedIfNeeded() {
   await repo.sprayJobs.save(j2);
 
   await repo.markSeeded();
+  await seedLinksIfNeeded();
 }

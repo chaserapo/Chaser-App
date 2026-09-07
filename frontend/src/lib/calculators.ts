@@ -91,6 +91,55 @@ export function tankMix(
   return { ha_per_tank, products: out };
 }
 
+// Product-total calculations across all supported rate units, with auto mL→L and g→kg normalisation.
+function normalise(amount: number, base: string): { amount: number; unit: string } {
+  if (base === "mL" && Math.abs(amount) >= 1000) return { amount: amount / 1000, unit: "L" };
+  if (base === "g" && Math.abs(amount) >= 1000) return { amount: amount / 1000, unit: "kg" };
+  return { amount, unit: base };
+}
+
+export function productTotalForJob(
+  rate: number,
+  unit: string,
+  area_ha: number,
+  water_rate_lha: number,
+  custom_label?: string,
+): { amount: number; unit: string } {
+  const sprayVolume = area_ha * water_rate_lha;
+  switch (unit) {
+    case "L/ha": return normalise(rate * area_ha, "L");
+    case "mL/ha": return normalise(rate * area_ha, "mL");
+    case "kg/ha": return normalise(rate * area_ha, "kg");
+    case "g/ha": return normalise(rate * area_ha, "g");
+    case "mL/100 L": return normalise((rate * sprayVolume) / 100, "mL");
+    case "L/100 L": return normalise((rate * sprayVolume) / 100, "L");
+    case "%v/v": return normalise((rate * sprayVolume) / 100, "L");
+    case "Custom": return { amount: rate * area_ha, unit: custom_label ?? "unit" };
+    default: return { amount: rate * area_ha, unit: unit.replace("/ha", "") };
+  }
+}
+
+export function productPerTank(
+  rate: number,
+  unit: string,
+  tank_capacity_l: number,
+  water_rate_lha: number,
+  custom_label?: string,
+): { amount: number; unit: string } {
+  const haPerTank = water_rate_lha > 0 ? tank_capacity_l / water_rate_lha : 0;
+  switch (unit) {
+    case "L/ha": return normalise(rate * haPerTank, "L");
+    case "mL/ha": return normalise(rate * haPerTank, "mL");
+    case "kg/ha": return normalise(rate * haPerTank, "kg");
+    case "g/ha": return normalise(rate * haPerTank, "g");
+    case "mL/100 L": return normalise((rate * tank_capacity_l) / 100, "mL");
+    case "L/100 L": return normalise((rate * tank_capacity_l) / 100, "L");
+    case "%v/v": return normalise((rate * tank_capacity_l) / 100, "L");
+    case "Custom": return { amount: rate * haPerTank, unit: custom_label ?? "unit" };
+    default: return { amount: rate * haPerTank, unit: unit.replace("/ha", "") };
+  }
+}
+
 export function fmt(n: number, decimals = 2): string {
   if (n == null || isNaN(n) || !isFinite(n)) return "0";
   return Number(n.toFixed(decimals)).toString();

@@ -127,7 +127,7 @@ export default function ActiveJob() {
             job.products.map((p) => (
               <Card key={p.id} style={{ marginBottom: spacing.sm }}>
                 <Text style={styles.pName}>{p.chemical_name}</Text>
-                <Text style={styles.pMeta}>Rate: {p.rate} {p.unit}{p.total_qty ? ` · Total: ${p.total_qty.toFixed(2)} ${p.unit === "%v/v" ? "L water" : p.unit.replace("/ha", "")}` : ""}</Text>
+                <Text style={styles.pMeta}>Rate: {p.rate} {p.unit}{p.total_qty ? ` · Total: ${p.total_qty.toFixed(2)} ${p.total_qty_unit ?? (p.unit === "%v/v" ? "L water" : p.unit.replace("/ha", ""))}` : ""}</Text>
               </Card>
             ))
           )}

@@ -20,7 +20,7 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: ({ color, size }) => <Icon name="home-variant" size={size} color={color} /> }} />
       <Tabs.Screen name="spray" options={{ title: "Spray", tabBarIcon: ({ color, size }) => <Icon name="sprinkler-variant" size={size} color={color} /> }} />
-      <Tabs.Screen name="records" options={{ title: "Records", tabBarIcon: ({ color, size }) => <Icon name="clipboard-text-outline" size={size} color={color} /> }} />
+      <Tabs.Screen name="chemicals" options={{ title: "Chemicals", tabBarIcon: ({ color, size }) => <Icon name="flask-outline" size={size} color={color} /> }} />
       <Tabs.Screen name="machinery" options={{ title: "Machinery", tabBarIcon: ({ color, size }) => <Icon name="tractor-variant" size={size} color={color} /> }} />
       <Tabs.Screen name="more" options={{ title: "More", tabBarIcon: ({ color, size }) => <Icon name="dots-horizontal" size={size} color={color} /> }} />
     </Tabs>

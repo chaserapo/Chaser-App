@@ -163,7 +163,7 @@ export default function Home() {
 
         <SectionTitle
           testID="recent-records-title"
-          action={<Pressable onPress={() => router.push("/(tabs)/records")}><Text style={styles.linkText}>See all</Text></Pressable>}
+          action={<Pressable onPress={() => router.push("/records")}><Text style={styles.linkText}>See all</Text></Pressable>}
         >
           Recent Spray Records
         </SectionTitle>
