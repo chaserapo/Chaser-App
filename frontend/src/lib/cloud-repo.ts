@@ -22,7 +22,7 @@ async function softDelete(table: string, id: string) {
 
 async function upsertRow<T extends { id: string }>(table: string, row: T) {
   const payload: any = { ...row, business_id: bid(), deleted_at: null };
-  const { error } = await supabase.from(table).upsert(payload, { onConflict: "id" });
+  const { error } = await supabase.from(table).upsert(payload, { onConflict: "id", defaultToNull: false });
   if (error) throw error;
 }
 
@@ -57,7 +57,7 @@ async function saveSprayJob(job: SprayJob) {
     total_qty_unit: p.total_qty_unit ?? null,
   }));
   if (productRows.length > 0) {
-    const { error } = await supabase.from("spray_job_products").upsert(productRows, { onConflict: "id" });
+    const { error } = await supabase.from("spray_job_products").upsert(productRows, { onConflict: "id", defaultToNull: false });
     if (error) throw error;
   }
   // Delete any products for this job that are no longer in the list (hard delete — child table)
@@ -205,7 +205,7 @@ export const cloudRepo = {
       return rows.map(completionFromDb).sort((a, b) => b.date.localeCompare(a.date));
     },
     save: async (c: MaintenanceCompletion) => {
-      const { error } = await supabase.from("maintenance_completions").upsert(completionToDb(c), { onConflict: "id" });
+      const { error } = await supabase.from("maintenance_completions").upsert(completionToDb(c), { onConflict: "id", defaultToNull: false });
       if (error) throw error;
     },
     remove: (id: string) => softDelete("maintenance_completions", id),

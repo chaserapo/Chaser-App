@@ -32,7 +32,9 @@ async function upsertBatch(table: string, rows: any[]) {
   if (rows.length === 0) return;
   for (let i = 0; i < rows.length; i += 250) {
     const chunk = rows.slice(i, i + 250);
-    const { error } = await supabase.from(table).upsert(chunk, { onConflict: "id" });
+    // defaultToNull:false tells PostgREST to use column defaults for missing fields
+    // instead of substituting nulls when batch rows have different key sets.
+    const { error } = await supabase.from(table).upsert(chunk, { onConflict: "id", defaultToNull: false });
     if (error) throw new Error(`${table}: ${error.message}`);
   }
 }
