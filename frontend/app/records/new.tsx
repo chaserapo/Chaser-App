@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Pressable, Modal, TextInput, FlatList } from "react-native";
+import { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Pressable, Modal, TextInput, FlatList, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { v4 as uuid } from "uuid";
@@ -15,6 +15,17 @@ import { RATE_UNITS } from "@/src/lib/types";
 
 const UNITS: RateUnit[] = RATE_UNITS;
 const REQUIRED = ["farm_id", "paddock_id", "operator_id", "machinery_id", "area_ha", "water_rate"] as const;
+
+// Dedupe list by display name (guards against legacy re-seeded duplicates).
+function uniqueByName<T extends { name: string }>(list: T[]): T[] {
+  const seen = new Set<string>();
+  return list.filter((x) => {
+    const k = x.name.trim().toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
 
 export default function NewSprayJob() {
   const insets = useSafeAreaInsets();
@@ -83,7 +94,7 @@ export default function NewSprayJob() {
         speed_kmh: draft.speed_kmh?.toString() ?? "",
         boom_width_m: draft.boom_width_m?.toString() ?? "",
         nozzle_type: draft.nozzle_type ?? "",
-        nozzle_spacing_m: draft.nozzle_spacing_m?.toString() ?? "",
+        nozzle_spacing_m: draft.nozzle_spacing_m != null ? (draft.nozzle_spacing_m * 1000).toString() : "",
         pressure: draft.pressure?.toString() ?? "3",
         start_time: draft.start_time ?? s.start_time,
         notes: draft.notes ?? "",
@@ -147,7 +158,7 @@ export default function NewSprayJob() {
       ...s,
       machinery_id: m.id, machinery_name: m.name,
       boom_width_m: m.boom_width_m != null ? m.boom_width_m.toString() : s.boom_width_m,
-      nozzle_spacing_m: m.nozzle_spacing_m != null ? m.nozzle_spacing_m.toString() : s.nozzle_spacing_m,
+      nozzle_spacing_m: m.nozzle_spacing_m != null ? (m.nozzle_spacing_m * 1000).toString() : s.nozzle_spacing_m,
       nozzle_type: m.default_nozzle ?? s.nozzle_type,
       speed_kmh: m.default_speed_kmh != null ? m.default_speed_kmh.toString() : s.speed_kmh,
       water_rate: m.default_water_rate_lha != null ? m.default_water_rate_lha.toString() : s.water_rate,
@@ -169,7 +180,10 @@ export default function NewSprayJob() {
   }
   function removeProduct(id: string) { setProducts((ps) => ps.filter((p) => p.id !== id)); }
 
-  const farmPaddocks = paddocks.filter((p) => p.farm_id === f.farm_id);
+  const farmPaddocks = uniqueByName(paddocks.filter((p) => p.farm_id === f.farm_id));
+  const uniqueFarms = uniqueByName(farms);
+  const uniqueOperators = uniqueByName(operators);
+  const uniqueMachs = uniqueByName(machs);
   const filteredChems = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
     if (!q) return chems;
@@ -184,12 +198,14 @@ export default function NewSprayJob() {
   const calc = useMemo(() => {
     const rate = parseFloat(f.water_rate) || 0;
     const speed = parseFloat(f.speed_kmh) || 0;
-    const spacing = parseFloat(f.nozzle_spacing_m) || 0;
+    const spacingMm = parseFloat(f.nozzle_spacing_m) || 0;
+    const spacingM = spacingMm / 1000;
     const boom = parseFloat(f.boom_width_m) || 0;
-    const nozzle = nozzleFlowLpm(rate, speed, spacing);
-    const nn = numNozzles(boom, spacing);
-    return { nozzle, nn, total: nozzle * nn };
-  }, [f.water_rate, f.speed_kmh, f.nozzle_spacing_m, f.boom_width_m]);
+    const nozzle = spacingM > 0 ? nozzleFlowLpm(rate, speed, spacingM) : 0;
+    const selectedMach = machs.find((m) => m.id === f.machinery_id);
+    const activeN = selectedMach?.nozzle_positions ?? (spacingM > 0 ? Math.round(boom / spacingM) : 0);
+    return { nozzle, nn: activeN, total: nozzle * activeN };
+  }, [f.water_rate, f.speed_kmh, f.nozzle_spacing_m, f.boom_width_m, f.machinery_id, machs]);
 
   function missing(field: (typeof REQUIRED)[number]): boolean {
     const v = (f as any)[field];
@@ -214,7 +230,7 @@ export default function NewSprayJob() {
       speed_kmh: parseFloat(f.speed_kmh) || undefined,
       boom_width_m: parseFloat(f.boom_width_m) || undefined,
       nozzle_type: f.nozzle_type || undefined,
-      nozzle_spacing_m: parseFloat(f.nozzle_spacing_m) || undefined,
+      nozzle_spacing_m: f.nozzle_spacing_m ? parseFloat(f.nozzle_spacing_m) / 1000 : undefined,
       pressure: parseFloat(f.pressure) || undefined,
       temperature_c: parseFloat(f.temperature_c) || undefined,
       humidity: parseFloat(f.humidity) || undefined,
@@ -305,7 +321,7 @@ export default function NewSprayJob() {
               </View>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                {farms.map((fa) => (
+                {uniqueFarms.map((fa) => (
                   <Chip key={fa.id} label={fa.name} active={f.farm_id === fa.id} onPress={() => pickFarm(fa)} testID={`farm-chip-${fa.id}`} />
                 ))}
               </ScrollView>
@@ -345,7 +361,7 @@ export default function NewSprayJob() {
               <Text style={styles.emptyText}>No operators saved yet. Go to More → Farms & Paddocks structure to add one later.</Text>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                {operators.map((o) => (
+                {uniqueOperators.map((o) => (
                   <Chip
                     key={o.id}
                     label={o.name + (o.is_default_user ? " · you" : "")}
@@ -362,7 +378,7 @@ export default function NewSprayJob() {
           <Card style={missing("machinery_id") ? styles.errorCard : undefined}>
             <Text style={[styles.pickerLabel, missing("machinery_id") && { color: colors.error }]}>Machine / sprayer*</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              {machs.map((m) => (
+              {uniqueMachs.map((m) => (
                 <Chip key={m.id} label={m.name} active={f.machinery_id === m.id} onPress={() => pickMachine(m)} testID={`mach-chip-${m.id}`} />
               ))}
             </ScrollView>
@@ -383,7 +399,7 @@ export default function NewSprayJob() {
             </View>
             <View style={{ flexDirection: "row", gap: 8 }}>
               <View style={{ flex: 1 }}><Input label="Nozzle" value={f.nozzle_type} onChangeText={(v) => setF({ ...f, nozzle_type: v })} testID="input-nozzle" /></View>
-              <View style={{ flex: 1 }}><Input label="Nozzle spacing" value={f.nozzle_spacing_m} onChangeText={(v) => setF({ ...f, nozzle_spacing_m: v })} keyboardType="decimal-pad" suffix="m" testID="input-spacing" /></View>
+              <View style={{ flex: 1 }}><Input label="Nozzle spacing" value={f.nozzle_spacing_m} onChangeText={(v) => setF({ ...f, nozzle_spacing_m: v })} keyboardType="decimal-pad" suffix="mm" testID="input-spacing" /></View>
             </View>
             <Input label="Start time" value={f.start_time} onChangeText={(v) => setF({ ...f, start_time: v })} testID="input-start" />
           </Card>
@@ -546,7 +562,31 @@ export default function NewSprayJob() {
             data={filteredChems}
             keyExtractor={(c) => c.id}
             contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}
-            ListEmptyComponent={<Text style={styles.emptyProducts}>No matching products in your Chemical Register.</Text>}
+            ListEmptyComponent={
+              <View style={{ paddingVertical: spacing.lg, alignItems: "center" }}>
+                <Icon name="magnify-close" size={40} color={colors.muted} />
+                <Text style={[styles.emptyProducts, { textAlign: "center", marginTop: 8 }]}>No matching products in your Chemical Register.</Text>
+                <View style={{ height: spacing.md, alignSelf: "stretch" }} />
+                <View style={{ alignSelf: "stretch", gap: spacing.sm }}>
+                  <Button
+                    title="Add New Chemical"
+                    icon="plus"
+                    onPress={() => { setShowPicker(false); setPickerQuery(""); router.push("/chemicals/new"); }}
+                    testID="picker-add-new-chem"
+                  />
+                  <Button
+                    title="Search APVMA Register"
+                    icon="magnify"
+                    variant="outline"
+                    onPress={() => Linking.openURL(`https://portal.apvma.gov.au/pubcris?query=${encodeURIComponent(pickerQuery)}`)}
+                    testID="picker-apvma-search"
+                  />
+                </View>
+                <Text style={{ fontSize: 11, color: colors.muted, fontStyle: "italic", marginTop: spacing.md, textAlign: "center", paddingHorizontal: 12 }}>
+                  Live APVMA lookup is on the roadmap. HectareHQ never fabricates product information.
+                </Text>
+              </View>
+            }
             renderItem={({ item }) => (
               <Pressable onPress={() => addProduct(item)} testID={`picker-chem-${item.id}`} style={({ pressed }) => [styles.pickerRow, pressed && { backgroundColor: colors.surfaceTertiary }]}>
                 <View style={styles.pickerIconBox}><Icon name="flask-outline" size={20} color={colors.brandPrimary} /></View>

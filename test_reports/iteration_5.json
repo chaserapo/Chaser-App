@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only test of New Spray Job fixes on /records/new. All 15 requested test cases PASS. Nozzle spacing input suffix is 'mm', Big Rig auto-fills spacing=500 mm (from 0.5 m), live calc converts mm→m correctly (nozzle flow 1.33 L/min at water=80/speed=20/spacing=500, active nozzles use machine.nozzle_positions override where set — Big Rig=72, Hardi Commander=60, boom 30 fallback = boom/spacing), total boom flow correct (Big Rig=96, Hardi=80). Values render at ≤2 dp via fmt(). Farm/Operator/Machinery chip rows dedupe by name — verified even after injecting duplicate entries directly into AsyncStorage (6 operators/4 farms rendered as 3/2). Add Product modal empty state renders icon, 'No matching products in your Chemical Register.', 'Add New Chemical' (routes to /chemicals/new — verified), 'Search APVMA Register' (button present, uses Linking.openURL('https://portal.apvma.gov.au/pubcris?query=...') — no crash), plus the roadmap italic note. Tank-mix product totals preserved: 1.5 L/ha × 100 ha = 150 L; 700 mL/ha × 100 ha = 70 L (auto mL→L). Saving a draft persists nozzle_spacing_m as 0.5 (metres) when user typed 500 in the mm input. No React Native red screen. No deprecated Expo packages detected in touched files.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_5.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "records/new.tsx is 655 lines — approaching the 700-line threshold. Consider splitting the Add-Product modal, weather card and tank-capacity block into smaller components for maintainability.",
+    "The unused import `numNozzles` from calculators.ts is imported in new.tsx (line 12) but the computation is inlined via `Math.round(boom / spacingM)`. Either use numNozzles or drop the import.",
+    "In pickMachine, existing `s.nozzle_spacing_m` is treated as raw mm from the form, while `m.nozzle_spacing_m * 1000` converts metres to mm — logic is correct but the field name conflates units. A rename like `nozzle_spacing_mm` in the local form state would prevent future regressions.",
+    "Saving a draft triggers router.back() which produced a 'GO_BACK action was not handled' toast when the New Spray Job screen is opened via a deep link (no back stack). Consider router.replace('/records') as a fallback."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (not tested per request)", "frontend": "100%" },
+  "seed_data_creation": "None — used the app's built-in seed. Injected temporary duplicate farms/operators into localStorage to validate uniqueByName dedup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 5 Spray Job bug fixes verified end-to-end via the public URL. Big Rig has nozzle_positions=72, Hardi Commander=60. Nozzle spacing UI uses mm, storage uses metres (÷1000). uniqueByName() dedupes farms/operators/machinery client-side. Empty-state testIDs: picker-add-new-chem, picker-apvma-search. Live calc testID: live-calc-card."
+}
