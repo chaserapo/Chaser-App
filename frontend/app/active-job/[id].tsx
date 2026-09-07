@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
@@ -8,6 +8,8 @@ import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { fetchWeather } from "@/src/lib/weather";
+import { previewDeductions, applyDeductions, DeductionPreview } from "@/src/lib/stock";
+import { productTotalForJob } from "@/src/lib/calculators";
 import type { SprayJob } from "@/src/lib/types";
 
 function formatElapsed(ms: number) {
@@ -30,6 +32,8 @@ export default function ActiveJob() {
   const [finishNotes, setFinishNotes] = useState("");
   const [finishWeather, setFinishWeather] = useState<{ t?: string; h?: string; dt?: string; ws?: string; wd?: string; at?: string }>({});
   const [capturingFinishWx, setCapturingFinishWx] = useState(false);
+  const [deductStock, setDeductStock] = useState(true);
+  const [previews, setPreviews] = useState<DeductionPreview[]>([]);
 
   useFocusEffect(useCallback(() => { if (id) repo.sprayJobs.get(id as string).then((j) => { setJob(j); if (j?.area_ha) setActualHa(j.area_ha.toString()); }); }, [id]));
 
@@ -62,6 +66,20 @@ export default function ActiveJob() {
       });
     } catch (e) { console.warn(e); }
     finally { setCapturingFinishWx(false); setFinishMode(true); }
+    // Compute deduction preview based on current job products + actualHa (or planned area)
+    if (job) {
+      const area = parseFloat(actualHa) || job.area_ha || 0;
+      const water = job.water_rate || 0;
+      const withTotals: SprayJob = {
+        ...job,
+        products: job.products.map((p) => {
+          const t = productTotalForJob(p.rate, p.unit, area, water, p.custom_unit_label);
+          return { ...p, total_qty: area > 0 ? t.amount : undefined, total_qty_unit: area > 0 ? t.unit : undefined };
+        }),
+      };
+      const preview = await previewDeductions(withTotals);
+      setPreviews(preview);
+    }
   }
 
   async function completeJob() {
@@ -81,6 +99,7 @@ export default function ActiveJob() {
       finish_weather_captured_at: finishWeather.at,
     };
     await repo.sprayJobs.save(completed);
+    if (deductStock) await applyDeductions(previews, completed.id);
     router.replace({ pathname: "/records/[id]", params: { id: completed.id } });
   }
 
@@ -171,6 +190,37 @@ export default function ActiveJob() {
                   <View style={{ flex: 1 }}><Input label="Wind" value={finishWeather.ws ?? ""} onChangeText={(v) => setFinishWeather({ ...finishWeather, ws: v })} keyboardType="decimal-pad" suffix="km/h" testID="finish-wind" /></View>
                   <View style={{ flex: 1 }}><Input label="Direction" value={finishWeather.wd ?? ""} onChangeText={(v) => setFinishWeather({ ...finishWeather, wd: v })} testID="finish-wind-dir" /></View>
                 </View>
+              </Card>
+
+              <View style={{ height: spacing.md }} />
+              <Text style={styles.section}>Stock deduction</Text>
+              <Card testID="deduction-card">
+                <Pressable onPress={() => setDeductStock((v) => !v)} style={{ flexDirection: "row", alignItems: "center", gap: 10 }} testID="toggle-deduct-stock">
+                  <View style={[{ width: 22, height: 22, borderRadius: 4, borderWidth: 2, borderColor: colors.brandPrimary, backgroundColor: deductStock ? colors.brandPrimary : "transparent", alignItems: "center", justifyContent: "center" }]}>
+                    {deductStock ? <Icon name="check" size={14} color={colors.onBrandPrimary} /> : null}
+                  </View>
+                  <Text style={{ flex: 1, fontSize: 14, fontWeight: "700", color: colors.onSurface }}>Deduct product usage from stock</Text>
+                </Pressable>
+                {deductStock && previews.length > 0 ? (
+                  <View style={{ marginTop: spacing.md, gap: 6 }}>
+                    {previews.map((p) => (
+                      <View key={p.chemical_id} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 4 }} testID={`ded-row-${p.chemical_id}`}>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.onSurface }} numberOfLines={1}>{p.chemical_name}</Text>
+                          {p.note ? <Text style={{ fontSize: 11, color: colors.muted, fontStyle: "italic" }}>{p.note}</Text> : (
+                            <Text style={{ fontSize: 11, color: colors.muted }}>{p.before.toFixed(2)} → {p.after.toFixed(2)} packs ({p.packs_used?.toFixed(2)} used)</Text>
+                          )}
+                        </View>
+                        {p.warning ? <View style={{ backgroundColor: colors.error, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}><Text style={{ color: colors.onError, fontSize: 10, fontWeight: "800" }}>UNDER 0</Text></View> : null}
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+                {previews.some((p) => p.warning) && deductStock ? (
+                  <Text style={{ marginTop: spacing.sm, fontSize: 12, color: colors.error, fontWeight: "700" }}>
+                    ⚠ At least one chemical will drop below zero. Save will still proceed — check stock or uncheck deduction.
+                  </Text>
+                ) : null}
               </Card>
 
               <View style={{ height: spacing.md }} />

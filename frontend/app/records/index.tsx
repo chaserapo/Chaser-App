@@ -7,6 +7,7 @@ import Icon from "@react-native-vector-icons/material-design-icons";
 import { Button, Card, Chip } from "@/src/components/ui";
 import { colors, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
+import { exportJobsCsv } from "@/src/lib/csv";
 import type { SprayJob, Farm, Paddock } from "@/src/lib/types";
 
 export default function Records() {
@@ -48,6 +49,9 @@ export default function Records() {
           <Text style={styles.title}>Spray Records</Text>
           <Text style={styles.sub}>{filtered.length} record{filtered.length === 1 ? "" : "s"}</Text>
         </View>
+        <Pressable onPress={async () => { const done = await repo.sprayJobs.completed(); await exportJobsCsv(done); }} style={styles.exportBtn} testID="export-csv-btn">
+          <Icon name="download-outline" size={18} color={colors.onSurface} />
+        </Pressable>
         <Pressable onPress={() => router.push("/records/new")} style={styles.newBtn} testID="new-record-btn">
           <Icon name="plus" size={20} color={colors.onBrandPrimary} />
           <Text style={styles.newBtnText}>New</Text>
@@ -102,11 +106,12 @@ export default function Records() {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md, gap: spacing.md },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md, gap: spacing.sm },
   title: { fontSize: 26, fontWeight: "800", color: colors.onSurface },
   sub: { fontSize: 13, color: colors.muted, marginTop: 2 },
   newBtn: { flexDirection: "row", alignItems: "center", backgroundColor: colors.brandPrimary, paddingHorizontal: 14, height: 40, borderRadius: 999 },
   newBtnText: { color: colors.onBrandPrimary, fontWeight: "700", marginLeft: 6 },
+  exportBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   chipRow: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingVertical: spacing.sm },
   empty: { color: colors.muted, textAlign: "center", fontSize: 14 },
   recTitle: { fontSize: 16, fontWeight: "700", color: colors.onSurface },

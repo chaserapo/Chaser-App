@@ -1,0 +1,32 @@
+{
+  "summary": "Tested all three new features end-to-end via mobile web preview (390x844): (1) CSV export from /records — download triggers file 'hectarehq-spray-records-YYYY-MM-DD.csv' with correct header row and seeded rows containing 'North 40', 'Roundup PowerMAX' and '1.5'. (2) Auto Stock Deduction on Finish flow — after fixing a runtime crash ('Pressable is not defined'), verified deduction-card + toggle-deduct-stock work: area=42 produced 4.00→0.85 packs (3.15 used) with NO warning, area=200 produced 4.00→-11.00 (15 used) with UNDER 0 red badge and 'drop below zero' warning message; toggling checkbox off hides rows; Save persists deduction (verified Roundup stock updated to 0.85 packs after save). (3) Batches section shows 'No batches recorded' hint, +Add routes to /chemicals/batch-new?chemicalId=…, saving batch 'LOT-A1' with expiry within 30d shows amber 'Exp. 12d' badge, and a second batch with past expiry shows red 'Expired' badge. Chemicals tab hub (/(tabs)/chemicals) shows testID='expiry-banner' text '1 batch already expired · 1 expiring within 30 days' (red because an expired batch exists). No visual regressions on Home, Spray hub, or bottom nav.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "active-job/[id].tsx", "issue": "Runtime crash 'Pressable is not defined' on Finish flow — <Pressable> used in Stock deduction card was not imported from react-native. FIXED by adding Pressable to the react-native import.", "testID": "toggle-deduct-stock", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "chemicals hub /(tabs)/chemicals", "issues": ["Footer note still reads 'Batch tracking, expiry alerts and auto stock deduction are on the roadmap and the data model is ready — just ask when you'd like them switched on.' — these features are now shipped; remove/update this copy.", "Sub-header still says 'Stock on hand · batches soon' for the Inventory tile — 'batches soon' should be dropped."]},
+      {"screen": "chemicals register (Roundup after deduction)", "issues": ["Displayed stock is not rounded — shows 'Stock: 0.8500000000000001 packs'. Consider rounding to 2 decimals in the list/detail render."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Optional) Round displayed stock_qty (e.g. .toFixed(2)) to avoid floating point artifacts like 0.8500000000000001 shown in Chemical Register and Chemical Detail Current Stock.",
+    "Update /(tabs)/chemicals footer copy and 'Chemical Inventory' subtitle now that batches/expiry/auto-deduction features are live.",
+    "Consider adding a native date picker for batch purchase/expiry inputs — currently free-text YYYY-MM-DD."
+  ],
+  "critical_code_review_comments": [
+    "active-job/[id].tsx used Pressable without importing it — this would have shipped as a red screen crash for any user who opened Finish. Please add a lint rule or precommit check to catch missing RN imports.",
+    "stock.ts uses simple subtraction which produces floating-point noise (0.8500000000000001). Round before persisting or before display."
+  ],
+  "updated_files": ["/app/frontend/app/active-job/[id].tsx"],
+  "success_rate": {"backend": "N/A (frontend-only test)", "frontend": "100% (all 3 features working after Pressable import fix)"},
+  "seed_data_creation": "Two chemical batches for Roundup PowerMAX ('LOT-A1' expiring 2026-09-20 and 'LOT-OLD' expired 2025-01-01) plus one new completed spray job on North 40 (Roundup 1.5 L/ha, area 42, water 80) were created during testing via UI.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "AsyncStorage backs everything, so each Playwright session starts with the seeded defaults. Bottom-tab 'Chemicals' resolves to /(tabs)/chemicals hub; the plain register lives at /chemicals (which navigates internally to the same URL but through the Stack). To reach the tab hub via URL, go to '/' then click the bottom Chemicals tab. The three feature testIDs to know: export-csv-btn, deduction-card / toggle-deduct-stock / ded-row-<chemId>, add-batch-btn / batch-row-<id> / expiry-banner.",
+  "rca_of_issue": "RCA: In /app/frontend/app/active-job/[id].tsx the deduction card toggle used <Pressable>, but the react-native import statement only pulled { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform }. Reproduction: Start a spray job, tap 'Finish Spray Job' — after the weather capture settles the Finish view attempts to render the deduction card and throws 'Pressable is not defined', showing the ErrorBoundary 'Something went wrong / Reload app'. Fix applied: added Pressable to the react-native named import in active-job/[id].tsx. Re-verified end-to-end (finish flow, deduction math, warning path, save + persistence)."
+}

@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only regression + new-feature test on 390x844 mobile viewport. All new Chemicals-hub / list / low-stock / stock-adjust acceptance criteria PASS. (1) Hub renders exactly 6 tiles in the required order: Search Chemicals, My Chemicals, Chemical Inventory, Low Stock, Labels & SDS, Add Chemical (all testIDs chem-hub-search/my/inv/low/docs/add present). (2) Hub footer now reads the new 'Stock deducts automatically when spray jobs finish. Batches record lot number, purchase & expiry — with a 30-day nudge in the banner above.' text; the word 'roadmap' is gone. (3) All 6 tiles route correctly: Search → /chemicals, My → /chemicals, Chemical Inventory → /chemicals/inventory, Low Stock → /chemicals/low-stock, Labels & SDS (docs) → /chemicals/documents, Add Chemical → /chemicals/new. (4) Chemicals list rows show manufacturer BEFORE APVMA — verified 'Bayer · APVMA 62506 · Group M (Glycines)' on Roundup, plus 'Syngenta · APVMA 63151 · Group 1 (ACCase)' on Axial, 'Nufarm · APVMA 63536' on Estercide, 'FMC · APVMA 58207' on Talstar, 'Victorian Chemicals · APVMA 50387' on Hasten. (5) list-label icon (testID list-label-<id>) renders on Roundup (only seed chemical with label_url); tapping opens Linking.openURL without navigating into detail (Pressable has e.stopPropagation). No list-sds icons rendered — expected because no seed chemical has sds_url. (6) Category filter chips (All, Herbicide, Fungicide, Insecticide, Adjuvant, Fertiliser, Other) still render; archive toggle still present. (7) Chemical detail sections render in required order: name+type badge+AI+formulation, Identification (APVMA/group/manufacturer), Default rate, Inventory (pack size / current stock / storage), then Adjust Stock button (testID adjust-stock-btn), then Batches, then Documents, then Edit + Archive buttons. Recent stock movements card appears when movements exist. (8) Adjust Stock flow: Add/Remove toggle works, entering qty=2 shows green Preview card with '4 → 6 packs'; switching to Remove qty=99 flips card to red and displays '⚠ Stock will drop below zero.'; all 6 reason chips (Purchase, Correction, Spill, Transfer, Usage, Other) present. Saving Add 2 with reason Purchase persisted change (Current stock 4 → 6 packs) and recorded a StockMovement row on detail with '+2 packs · Purchase' + formatted timestamp. (9) Low Stock screen at /chemicals/low-stock lists only Axial (stock=1) — the only seeded chemical with stock ≤ 1 — with the green '+' quick-adjust shortcut (testID quick-adjust-<id>) that routes to stock-adjust. Sorted ascending. Empty-state, dedupe, search, archive toggle behaviours preserved. Spray-job auto-deduction rounding was already verified in iteration_6 (0.85 packs cleanly, not 0.8500…); the stock.applyDeductions Math.round×100/100 fix is present in /app/frontend/src/lib/stock.ts. No red-screen errors, no console errors observed. No deprecated Expo packages, no react-native issues detected in the reviewed files.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "stock.ts recordManualMovement rounds delta before persisting — good; applyDeductions also rounds via Math.round × 100 / 100 — resolves the previous 0.8500000000000001 artifact.",
+    "chemicals/index.tsx list row correctly uses e.stopPropagation on the label/SDS quick-icons so tapping them opens the URL without navigating into detail.",
+    "low-stock.tsx uses '≤ 1' threshold matching the hub badge logic — consistent."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only test)", "frontend": "100% (12/12 acceptance criteria verified)"},
+  "seed_data_creation": "During test, added +2 packs to Roundup PowerMAX via Adjust Stock (reason Purchase). AsyncStorage now holds Roundup stock=6 and one manual StockMovement row. Main agent may want to reset AsyncStorage before next test if pristine seed is desired.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "AsyncStorage backs everything. Bottom-tab 'Chemicals' → /(tabs)/chemicals hub. Key testIDs: chem-hub-{search|my|inv|low|docs|add}, chemical-card-<id>, list-label-<id>, list-sds-<id>, adjust-stock-btn, adjust-add-btn/adjust-remove-btn, input-adjust-qty, reason-<Purchase|Correction|Spill|Transfer|Usage|Other>, save-adjust-btn, movement-<id>, low-row-<id>, quick-adjust-<id>. Roundup chemical id was 7b792fb2-7101-439a-927e-122472b9386f in this test run. After running these tests Roundup stock is 6 packs (originally 4). Spray-job deduction rounding was covered in iteration_6 and stock.ts still uses the rounding fix.",
+  "rca_of_issue": "N/A — no regressions or new bugs found this iteration."
+}

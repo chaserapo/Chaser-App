@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { View, Text, FlatList, StyleSheet, TextInput, ScrollView, Pressable } from "react-native";
+import { View, Text, FlatList, StyleSheet, TextInput, ScrollView, Pressable, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
@@ -113,12 +113,26 @@ export default function ChemicalsList() {
                   </View>
                   {item.active_ingredient ? <Text style={styles.ai}>{item.active_ingredient}</Text> : null}
                   <View style={styles.metaRow}>
+                    {item.manufacturer ? <Text style={styles.meta}>{item.manufacturer}</Text> : null}
+                    {item.manufacturer && item.apvma_number ? <Text style={styles.meta}> · </Text> : null}
                     {item.apvma_number ? <Text style={styles.meta}>APVMA {item.apvma_number}</Text> : null}
                     {item.chemical_group ? <Text style={styles.meta}> · Group {item.chemical_group}</Text> : null}
                   </View>
                   {item.stock_qty != null ? <Text style={styles.stock}>Stock: {item.stock_qty} {item.stock_unit ?? item.pack_size ?? ""}</Text> : null}
                 </View>
-                <Icon name="chevron-right" size={22} color={colors.muted} />
+                <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                  {item.label_url ? (
+                    <Pressable onPress={(e) => { e.stopPropagation?.(); Linking.openURL(item.label_url!); }} style={styles.docIcon} testID={`list-label-${item.id}`}>
+                      <Icon name="file-document-outline" size={18} color={colors.brandPrimary} />
+                    </Pressable>
+                  ) : null}
+                  {item.sds_url ? (
+                    <Pressable onPress={(e) => { e.stopPropagation?.(); Linking.openURL(item.sds_url!); }} style={styles.docIcon} testID={`list-sds-${item.id}`}>
+                      <Icon name="shield-outline" size={18} color={colors.brandPrimary} />
+                    </Pressable>
+                  ) : null}
+                  <Icon name="chevron-right" size={22} color={colors.muted} />
+                </View>
               </View>
             </Card>
           );
@@ -148,5 +162,6 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: "row", marginTop: 4 },
   meta: { fontSize: 12, color: colors.muted, fontWeight: "600" },
   stock: { fontSize: 12, color: colors.brandPrimary, marginTop: 4, fontWeight: "700" },
+  docIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center" },
   empty: { color: colors.muted, textAlign: "center" },
 });

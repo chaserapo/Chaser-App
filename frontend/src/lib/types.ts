@@ -57,6 +57,21 @@ export type Chemical = {
   created_at: string;
 };
 
+export type StockMovementReason = "Purchase" | "Usage" | "Spray Job" | "Correction" | "Spill" | "Transfer" | "Other";
+
+export type StockMovement = {
+  id: ID;
+  business_id: ID;
+  chemical_id: ID;
+  ts: string;
+  delta: number; // positive added, negative removed
+  unit?: string;
+  reason: StockMovementReason;
+  spray_job_id?: ID;
+  notes?: string;
+  created_at: string;
+};
+
 export type ChemicalBatch = {
   id: ID;
   business_id: ID;

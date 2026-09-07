@@ -15,6 +15,8 @@ export default function ChemicalDetail() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [c, setC] = useState<Chemical | null>(null);
+  const [batches, setBatches] = useState<import("@/src/lib/types").ChemicalBatch[]>([]);
+  const [movements, setMovements] = useState<import("@/src/lib/types").StockMovement[]>([]);
   const [editing, setEditing] = useState(false);
   const [type, setType] = useState<ChemicalCategory>("Herbicide");
   const [rateUnit, setRateUnit] = useState<RateUnit>("L/ha");
@@ -53,6 +55,10 @@ export default function ChemicalDetail() {
       const chem = await repo.chemicals.get(id as string);
       setC(chem);
       if (chem) loadState(chem);
+      const bs = await repo.chemicalBatches.forChemical(id as string);
+      setBatches(bs.sort((a, b) => (a.expiry_date ?? "").localeCompare(b.expiry_date ?? "")));
+      const mvs = await repo.stockMovements.forChemical(id as string);
+      setMovements(mvs.slice(0, 10));
     })();
   }, [id]));
 
@@ -203,6 +209,59 @@ export default function ChemicalDetail() {
           <Field label="Storage location" value={c.storage_location} />
         </Card>
 
+        <View style={{ height: spacing.sm }} />
+        <Button title="Adjust Stock" icon="plus-minus" variant="secondary" onPress={() => router.push({ pathname: "/chemicals/stock-adjust", params: { chemicalId: c.id } })} testID="adjust-stock-btn" />
+
+        {movements.length > 0 && (
+          <>
+            <Text style={styles.section}>Recent stock movements</Text>
+            <Card style={{ padding: 0, overflow: "hidden" }}>
+              {movements.map((m, i) => (
+                <View key={m.id} style={[{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, flexDirection: "row", alignItems: "center", gap: 10 }, i < movements.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]} testID={`movement-${m.id}`}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: m.delta >= 0 ? colors.brandSecondary : "#FEE2E2", alignItems: "center", justifyContent: "center" }}>
+                    <Icon name={m.delta >= 0 ? "arrow-up" : "arrow-down"} size={18} color={m.delta >= 0 ? colors.brandPrimary : colors.error} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.onSurface }}>{m.delta > 0 ? "+" : ""}{m.delta} {m.unit ?? ""} · {m.reason}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>{new Date(m.ts).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}{m.notes ? ` · ${m.notes}` : ""}</Text>
+                  </View>
+                </View>
+              ))}
+            </Card>
+          </>
+        )}
+
+        <View style={styles.sectionRow}>
+          <Text style={[styles.section, { marginTop: 0 }]}>Batches</Text>
+          <Pressable onPress={() => router.push({ pathname: "/chemicals/batch-new", params: { chemicalId: c.id } })} testID="add-batch-btn">
+            <Text style={styles.linkAction}>+ Add</Text>
+          </Pressable>
+        </View>
+        {batches.length === 0 ? (
+          <Card><Text style={styles.hint}>No batches recorded. Add lot numbers and expiry dates to enable expiry alerts.</Text></Card>
+        ) : (
+          batches.map((b) => {
+            const daysToExpiry = b.expiry_date ? Math.floor((new Date(b.expiry_date).getTime() - Date.now()) / 86400000) : null;
+            const expiring = daysToExpiry != null && daysToExpiry <= 30 && daysToExpiry >= 0;
+            const expired = daysToExpiry != null && daysToExpiry < 0;
+            return (
+              <Card key={b.id} style={{ marginBottom: spacing.sm }} testID={`batch-row-${b.id}`}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: colors.onSurface }}>Lot {b.batch_number}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                      {b.quantity != null ? `${b.quantity} ${b.unit ?? ""}` : "—"}
+                      {b.purchase_date ? ` · purchased ${b.purchase_date}` : ""}
+                      {b.expiry_date ? ` · expires ${b.expiry_date}` : ""}
+                    </Text>
+                  </View>
+                  {expired ? <View style={styles.expBadge}><Text style={styles.expBadgeText}>Expired</Text></View> : expiring ? <View style={styles.expSoonBadge}><Text style={styles.expSoonText}>Exp. {daysToExpiry}d</Text></View> : null}
+                </View>
+              </Card>
+            );
+          })
+        )}
+
         {(c.label_url || c.sds_url) && (
           <>
             <Text style={styles.section}>Documents</Text>
@@ -266,4 +325,10 @@ const styles = StyleSheet.create({
   unitChip: { paddingHorizontal: 12, height: 40, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, alignItems: "center", justifyContent: "center" },
   unitChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
   unitText: { fontSize: 12, fontWeight: "700", color: colors.onSurfaceTertiary },
+  sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.lg, marginBottom: spacing.sm },
+  linkAction: { fontSize: 13, fontWeight: "700", color: colors.brandPrimary },
+  expBadge: { backgroundColor: colors.error, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
+  expBadgeText: { color: colors.onError, fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+  expSoonBadge: { backgroundColor: "#FEF3C7", paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
+  expSoonText: { color: colors.warning, fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
 });

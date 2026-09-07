@@ -10,6 +10,7 @@ import type {
   SprayJob,
   ExternalLink,
   Operator,
+  StockMovement,
 } from "./types";
 
 const KEYS = {
@@ -18,6 +19,7 @@ const KEYS = {
   paddocks: "as.paddocks",
   chemicals: "as.chemicals",
   chemical_batches: "as.chemical_batches",
+  stock_movements: "as.stock_movements",
   machinery: "as.machinery",
   maintenance: "as.maintenance",
   spray_jobs: "as.spray_jobs",
@@ -103,6 +105,15 @@ export const repo = {
     remove: async (id: string) => {
       const list = (await readList<ChemicalBatch>(KEYS.chemical_batches)).filter((x) => x.id !== id);
       await writeList(KEYS.chemical_batches, list);
+    },
+  },
+  stockMovements: {
+    list: () => readList<StockMovement>(KEYS.stock_movements),
+    forChemical: async (id: string) => (await readList<StockMovement>(KEYS.stock_movements)).filter((m) => m.chemical_id === id).sort((a, b) => b.ts.localeCompare(a.ts)),
+    save: async (m: StockMovement) => {
+      const list = await readList<StockMovement>(KEYS.stock_movements);
+      list.push(m);
+      await writeList(KEYS.stock_movements, list);
     },
   },
   machinery: {
