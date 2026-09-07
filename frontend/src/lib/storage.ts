@@ -7,6 +7,7 @@ import type {
   ChemicalBatch,
   Machinery,
   Maintenance,
+  MaintenanceCompletion,
   SprayJob,
   ExternalLink,
   Operator,
@@ -22,6 +23,7 @@ const KEYS = {
   stock_movements: "as.stock_movements",
   machinery: "as.machinery",
   maintenance: "as.maintenance",
+  maintenance_completions: "as.maintenance_completions",
   spray_jobs: "as.spray_jobs",
   links: "as.links",
   operators: "as.operators",
@@ -145,6 +147,29 @@ export const repo = {
     remove: async (id: string) => {
       const list = (await readList<Maintenance>(KEYS.maintenance)).filter((x) => x.id !== id);
       await writeList(KEYS.maintenance, list);
+    },
+    get: async (id: string) => (await readList<Maintenance>(KEYS.maintenance)).find((m) => m.id === id) ?? null,
+  },
+  maintenanceCompletions: {
+    list: () => readList<MaintenanceCompletion>(KEYS.maintenance_completions),
+    forMachine: async (machineId: string) =>
+      (await readList<MaintenanceCompletion>(KEYS.maintenance_completions))
+        .filter((c) => c.machinery_id === machineId)
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    forMaintenance: async (maintenanceId: string) =>
+      (await readList<MaintenanceCompletion>(KEYS.maintenance_completions))
+        .filter((c) => c.maintenance_id === maintenanceId)
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    save: async (c: MaintenanceCompletion) => {
+      const list = await readList<MaintenanceCompletion>(KEYS.maintenance_completions);
+      const idx = list.findIndex((x) => x.id === c.id);
+      if (idx >= 0) list[idx] = c;
+      else list.push(c);
+      await writeList(KEYS.maintenance_completions, list);
+    },
+    remove: async (id: string) => {
+      const list = (await readList<MaintenanceCompletion>(KEYS.maintenance_completions)).filter((x) => x.id !== id);
+      await writeList(KEYS.maintenance_completions, list);
     },
   },
   sprayJobs: {

@@ -14,7 +14,7 @@ A mobile-first spray application & machinery management app for Australian broad
 - **Spray tab**: adaptive Start / Resume + Spray Rate, Tank Mix, Nozzle Flow, Delta T calculators.
 - **Records tab**: only completed jobs; farm & chemical filter chips; detail view.
 - **Chemical Register**: 5 seeded Australian products, searchable.
-- **Machinery**: register, detail, maintenance list with status badges, add machine & add maintenance flows.
+- **Machinery**: dashboard with fleet summary tiles (Machines / Due Soon / Overdue); machine detail with view + edit mode, sprayer-specific setup card, Connected Data stub (for future telematics), full maintenance schedule + "Mark Complete" workflow with permanent Service History and auto-rescheduling (editable next-due).
 - **More/Tools**: calculators + external Australian resources grouped Weather / Chemicals & Labels / Spray Application / Agronomy.
 
 ## Data model (Supabase-ready)

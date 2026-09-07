@@ -94,16 +94,21 @@ export type Operator = {
   created_at: string;
 };
 
+export type MachineType = "Tractor" | "Self-propelled sprayer" | "Tow-behind sprayer" | "Air seeder" | "Header/Harvester" | "Spreader" | "Ute/Vehicle" | "Implement" | "Other";
+export const MACHINE_TYPES: MachineType[] = ["Tractor", "Self-propelled sprayer", "Tow-behind sprayer", "Air seeder", "Header/Harvester", "Spreader", "Ute/Vehicle", "Implement", "Other"];
+
 export type Machinery = {
   id: ID;
   business_id: ID;
   name: string;
+  machine_type?: MachineType;
   make?: string;
   model?: string;
   year?: number;
   serial_number?: string;
   registration?: string;
   current_hours?: number;
+  current_km?: number;
   purchase_date?: string;
   notes?: string;
   tank_capacity_l?: number;
@@ -113,7 +118,49 @@ export type Machinery = {
   default_nozzle?: string;
   default_speed_kmh?: number;
   default_water_rate_lha?: number;
+  external_platform?: string;
+  external_machine_id?: string;
+  last_sync_at?: string;
+  synced_hours?: number;
+  sync_status?: "connected" | "pending" | "error" | "disconnected";
+  archived_at?: string;
   created_at: string;
+};
+
+// Future-ready data model
+export type MaintenanceCompletion = {
+  id: ID;
+  business_id: ID;
+  machinery_id: ID;
+  maintenance_id?: ID;
+  date: string;
+  hours?: number;
+  km?: number;
+  work_performed?: string;
+  parts_used?: string;
+  cost?: number;
+  service_provider?: string;
+  notes?: string;
+  created_at: string;
+};
+export type FuelRecord = {
+  id: ID; business_id: ID; machinery_id: ID; date: string;
+  litres?: number; cost?: number; hours?: number; km?: number; notes?: string; created_at: string;
+};
+export type RepairRecord = {
+  id: ID; business_id: ID; machinery_id: ID; date: string;
+  description: string; cost?: number; service_provider?: string; parts_used?: string; notes?: string; created_at: string;
+};
+export type PartUsage = {
+  id: ID; business_id: ID; machinery_id: ID; date: string;
+  part_name: string; part_number?: string; quantity?: number; cost?: number; notes?: string; created_at: string;
+};
+export type Attachment = {
+  id: ID; business_id: ID; machinery_id: ID; kind: "photo" | "document"; uri: string; label?: string; created_at: string;
+};
+export type PreStartInspection = {
+  id: ID; business_id: ID; machinery_id: ID; date: string; operator?: string;
+  checklist_json: string; passed: boolean; notes?: string; created_at: string;
 };
 
 export type MaintenanceStatus = "good" | "due_soon" | "overdue";

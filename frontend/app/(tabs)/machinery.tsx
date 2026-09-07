@@ -1,40 +1,75 @@
 import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, FlatList, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { Button, Card, StatusBadge } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo, maintenanceStatus } from "@/src/lib/storage";
-import type { Machinery, Maintenance } from "@/src/lib/types";
+import type { Machinery, MaintenanceStatus } from "@/src/lib/types";
+
+type EnrichedMachine = Machinery & {
+  status: MaintenanceStatus;
+  nextService?: number;
+  dueCount: number;
+  overdueCount: number;
+  totalMaint: number;
+};
 
 export default function MachineryTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [list, setList] = useState<(Machinery & { status: "good" | "due_soon" | "overdue"; nextService?: number })[]>([]);
+  const [list, setList] = useState<EnrichedMachine[]>([]);
 
   useFocusEffect(useCallback(() => {
     (async () => {
       const [m, ms] = await Promise.all([repo.machinery.list(), repo.maintenance.list()]);
-      const enriched = m.map((x) => {
-        const machMaints = ms.filter((mm) => mm.machinery_id === x.id);
-        const next = machMaints.reduce<number | undefined>((min, mn) => {
-          if (mn.next_service_hours == null) return min;
-          return min == null || mn.next_service_hours < min ? mn.next_service_hours : min;
-        }, undefined);
-        return { ...x, status: maintenanceStatus(x.current_hours, next), nextService: next };
+      const enriched: EnrichedMachine[] = m
+        .filter((x) => !x.archived_at)
+        .map((x) => {
+          const machMaints = ms.filter((mm) => mm.machinery_id === x.id);
+          let next: number | undefined;
+          let dueCount = 0;
+          let overdueCount = 0;
+          machMaints.forEach((mn) => {
+            if (mn.next_service_hours != null) {
+              if (next == null || mn.next_service_hours < next) next = mn.next_service_hours;
+            }
+            const status = maintenanceStatus(x.current_hours, mn.next_service_hours);
+            if (status === "due_soon") dueCount += 1;
+            if (status === "overdue") overdueCount += 1;
+          });
+          // Overall status is the worst status among its maintenance entries
+          const overallStatus: MaintenanceStatus = overdueCount > 0 ? "overdue" : dueCount > 0 ? "due_soon" : "good";
+          return {
+            ...x,
+            status: overallStatus,
+            nextService: next,
+            dueCount,
+            overdueCount,
+            totalMaint: machMaints.length,
+          };
+        });
+      // Sort: overdue -> due_soon -> good, then by name
+      enriched.sort((a, b) => {
+        const rank = { overdue: 0, due_soon: 1, good: 2 } as const;
+        if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
+        return a.name.localeCompare(b.name);
       });
       setList(enriched);
     })();
   }, []));
+
+  const totalMachines = list.length;
+  const totalDueSoon = list.reduce((s, m) => s + m.dueCount, 0);
+  const totalOverdue = list.reduce((s, m) => s + m.overdueCount, 0);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Machinery</Text>
-          <Text style={styles.sub}>{list.length} machine{list.length === 1 ? "" : "s"}</Text>
+          <Text style={styles.sub}>{totalMachines} machine{totalMachines === 1 ? "" : "s"} in your fleet</Text>
         </View>
         <Pressable onPress={() => router.push("/machinery/new")} style={styles.newBtn} testID="new-machinery-btn">
           <Icon name="plus" size={20} color={colors.onBrandPrimary} />
@@ -46,6 +81,15 @@ export default function MachineryTab() {
         data={list}
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}
+        ListHeaderComponent={
+          totalMachines > 0 ? (
+            <View style={styles.statsRow} testID="machinery-stats">
+              <StatTile label="Machines" value={totalMachines} tone="brand" icon="tractor-variant" testID="stat-total" />
+              <StatTile label="Due Soon" value={totalDueSoon} tone={totalDueSoon > 0 ? "warn" : "muted"} icon="clock-alert-outline" testID="stat-due" />
+              <StatTile label="Overdue" value={totalOverdue} tone={totalOverdue > 0 ? "danger" : "muted"} icon="alert-octagon-outline" testID="stat-overdue" />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <Card>
             <Text style={styles.empty}>No machinery yet.</Text>
@@ -53,22 +97,95 @@ export default function MachineryTab() {
             <Button title="Add Your First Machine" icon="plus" onPress={() => router.push("/machinery/new")} testID="empty-add-machine-btn" />
           </Card>
         }
-        renderItem={({ item }) => (
-          <Card style={{ marginBottom: spacing.md }} onPress={() => router.push({ pathname: "/machinery/[id]", params: { id: item.id } })} testID={`machine-card-${item.id}`}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={styles.iconBox}>
-                <Icon name="tractor-variant" size={26} color={colors.brandPrimary} />
+        renderItem={({ item }) => {
+          const remaining = item.nextService != null && item.current_hours != null ? item.nextService - item.current_hours : null;
+          return (
+            <Card style={{ marginBottom: spacing.md }} onPress={() => router.push({ pathname: "/machinery/[id]", params: { id: item.id } })} testID={`machine-card-${item.id}`}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={styles.iconBox}>
+                  <Icon name={iconForType(item.machine_type)} size={26} color={colors.brandPrimary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <Text style={styles.name}>{item.name}</Text>
+                    {item.machine_type ? (
+                      <View style={styles.typePill}>
+                        <Text style={styles.typePillText}>{item.machine_type}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={styles.meta}>{[item.make, item.model].filter(Boolean).join(" ") || "—"}</Text>
+                  <View style={styles.metricsRow}>
+                    {item.current_hours != null ? (
+                      <View style={styles.metric}>
+                        <Icon name="clock-outline" size={12} color={colors.muted} />
+                        <Text style={styles.metricText}>{item.current_hours}h</Text>
+                      </View>
+                    ) : null}
+                    {item.current_km != null ? (
+                      <View style={styles.metric}>
+                        <Icon name="road-variant" size={12} color={colors.muted} />
+                        <Text style={styles.metricText}>{item.current_km}km</Text>
+                      </View>
+                    ) : null}
+                    {item.nextService != null ? (
+                      <View style={styles.metric}>
+                        <Icon name="wrench-outline" size={12} color={colors.muted} />
+                        <Text style={[styles.metricText, remaining != null && remaining <= 0 && { color: colors.error, fontWeight: "700" }]}>
+                          {remaining != null && remaining <= 0
+                            ? `${Math.abs(Math.round(remaining))}h overdue`
+                            : `next @ ${item.nextService}h`}
+                        </Text>
+                      </View>
+                    ) : item.totalMaint === 0 ? (
+                      <View style={styles.metric}>
+                        <Icon name="wrench-outline" size={12} color={colors.muted} />
+                        <Text style={styles.metricText}>no schedule</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+                <StatusBadge status={item.status} testID={`machine-status-${item.id}`} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.meta}>{item.make ?? ""} {item.model ?? ""}</Text>
-                <Text style={styles.hours}>{item.current_hours ?? 0} h{item.nextService ? `  ·  next @ ${item.nextService}h` : ""}</Text>
-              </View>
-              <StatusBadge status={item.status} testID={`machine-status-${item.id}`} />
-            </View>
-          </Card>
-        )}
+            </Card>
+          );
+        }}
       />
+    </View>
+  );
+}
+
+function iconForType(t?: string): string {
+  switch (t) {
+    case "Self-propelled sprayer":
+    case "Tow-behind sprayer":
+      return "sprinkler-variant";
+    case "Header/Harvester":
+      return "combine-harvester";
+    case "Air seeder":
+    case "Spreader":
+      return "grain";
+    case "Ute/Vehicle":
+      return "car-pickup";
+    case "Implement":
+      return "hammer-wrench";
+    default:
+      return "tractor-variant";
+  }
+}
+
+function StatTile({ label, value, tone, icon, testID }: { label: string; value: number; tone: "brand" | "warn" | "danger" | "muted"; icon: string; testID?: string }) {
+  const styleMap = {
+    brand: { bg: colors.brandSecondary, fg: colors.onBrandSecondary, iconColor: colors.brandPrimary },
+    warn: { bg: "#FEF3C7", fg: colors.warning, iconColor: colors.warning },
+    danger: { bg: "#FEE2E2", fg: colors.error, iconColor: colors.error },
+    muted: { bg: colors.surfaceTertiary, fg: colors.onSurfaceTertiary, iconColor: colors.muted },
+  }[tone];
+  return (
+    <View style={[styles.tile, { backgroundColor: styleMap.bg }]} testID={testID}>
+      <Icon name={icon as any} size={20} color={styleMap.iconColor} />
+      <Text style={[styles.tileValue, { color: styleMap.fg }]}>{value}</Text>
+      <Text style={[styles.tileLabel, { color: styleMap.fg }]}>{label}</Text>
     </View>
   );
 }
@@ -79,9 +196,17 @@ const styles = StyleSheet.create({
   sub: { fontSize: 13, color: colors.muted, marginTop: 2 },
   newBtn: { flexDirection: "row", alignItems: "center", backgroundColor: colors.brandPrimary, paddingHorizontal: 14, height: 40, borderRadius: 999 },
   newBtnText: { color: colors.onBrandPrimary, fontWeight: "700", marginLeft: 6 },
+  statsRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
+  tile: { flex: 1, paddingVertical: spacing.md, paddingHorizontal: spacing.sm, borderRadius: radius.lg, alignItems: "flex-start" },
+  tileValue: { fontSize: 22, fontWeight: "800", marginTop: 4 },
+  tileLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 },
   iconBox: { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center", marginRight: 14 },
   name: { fontSize: 16, fontWeight: "700", color: colors.onSurface },
+  typePill: { backgroundColor: colors.surfaceTertiary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  typePillText: { fontSize: 9, fontWeight: "800", color: colors.onSurfaceTertiary, letterSpacing: 0.3 },
   meta: { fontSize: 13, color: colors.onSurfaceTertiary, marginTop: 2 },
-  hours: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  metricsRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 6 },
+  metric: { flexDirection: "row", alignItems: "center", gap: 3 },
+  metricText: { fontSize: 12, color: colors.muted, fontWeight: "600" },
   empty: { color: colors.muted, textAlign: "center", fontSize: 14 },
 });
