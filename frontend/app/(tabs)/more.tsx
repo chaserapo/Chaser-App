@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, Pressable, Linking } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Pressable, Linking, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
@@ -7,6 +7,7 @@ import { Card } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { LINK_CATEGORIES } from "@/src/lib/links";
+import { useAuth } from "@/src/lib/auth-context";
 import type { ExternalLink } from "@/src/lib/types";
 
 const TOOLS = [
@@ -22,9 +23,17 @@ const TOOLS = [
 export default function More() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user, business, signOut } = useAuth();
   const [links, setLinks] = useState<ExternalLink[]>([]);
 
   useFocusEffect(useCallback(() => { repo.links.list().then(setLinks); }, []));
+
+  function confirmSignOut() {
+    Alert.alert("Sign out", "You'll be signed out of the cloud. Your local backup stays on this device.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign out", style: "destructive", onPress: () => { signOut(); } },
+    ]);
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
@@ -33,6 +42,35 @@ export default function More() {
         <Text style={styles.sub}>Tools & external resources</Text>
       </View>
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}>
+        {user ? (
+          <>
+            <Text style={styles.sectionTitle}>Account</Text>
+            <Card testID="account-card">
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={styles.accountIcon}><Icon name="account-circle-outline" size={30} color={colors.brandPrimary} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.accountName} numberOfLines={1}>{business?.name ?? "My Farm"}</Text>
+                  <Text style={styles.accountEmail} numberOfLines={1}>{user.email}</Text>
+                  {business?.role ? (
+                    <View style={styles.roleChip}>
+                      <Text style={styles.roleChipText}>{business.role.toUpperCase()}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <View style={styles.cloudBadge}>
+                  <Icon name="cloud-check-outline" size={14} color={colors.brandPrimary} />
+                  <Text style={styles.cloudBadgeText}>Synced</Text>
+                </View>
+              </View>
+              <View style={{ height: spacing.md }} />
+              <Pressable onPress={confirmSignOut} style={styles.signOutBtn} testID="sign-out-btn">
+                <Icon name="logout-variant" size={18} color={colors.error} />
+                <Text style={styles.signOutText}>Sign out</Text>
+              </Pressable>
+            </Card>
+          </>
+        ) : null}
+
         <Text style={styles.sectionTitle}>Tools</Text>
         <Card style={{ padding: 0, overflow: "hidden" }}>
           {TOOLS.map((t, i) => (
@@ -107,4 +145,13 @@ const styles = StyleSheet.create({
   manageBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, height: 48 },
   manageBtnText: { color: colors.brandPrimary, fontWeight: "700", fontSize: 15 },
   footer: { textAlign: "center", color: colors.muted, marginTop: spacing.xl, fontSize: 12 },
+  accountIcon: { width: 48, height: 48, borderRadius: radius.md, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center", marginRight: 12 },
+  accountName: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
+  accountEmail: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  roleChip: { alignSelf: "flex-start", backgroundColor: colors.surfaceTertiary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, marginTop: 4 },
+  roleChipText: { fontSize: 9, fontWeight: "800", color: colors.onSurfaceTertiary, letterSpacing: 0.4 },
+  cloudBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.brandSecondary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  cloudBadgeText: { fontSize: 11, fontWeight: "700", color: colors.brandPrimary },
+  signOutBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, height: 44, backgroundColor: colors.surface },
+  signOutText: { color: colors.error, fontWeight: "700", fontSize: 14 },
 });

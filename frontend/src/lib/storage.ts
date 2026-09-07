@@ -1,4 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getBackendMode } from "./backend";
+import { cloudRepo } from "./cloud-repo";
 import type {
   Business,
   Farm,
@@ -39,7 +41,7 @@ async function writeList<T>(key: string, list: T[]) {
   await AsyncStorage.setItem(key, JSON.stringify(list));
 }
 
-export const repo = {
+export const localRepo = {
   async getBusiness(): Promise<Business | null> {
     const raw = await AsyncStorage.getItem(KEYS.business);
     return raw ? (JSON.parse(raw) as Business) : null;
@@ -237,6 +239,18 @@ export const repo = {
     await AsyncStorage.multiRemove(Object.values(KEYS));
   },
 };
+
+// -----------------------------------------------------------------------------
+// Backend router: exports `repo` as a Proxy that dispatches to the currently
+// active backend (local AsyncStorage before sign-in, Supabase after).
+// -----------------------------------------------------------------------------
+
+export const repo: typeof localRepo = new Proxy({} as typeof localRepo, {
+  get(_target, prop, _receiver) {
+    const impl: any = getBackendMode() === "cloud" ? cloudRepo : localRepo;
+    return impl[prop as keyof typeof localRepo];
+  },
+}) as typeof localRepo;
 
 export function maintenanceStatus(
   currentHours: number | undefined,
