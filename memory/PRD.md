@@ -17,17 +17,21 @@ A mobile-first spray application & machinery management app for Australian broad
 - **Machinery**: dashboard with fleet summary tiles (Machines / Due Soon / Overdue); machine detail with view + edit mode, sprayer-specific setup card, Connected Data stub (for future telematics), full maintenance schedule + "Mark Complete" workflow with permanent Service History and auto-rescheduling (editable next-due).
 - **More/Tools**: calculators + external Australian resources grouped Weather / Chemicals & Labels / Spray Application / Agronomy.
 
-## Data model (Supabase-ready)
-`businesses`, `business_members`, `farms`, `paddocks`, `chemicals`, `machinery`, `maintenance`, `spray_jobs` (now with `status: draft|active|completed` and finish weather block), `spray_job_products`.
-Persisted via AsyncStorage repository with the same shape as the target Postgres schema.
+## Data model (Supabase-backed, deployed)
+Multi-tenant Postgres schema with role-based RLS + soft deletes:
+`businesses`, `business_members` (owner/manager/operator), `farms`, `paddocks`, `chemicals`, `chemical_batches`, `stock_movements`, `machinery`, `maintenance_schedules`, `maintenance_completions`, `spray_jobs`, `spray_job_products`, `operators`, `external_links`.
+Every tenant row has `id` (client-generated UUID), `business_id`, `created_at`, `updated_at` (server trigger), `deleted_at` (soft-delete). Tenant isolation is enforced by `is_business_member(business_id)` + `business_role(business_id)` SECURITY DEFINER helpers.
+Repository layer (`repo` in `src/lib/storage.ts`) is a Proxy that routes to `localRepo` (AsyncStorage) before sign-in and `cloudRepo` (Supabase) after. AsyncStorage remains as a backup post-migration.
+
+## Auth & first-sign-in migration
+- Email + password via Supabase Auth (email confirmation disabled).
+- Signup creates a Business + owner membership on the client using UUIDs, then runs a one-time migration uploading all existing AsyncStorage data (`upsert onConflict:'id', defaultToNull:false`, retry-safe, ordered by FKs).
+- Migration is scoped to fresh-business signups only; subsequent signins on other devices skip the migration to avoid duplicate uploads.
+- Marker file `@hectarehq/migrated-v1:<userId>:<businessId>` records completion.
 
 ## Not yet built (parked)
-- Supabase auth & cloud sync (playbook available, awaiting URL + anon key)
-- Farms & Paddocks CRUD screens
-- GPS paddock boundaries / maps
-- PDF spray application reports
-- Chemical inventory auto-deduction
-- Barcode/QR scanning
-- Contractor/customer & invoicing
-- AI querying of farm records
+- Invite-a-member flow + members management screen
+- Realtime subscriptions for multi-device live updates
+- Offline outbox / write-behind sync (schema is already sync-ready)
+- APVMA product search integration
 

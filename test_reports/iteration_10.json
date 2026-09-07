@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only end-to-end test of the Supabase cloud-sync iteration on HectareHQ. Full happy-path verified against the live preview URL: (1) Boot -> Auth screen with brand block, Sign in / Create account tabs, 'By signing in...' footer. (2) Signup with fresh gmail unique-suffix email + business name 'RiverinaTestCo_<ts>' succeeds and MigrationScreen shows 'Cloud sync active - 38 records across 12 tables uploaded safely'. (3) 'Continue to HectareHQ' lands on Home with weather card, Start Spray Job btn, Service Reminders showing Case 340 (Overdue, 10h overdue @ 5200h) + Big Rig (Due Soon, 20h remaining @ 2400h). (4) Machinery tab shows 3 machines / 1 Due Soon / 1 Overdue with correct hours 5210/2380/1980. (5) Case 340 detail shows Overdue banner + Transmission service listed; tapping Mark Complete opens Complete Service form pre-filled with 5210h, 'Transmission service'; Save persists and status flips Overdue -> Good, Next @ 6210h. (6) More tab renders Account card with business name, signup email, OWNER role chip, Synced badge, and testID='sign-out-btn'. (7) Sign out clears session (Alert.alert -> handled). (8) Re-signin with SAME email lands DIRECTLY on Home (NO migration screen shown), Service Reminders now shows Big Rig Due Soon only (Case 340 is Good, 1000h remaining @ 6210h). Case 340 detail after re-signin still lists Transmission service as Good with Last serviced 2026-09-07 - proves the completion is persisted in Supabase, not just AsyncStorage. (9) Regression: Chemicals tab (5 items), Spray tab (Start Spray Job + calculators + 2 records), Machinery dashboard tiles all render without red-screen errors. Deprecated packages check: none of the flagged Expo packages (expo-av, expo-barcode-scanner, expo-background-fetch) appear in dependencies affected by this iteration.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_10.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "In /app/frontend/src/features/auth/AuthScreen.tsx the Password Input is missing secureTextEntry=true; the password field renders as plaintext, which is a mobile UX/security smell (though it does not block the acceptance flow). Consider adding secureTextEntry to the password Input.",
+    "In /app/frontend/src/lib/migrate.ts the migration-complete marker is stored in AsyncStorage keyed by userId+businessId. Because AsyncStorage in web is per-browser-context, a user signing in on a fresh browser context will re-trigger the migration path. The upserts are idempotent (onConflict: 'id'), so this is safe, but consider persisting the marker in a Supabase table (e.g. business_members.migrated_at) so it works across devices.",
+    "The Alert.alert-based signout confirmation in /app/frontend/app/(tabs)/more.tsx works on web via react-native-web (it maps to window.confirm), but the two-second-poll test observed a brief delay before the Auth screen appears. Non-blocking; noting for awareness."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (skipped)", "frontend": "100%" },
+  "seed_data_creation": "Created 1 Supabase account for testing: email=hqauto1788822994@gmail.com password=Test1234! business=RiverinaTestCo_1788822994. Also completed a Transmission service on Case 340 dated 2026-09-07 @ 5210h (persisted in Supabase maintenance_completions).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Supabase-backed cloud sync is fully working end-to-end. Sign up -> migration (38 rows across 12 tables) -> Home. Sign out via testID='sign-out-btn' (Alert.alert -> window.confirm on web, auto-accepted). Second sign-in with same creds skips MigrationScreen and shows persisted data (Case 340 flipped to Good after Mark Complete). Weather card sometimes shows 0/0/0 due to a 429 from the external weather API — pre-existing, unrelated to this iteration. When testing, always use a unique @gmail.com email per run (Supabase rejects fake TLDs, and the migration marker key is per userId+businessId so re-using an email would still exercise the migrated branch). testIDs available: tab-signin, tab-signup, input-business-name, input-email, input-password, submit-auth-btn, auth-error, continue-to-app-btn, retry-migration-btn, signout-from-error-btn, account-card, sign-out-btn, start-spray-job-btn, service-reminders-title, reminder-card-<id>, tool-link-<slug>.",
+  "rca_of_issue": "N/A - no defects reproduced. All acceptance criteria in the review_request passed on first attempt."
+}

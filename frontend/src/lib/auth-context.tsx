@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (memErr) throw memErr;
 
     let biz: ActiveBusiness;
+    let isFreshBusiness = false;
     if (members && members.length > 0) {
       const m = members[0];
       const { data: bz, error: bzErr } = await supabase.from("businesses").select("id, name").eq("id", m.business_id).maybeSingle();
@@ -72,11 +73,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .insert({ id: uuid(), business_id: bId, user_id: u.id, role: "owner" });
       if (insMemErr) throw insMemErr;
       biz = { id: bId, name: businessName, role: "owner" };
+      isFreshBusiness = true;
     }
 
-    // 2) Migration — only run if not yet migrated for this (user, business) on this device.
+    // 2) Migration — ONLY on the device where the business was just created (signup).
+    //    On a new device that signs in to an existing business, we skip migration to avoid
+    //    uploading that device's local seed data as duplicates.
     const already = await isMigrated(u.id, biz.id);
-    if (!already) {
+    if (isFreshBusiness && !already) {
       setMigration({ kind: "running", progress: { step: "Starting…", uploaded: 0, totalTables: 0, completedTables: 0 } });
       try {
         const result = await runMigration(u.id, biz.id, (p) => setMigration({ kind: "running", progress: p }));

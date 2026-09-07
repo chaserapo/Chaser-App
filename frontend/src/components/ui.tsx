@@ -106,6 +106,8 @@ export function Input({
   testID,
   multiline,
   error,
+  secureTextEntry,
+  autoCapitalize,
 }: {
   label?: string;
   value: string;
@@ -116,6 +118,8 @@ export function Input({
   testID?: string;
   multiline?: boolean;
   error?: boolean;
+  secureTextEntry?: boolean;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
 }) {
   const { TextInput } = require("react-native");
   return (
@@ -131,6 +135,8 @@ export function Input({
           placeholderTextColor={colors.muted}
           style={styles.input}
           multiline={multiline}
+          secureTextEntry={secureTextEntry}
+          autoCapitalize={autoCapitalize}
         />
         {suffix ? <Text style={styles.suffix}>{suffix}</Text> : null}
       </View>

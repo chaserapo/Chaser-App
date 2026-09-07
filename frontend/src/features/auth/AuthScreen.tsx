@@ -65,8 +65,8 @@ export function AuthScreen() {
                 testID="input-business-name"
               />
             ) : null}
-            <Input label="Email" value={email} onChangeText={setEmail} placeholder="you@farm.com.au" keyboardType="default" testID="input-email" />
-            <Input label="Password" value={password} onChangeText={setPassword} placeholder="Minimum 6 characters" testID="input-password" />
+            <Input label="Email" value={email} onChangeText={setEmail} placeholder="you@farm.com.au" keyboardType="default" autoCapitalize="none" testID="input-email" />
+            <Input label="Password" value={password} onChangeText={setPassword} placeholder="Minimum 6 characters" secureTextEntry autoCapitalize="none" testID="input-password" />
             {error ? (
               <View style={styles.errorBox} testID="auth-error">
                 <Icon name="alert-circle-outline" size={16} color={colors.error} />
