@@ -1,0 +1,163 @@
+{
+  "app_name": "AgSpray Pro",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "A highly legible, outdoor-ready professional agricultural tool emphasizing high-contrast utility, large touch targets, and offline-first task focus.",
+  "color": {
+    "surface": "#F3F4F6",
+    "onSurface": "#111827",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#111827",
+    "surfaceTertiary": "#E5E7EB",
+    "onSurfaceTertiary": "#374151",
+    "surfaceInverse": "#111827",
+    "onSurfaceInverse": "#F9FAFB",
+    "brand": "#15803D",
+    "onBrand": "#FFFFFF",
+    "brandPrimary": "#15803D",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#DCFCE7",
+    "onBrandSecondary": "#14532D",
+    "brandTertiary": "#22C55E",
+    "onBrandTertiary": "#064E3B",
+    "success": "#15803D",
+    "onSuccess": "#FFFFFF",
+    "warning": "#B45309",
+    "onWarning": "#FFFFFF",
+    "error": "#B91C1C",
+    "onError": "#FFFFFF",
+    "info": "#0369A1",
+    "onInfo": "#FFFFFF",
+    "border": "#D1D5DB",
+    "borderStrong": "#9CA3AF",
+    "divider": "#E5E7EB",
+    "muted": "#4B5563"
+  },
+  "typography": {
+    "displayFontFamily": "Plus Jakarta Sans",
+    "textFontFamily": "Geist",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous spacing for outdoor use; avoid dense layouts. Minimal padding of 16px to 24px around main content. Ensure extra safe-area margin at bottom for sticky CTAs.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": "false",
+    "do's": [
+      "Avoid glassmorphism for this app to guarantee pure contrast and legibility under direct sunlight."
+    ],
+    "dont's": [
+      "Do not use blur or frosted effects over field data, as it can reduce readability in outdoor environments."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "solid surfaceSecondary",
+      "android": "solid surfaceSecondary",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "solid colors instead",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Home",
+      "purpose": "Dashboard providing immediate environmental context and quick access to core spraying workflows.",
+      "states": {
+        "loading": "Centered spinner over off-white surface",
+        "empty": "N/A for dashboard",
+        "error": "Card showing 'Unable to load field data' with bold retry button."
+      },
+      "layout": "Use a sequential architecture starting with an image-backed hero card or plain high-contrast card for the Weather & Delta T dashboard (5 stats). Below it, stack massive, highly-visible CTAs ('Start Spray Job' and 'Spray Calculator') using primary brand colors. Ensure these touch targets are oversized (minimum 56pt height). Follow with 'Upcoming Maintenance' (utilizing amber/red status badges for Due Soon/Overdue) and 'Recent Spray Records' inside crisp, white surfaceSecondary cards with 1px border. No clutter."
+    },
+    {
+      "name": "Spray",
+      "purpose": "Live calculators for Tank Mix, Spray Rate, and Delta T with immediate visual feedback.",
+      "states": {
+        "loading": "Skeleton UI for input fields",
+        "empty": "Default input state 0 values",
+        "error": "Inline red validation text under failed inputs"
+      },
+      "layout": "Input fields stacked at the top in a single column (use large 48px-56px input heights for glove accessibility). Live calculation results should sit below the inputs inside a visually distinct 'Results' card (perhaps slightly tinted brandSecondary). The Delta T calculation MUST include a disclaimer text directly below the output, clearly stating it is a measured value only. No 'safe to spray' verdicts."
+    },
+    {
+      "name": "Records",
+      "purpose": "Comprehensive history of spray jobs and entry point for new logging.",
+      "states": {
+        "loading": "Skeleton list items",
+        "empty": "Illustration of a clipboard with 'No spray records logged yet', plus a primary CTA to 'Log New Record'.",
+        "error": "Error message with 'Retry Sync' button."
+      },
+      "layout": "Top section features horizontally scrolling filter chips (surfaceTertiary background, pill radius). Below, a vertical list of robust cards (surfaceSecondary). Each card displays key info: Date, Paddock, Chemical, Area. A sticky 'Log New Spray Record' FAB or full-width button sits fixed at the bottom."
+    },
+    {
+      "name": "Machinery",
+      "purpose": "Register and health status of all farm equipment.",
+      "states": {
+        "loading": "Skeleton list",
+        "empty": "Empty state illustration of a tractor, 'Add your first machine'.",
+        "error": "Retry connection message."
+      },
+      "layout": "List view of machinery. Each row uses a leading tinted icon container or real image if available, machine name, and a prominent right-aligned status badge (Green/Good, Amber/Due Soon, Red/Overdue). Tapping a row opens a detailed view with service hours and history."
+    },
+    {
+      "name": "More",
+      "purpose": "Directory of secondary tools, external links, and chemical management.",
+      "states": {
+        "loading": "Standard spinner",
+        "empty": "None",
+        "error": "Retry."
+      },
+      "layout": "Simple iOS-native style settings list grouped by category ('Weather', 'Chemicals & Labels', 'Spray Application', 'Agronomy'). Chemical Register is a sub-page showing product name, APVMA number, and active ingredients."
+    }
+  ],
+  "images": {
+    "hero_wheat_field": {
+      "url": "https://images.unsplash.com/photo-1707286703394-97a3f89bfab6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwxfHx0cmFjdG9yJTIwd2hlYXQlMjBmaWVsZCUyMGF1c3RyYWxpYW4lMjBmYXJtfGVufDB8fHx8MTc4ODc0OTc1OXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Tractor plowing a dusty Australian wheat field"
+    },
+    "hero_boom_sprayer": {
+      "url": "https://images.unsplash.com/photo-1621490087833-96307b5d5620?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwxfHxib29tJTIwc3ByYXllciUyMGFncmljdWx0dXJlfGVufDB8fHx8MTc4ODc0OTc1OXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Boom sprayer operating over a bright yellow agricultural field"
+    }
+  },
+  "haptics": {
+    "primary_button": "impactMedium",
+    "tab_press": "selection",
+    "record_saved": "notificationSuccess",
+    "warning_alert": "notificationWarning"
+  },
+  "instructions_to_main_agent": [
+    "Design for extreme outdoor legibility. Use #F3F4F6 for the screen background to reduce glare, and #FFFFFF for cards, providing high contrast against the very dark #111827 text.",
+    "Implement oversized touch targets. Buttons and list items must have a minimum height of 56px to accommodate users wearing gloves or operating in a moving vehicle.",
+    "Avoid glassmorphism completely in this app. Blurs reduce readability outdoors. Use solid surfaces and 1px borders instead.",
+    "For the Delta T Calculator, strictly display the measured numeric output and a disclaimer. Do not add green/red 'Safe to spray' UI elements, as this is a legal/compliance constraint.",
+    "Maintenance status badges should strictly use the defined semantic colors: success (#15803D) for Good, warning (#B45309) for Due Soon, and error (#B91C1C) for Overdue.",
+    "Ensure all primary actions (like 'Start Spray Job') are sticky at the bottom of the screen or prominently placed in the lower third for easy one-handed access.",
+    "Always apply a dark vertical gradient scrim (transparent to at least 70% opacity) if rendering text over the hero images, though for outdoor utility apps, placing text entirely outside images on solid backgrounds is heavily preferred."
+  ]
+}
