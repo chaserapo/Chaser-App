@@ -52,6 +52,7 @@ export default function TankMixCalc() {
     const job: SprayJob = {
       id: uuid(),
       business_id: business.id,
+      status: "completed",
       date: new Date().toISOString().slice(0, 10),
       area_ha: results.ha_per_tank,
       water_rate: w,

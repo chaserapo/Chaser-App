@@ -1,28 +1,33 @@
-# AgSpray Pro — PRD
+# HectareHQ — PRD
 
 ## What it is
 A mobile-first spray application & machinery management app for Australian broadacre farmers and spray contractors. Field-ready with high-contrast UI, oversized touch targets and offline-capable calculators.
 
-## Core features (v1 — Demo mode)
-- **Home dashboard**: live weather (Open-Meteo, uses device location), Temp / RH / Delta T / Wind / Direction, "Start Spray Job" & "Spray Calculator" CTAs, upcoming maintenance with Good/Due Soon/Overdue badges, recent spray records.
-- **Spray tools** (Spray tab + More): Spray Rate Calculator, Tank Mix Calculator, Delta T Calculator (never shows "safe to spray" verdicts — only measured values + disclaimer).
-- **Spray Records**: full new-record workflow (farm, paddock, crop, target, dates, operator, machinery, boom, nozzle, pressure, water rate, speed, area, auto-captured weather with manual override, multi-chemical tank mix). Records list with farm & chemical filter chips. Detail view.
-- **Chemical Register**: 5 seeded Australian chemicals (Roundup PowerMAX, Estercide Xtra 680, Axial, Talstar 250 EC, Hasten). Search by name / AI / APVMA #. Detail view with label/SDS links.
-- **Machinery**: register with detail, current hours, maintenance history & status badges. Add new machine + add new maintenance flows.
-- **More/Tools**: quick access to all calculators + external Australian links organised by Weather, Chemicals & Labels, Spray Application, Agronomy (BOM, APVMA PubCRIS, APVMA Permits, GRDC, CropLife, SprayWise, DPIRD WA, Ag Vic, TeeJet, Hardi).
+## Core features (v1.1 — Start Spray Job workflow live)
+- **HectareHQ** branding across the app.
+- **Home dashboard**: live weather (Open-Meteo, uses device location) shown with `Your location · lat, lon · Updated HH:MM`, refresh button. Big Start Spray Job / Resume Active Job (adaptive) + Spray Calculator CTAs. Upcoming maintenance (Good/Due Soon/Overdue badges). Recent Spray Records (completed only).
+- **Start Spray Job → Active Job → Finish workflow**:
+  - New Spray Job form: Farm, Paddock, Crop, Target, Operator, Machine, Area (ha), Water rate (L/ha), Speed (km/h), Boom (m), Pressure (bar), Nozzle, Nozzle spacing (m), Start time, Notes. Auto-captures Temp / RH / Delta T / Wind speed & direction + GPS on open, editable manually. Multiple products from the Chemical Register with rate + unit + live Total quantity preview.
+  - Actions: **Start Job** (creates active job, re-captures fresh weather, routes to Active screen) · **Save Draft** (status=draft) · **Cancel**.
+  - Active Spray Job screen: live HH:MM:SS elapsed timer, farm/paddock/area/tank mix/starting weather grid + GPS, big **Finish Spray Job** button and **Cancel Job**.
+  - Finish flow: auto-captures finish weather (editable), prompts for actual hectares treated + final notes, saves with status=completed and opens the saved record.
+- **Spray tab**: adaptive Start / Resume + Spray Rate, Tank Mix, Nozzle Flow, Delta T calculators.
+- **Records tab**: only completed jobs; farm & chemical filter chips; detail view.
+- **Chemical Register**: 5 seeded Australian products, searchable.
+- **Machinery**: register, detail, maintenance list with status badges, add machine & add maintenance flows.
+- **More/Tools**: calculators + external Australian resources grouped Weather / Chemicals & Labels / Spray Application / Agronomy.
 
 ## Data model (Supabase-ready)
-`businesses`, `business_members` (multi-user per business), `farms`, `paddocks`, `chemicals`, `machinery`, `maintenance`, `spray_jobs`, `spray_job_products`.
-Currently persisted via AsyncStorage repository (`src/lib/storage.ts`) with the same shape as the target Postgres schema — ready to swap in Supabase with RLS policies from the integration playbook.
+`businesses`, `business_members`, `farms`, `paddocks`, `chemicals`, `machinery`, `maintenance`, `spray_jobs` (now with `status: draft|active|completed` and finish weather block), `spray_job_products`.
+Persisted via AsyncStorage repository with the same shape as the target Postgres schema.
 
-## Australian defaults
-Units: hectares, L/ha, mL/ha, kg/ha, g/ha, %v/v, L/min, km/h, m, °C. Seeded business "Riverina Broadacre Co." with farms, paddocks (Wheat/Canola/Barley/Lupins), 3 machines and 5 chemicals.
-
-## Not yet built (parked for later phases)
-- Supabase auth & cloud sync (playbook obtained, awaiting user's Supabase URL + anon key)
+## Not yet built (parked)
+- Supabase auth & cloud sync (playbook available, awaiting URL + anon key)
+- Farms & Paddocks CRUD screens
 - GPS paddock boundaries / maps
 - PDF spray application reports
 - Chemical inventory auto-deduction
 - Barcode/QR scanning
 - Contractor/customer & invoicing
 - AI querying of farm records
+

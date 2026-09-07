@@ -71,7 +71,7 @@ export default function More() {
           );
         })}
 
-        <Text style={styles.footer}>AgSpray Pro · v1.0 (Demo Mode)</Text>
+        <Text style={styles.footer}>HectareHQ · v1.0 (Demo Mode)</Text>
       </ScrollView>
     </View>
   );

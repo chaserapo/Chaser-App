@@ -17,7 +17,7 @@ const KEYS = {
   machinery: "as.machinery",
   maintenance: "as.maintenance",
   spray_jobs: "as.spray_jobs",
-  seeded: "as.seeded_v2",
+  seeded: "as.seeded_v3",
 } as const;
 
 async function readList<T>(key: string): Promise<T[]> {
@@ -113,6 +113,8 @@ export const repo = {
   },
   sprayJobs: {
     list: () => readList<SprayJob>(KEYS.spray_jobs),
+    active: async () => (await readList<SprayJob>(KEYS.spray_jobs)).find((j) => j.status === "active") ?? null,
+    completed: async () => (await readList<SprayJob>(KEYS.spray_jobs)).filter((j) => j.status === "completed"),
     save: async (j: SprayJob) => {
       const list = await readList<SprayJob>(KEYS.spray_jobs);
       const idx = list.findIndex((x) => x.id === j.id);

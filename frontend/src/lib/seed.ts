@@ -161,7 +161,7 @@ export async function seedIfNeeded() {
   for (const m of maints) await repo.maintenance.save(m);
 
   const j1: SprayJob = {
-    id: uuid(), business_id: bid,
+    id: uuid(), business_id: bid, status: "completed",
     farm_id: farm1.id, farm_name: farm1.name,
     paddock_id: paddocks[0].id, paddock_name: paddocks[0].name,
     crop: "Wheat", target: "Ryegrass",
@@ -181,7 +181,7 @@ export async function seedIfNeeded() {
     created_at: daysAgo(3),
   };
   const j2: SprayJob = {
-    id: uuid(), business_id: bid,
+    id: uuid(), business_id: bid, status: "completed",
     farm_id: farm1.id, farm_name: farm1.name,
     paddock_id: paddocks[1].id, paddock_name: paddocks[1].name,
     crop: "Canola", target: "Wild radish",

@@ -85,9 +85,12 @@ export type SprayJobProduct = {
   total_qty?: number;
 };
 
+export type SprayJobStatus = "draft" | "active" | "completed";
+
 export type SprayJob = {
   id: ID;
   business_id: ID;
+  status: SprayJobStatus;
   farm_id?: ID;
   farm_name?: string;
   paddock_id?: ID;
@@ -101,6 +104,7 @@ export type SprayJob = {
   machinery_id?: ID;
   machinery_name?: string;
   area_ha?: number;
+  actual_area_ha?: number;
   water_rate?: number;
   speed_kmh?: number;
   boom_width_m?: number;
@@ -115,7 +119,14 @@ export type SprayJob = {
   weather_captured_at?: string;
   gps_lat?: number;
   gps_lon?: number;
+  finish_temperature_c?: number;
+  finish_humidity?: number;
+  finish_delta_t?: number;
+  finish_wind_speed?: number;
+  finish_wind_direction?: string;
+  finish_weather_captured_at?: string;
   notes?: string;
+  finish_notes?: string;
   products: SprayJobProduct[];
   created_at: string;
 };

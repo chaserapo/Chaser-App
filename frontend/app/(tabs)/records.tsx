@@ -20,7 +20,7 @@ export default function Records() {
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [j, f, p] = await Promise.all([repo.sprayJobs.list(), repo.farms.list(), repo.paddocks.list()]);
+      const [j, f, p] = await Promise.all([repo.sprayJobs.completed(), repo.farms.list(), repo.paddocks.list()]);
       setJobs(j.sort((a, b) => (a.date < b.date ? 1 : -1)));
       setFarms(f);
       setPaddocks(p);
