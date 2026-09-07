@@ -23,7 +23,8 @@ export default function Home() {
   const [locationLabel, setLocationLabel] = useState("Your location");
   const [jobs, setJobs] = useState<SprayJob[]>([]);
   const [activeJob, setActiveJob] = useState<SprayJob | null>(null);
-  const [maints, setMaints] = useState<(Maintenance & { machineName: string; status: "good" | "due_soon" | "overdue" })[]>([]);
+  const [maints, setMaints] = useState<(Maintenance & { machineName: string; status: "good" | "due_soon" | "overdue"; remaining: number | null })[]>([]);
+  const [dueCount, setDueCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -35,18 +36,30 @@ export default function Home() {
     ]);
     setJobs(j.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 3));
     setActiveJob(active);
-    const withStatus = ms
+    const enriched = ms
+      .filter((mn) => mn.next_service_hours != null)
       .map((mn) => {
         const mach = m.find((x) => x.id === mn.machinery_id);
+        const remaining = mach?.current_hours != null && mn.next_service_hours != null
+          ? mn.next_service_hours - mach.current_hours
+          : null;
         return {
           ...mn,
           machineName: mach?.name ?? "Machine",
           status: maintenanceStatus(mach?.current_hours, mn.next_service_hours),
+          remaining,
         };
-      })
-      .sort((a, b) => (a.status === "overdue" ? -1 : b.status === "overdue" ? 1 : a.status === "due_soon" ? -1 : 1))
-      .slice(0, 3);
-    setMaints(withStatus);
+      });
+    // Prioritise not-good (overdue first, then due_soon), then good, sorted by remaining ascending
+    const rank = { overdue: 0, due_soon: 1, good: 2 } as const;
+    enriched.sort((a, b) => {
+      if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
+      const ar = a.remaining ?? Infinity;
+      const br = b.remaining ?? Infinity;
+      return ar - br;
+    });
+    setDueCount(enriched.filter((x) => x.status !== "good").length);
+    setMaints(enriched.slice(0, 3));
   }, []);
 
   const loadWeather = useCallback(async () => {
@@ -138,27 +151,61 @@ export default function Home() {
         <Button title="Spray Calculator" icon="calculator-variant-outline" size="lg" variant="secondary" onPress={() => router.push("/(tabs)/spray")} testID="spray-calculator-btn" />
 
         <SectionTitle
-          testID="upcoming-maintenance-title"
-          action={<Pressable onPress={() => router.push("/(tabs)/machinery")}><Text style={styles.linkText}>See all</Text></Pressable>}
+          testID="service-reminders-title"
+          action={<Pressable onPress={() => router.push("/(tabs)/machinery")} hitSlop={8}><Text style={styles.linkText}>See all</Text></Pressable>}
         >
-          Upcoming Maintenance
+          Service Reminders
         </SectionTitle>
+        {dueCount > 0 ? (
+          <View style={styles.dueBanner} testID="due-banner">
+            <Icon name="alert-circle" size={16} color={colors.warning} />
+            <Text style={styles.dueBannerText}>{dueCount} service{dueCount === 1 ? "" : "s"} due or overdue across your fleet</Text>
+          </View>
+        ) : null}
         {maints.length === 0 ? (
-          <Card><Text style={styles.empty}>No maintenance recorded.</Text></Card>
-        ) : (
-          maints.map((m) => (
-            <Card key={m.id} style={{ marginBottom: spacing.sm }} testID={`maint-card-${m.id}`}
-              onPress={() => router.push({ pathname: "/machinery/[id]", params: { id: m.machinery_id } })}>
-              <View style={styles.rowBetween}>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={styles.itemTitle}>{m.machineName}</Text>
-                  <Text style={styles.itemSub}>{m.maintenance_type}</Text>
-                  {m.next_service_hours ? <Text style={styles.itemMeta}>Next @ {m.next_service_hours}h</Text> : null}
-                </View>
-                <StatusBadge status={m.status} />
+          <Card testID="reminders-empty">
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <View style={styles.checkPill}><Icon name="check" size={18} color={colors.brandPrimary} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemTitle}>You&apos;re on top of service</Text>
+                <Text style={styles.itemSub}>Add a maintenance schedule on any machine to see reminders here.</Text>
               </View>
-            </Card>
-          ))
+            </View>
+          </Card>
+        ) : (
+          maints.map((m) => {
+            const isOverdue = m.status === "overdue";
+            const isDue = m.status === "due_soon";
+            const remainingLabel = m.remaining == null
+              ? `Next @ ${m.next_service_hours}h`
+              : isOverdue
+                ? `${Math.abs(Math.round(m.remaining))}h overdue`
+                : `${Math.round(m.remaining)}h remaining`;
+            const accent = isOverdue ? colors.error : isDue ? colors.warning : colors.brandPrimary;
+            const accentBg = isOverdue ? "#FEE2E2" : isDue ? "#FEF3C7" : colors.brandSecondary;
+            return (
+              <Card
+                key={m.id}
+                style={{ marginBottom: spacing.sm, borderLeftWidth: 4, borderLeftColor: accent }}
+                testID={`reminder-card-${m.id}`}
+                onPress={() => router.push({ pathname: "/machinery/[id]", params: { id: m.machinery_id } })}
+              >
+                <View style={styles.rowBetween}>
+                  <View style={[styles.reminderIcon, { backgroundColor: accentBg }]}>
+                    <Icon name={isOverdue ? "alert-octagon" : isDue ? "clock-alert-outline" : "wrench-outline"} size={20} color={accent} />
+                  </View>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={styles.itemTitle} numberOfLines={1}>{m.machineName}</Text>
+                    <Text style={styles.itemSub} numberOfLines={1}>{m.maintenance_type}</Text>
+                    <Text style={[styles.itemMeta, (isOverdue || isDue) && { color: accent, fontWeight: "700" }]}>
+                      {remainingLabel}{m.next_service_hours != null ? ` · @ ${m.next_service_hours}h` : ""}
+                    </Text>
+                  </View>
+                  <StatusBadge status={m.status} testID={`reminder-status-${m.id}`} />
+                </View>
+              </Card>
+            );
+          })
         )}
 
         <SectionTitle
@@ -220,4 +267,8 @@ const styles = StyleSheet.create({
   itemSub: { fontSize: 13, color: colors.onSurfaceTertiary, marginTop: 2 },
   itemMeta: { fontSize: 12, color: colors.muted, marginTop: 2 },
   empty: { color: colors.muted, fontSize: 14, textAlign: "center", paddingVertical: 12 },
+  dueBanner: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF3C7", paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.md, marginBottom: spacing.sm },
+  dueBannerText: { color: colors.warning, fontWeight: "700", fontSize: 13, flex: 1 },
+  reminderIcon: { width: 40, height: 40, borderRadius: radius.md, alignItems: "center", justifyContent: "center", marginRight: 12 },
+  checkPill: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center" },
 });

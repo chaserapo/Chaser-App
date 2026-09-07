@@ -1,0 +1,22 @@
+{
+  "summary": "Frontend-only test of Home tab Service Reminders. All acceptance criteria met: section renders with title, 'See all' navigates to /(tabs)/machinery, amber due-banner shows '2 services due or overdue across your fleet', 3 cards sorted overdue-first (Case 340 → Big Rig → Hardi Commander) with correct labels ('10h overdue · @ 5200h', '20h remaining · @ 2400h', '120h remaining · @ 2100h'), correct StatusBadges (Overdue / Due Soon / Good), visually correct red/amber/green left borders and icon colors (verified via screenshot), and tapping the first card navigates to /machinery/[id]. Regression checks pass: weather-card, start-spray-job-btn, spray-calculator-btn and recent-records-title all render. Empty state was not exercised because AsyncStorage has due/overdue schedules; the code path for reminders-empty is present and logically hides the banner when dueCount === 0.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_9.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Home screen file /app/frontend/app/(tabs)/index.tsx is ~275 lines and starting to hold multiple concerns (weather, active job, reminders, recent records). Consider extracting <ServiceReminders/> into its own component if it grows further.",
+    "The banner threshold is derived from maintenanceStatus (remaining <= 25). The banner intentionally hides when dueCount === 0 (verified in code) and matches spec."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (skipped)", "frontend": "100%" },
+  "seed_data_creation": "No new seed data created. Used existing AsyncStorage state from prior iterations (Case 340 current_hours=5210 or higher due to earlier completion history) which still yields overdue status. Big Rig remains due_soon (2380 vs 2400).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Home tab Service Reminders block is stable. testIDs used: service-reminders-title, due-banner, reminders-empty, reminder-card-<id>, reminder-status-<id>. Sort ranks overdue<due_soon<good with remaining ASC as secondary key. When dueCount is 0 the banner is hidden and the empty-state card 'You're on top of service' is shown."
+}
