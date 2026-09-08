@@ -141,7 +141,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // requiring a manual refresh.
   useEffect(() => {
     if (!business) return;
-    const channel = supabase.channel(`biz-${business.id}`);
+    const suffix = Math.random().toString(36).slice(2, 10);
+    const channel = supabase.channel(`biz-${business.id}-${suffix}`);
     channel.on(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       "postgres_changes" as any,

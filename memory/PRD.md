@@ -34,11 +34,21 @@ Repository layer (`repo` in `src/lib/storage.ts`) is a Proxy that routes to `loc
 - Migration is scoped to fresh-business signups only; subsequent signins on other devices skip the migration to avoid duplicate uploads.
 - Marker file `@hectarehq/migrated-v1:<userId>:<businessId>` records completion.
 
+## Spray tab (Phase 3 shipped)
+- Restructured into **In Progress → Planned → Recently Completed → Tools** sections with big field-friendly tap targets.
+- New spray-job status `planned` (extends `draft | active | completed`). "Save as Planned" button on New Job creates a card in the Planned section that a user can pick up later.
+- Multi-product tank mix + unit conversions (L/ha, mL/ha, kg/ha, g/ha, mL/100L, L/100L, %v/v) unchanged from prior iterations — still working.
+- Start Job → Active Screen → Complete Job pipeline unchanged and green.
+
+## Home dashboard
+- Time-aware greeting (Good Morning / Afternoon / Evening) + farmer name (from default operator) + "What are we chasing today?" prompt on the left.
+- Chaser · Behind every good operation brand on the right + refresh button.
+
 ## Not yet built (parked)
-- **Phase 3 — Multi-Product Tank Mix / New Job workflow**: rebuild spray job with paddock prefill, multi-product tank mix, unit conversions, start/complete flow, tank-mix summary — a full iteration on its own
-- Realtime subscriptions for multi-device live updates (paddocks/machinery/team done; extend to spray jobs when Phase 3 lands)
-- Offline outbox / write-behind sync (schema is already sync-ready)
-- APVMA product search integration
-- Reset demo data action
-- Fertiliser / seeding / harvest records under paddock history (structure ready)
+- Home "Today's Jobs" tiles (Planned / In Progress / Completed) — future pass
+- History filters on /records (date, paddock, crop, chemical, operator, machine)
+- Convert-planned-to-active prefill in /records/new when opened with plannedId
+- Offline outbox / write-behind sync
+- APVMA product search
+- Fertiliser / seeding / harvest records under paddock history
 

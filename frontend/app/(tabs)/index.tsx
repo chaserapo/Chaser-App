@@ -27,6 +27,25 @@ export default function Home() {
   const [maints, setMaints] = useState<(Maintenance & { machineName: string; status: "good" | "due_soon" | "overdue"; remaining: number | null })[]>([]);
   const [dueCount, setDueCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [farmerName, setFarmerName] = useState<string | null>(null);
+
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 12) return "Good Morning";
+    if (h >= 12 && h < 18) return "Good Afternoon";
+    return "Good Evening";
+  })();
+
+  const loadFarmer = useCallback(async () => {
+    try {
+      // Prefer an operator record marked as the default user for this business.
+      const op = await repo.operators.defaultUser();
+      if (op?.name) { setFarmerName(op.name); return; }
+      setFarmerName(null);
+    } catch {
+      setFarmerName(null);
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     const [j, ms, m, active] = await Promise.all([
@@ -77,11 +96,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => { loadWeather(); }, [loadWeather]);
-  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+  useFocusEffect(useCallback(() => { loadData(); loadFarmer(); }, [loadData, loadFarmer]));
   useRealtime(
-    ["machinery", "maintenance_schedules", "maintenance_completions", "spray_jobs"],
-    loadData,
-    [loadData],
+    ["machinery", "maintenance_schedules", "maintenance_completions", "spray_jobs", "operators"],
+    () => { loadData(); loadFarmer(); },
+    [loadData, loadFarmer],
   );
 
   const onRefresh = async () => {
@@ -93,14 +112,20 @@ export default function Home() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
       <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.greeting}>Good day</Text>
-          <Text style={styles.title}>Chaser</Text>
-          <Text style={styles.tagline}>Behind every good operation</Text>
+        <View style={{ flex: 1, paddingRight: spacing.md }}>
+          <Text style={styles.greeting} testID="greeting-time">{greeting}</Text>
+          {farmerName ? (
+            <Text style={styles.farmerName} numberOfLines={1} testID="greeting-name">{farmerName}</Text>
+          ) : null}
+          <Text style={styles.prompt}>What are we chasing today?</Text>
         </View>
-        <Pressable onPress={loadWeather} style={styles.refreshBtn} testID="refresh-weather-btn">
-          <Icon name="refresh" size={22} color={colors.onSurface} />
-        </Pressable>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={styles.brand} testID="brand-name">Chaser</Text>
+          <Text style={styles.brandTagline} testID="brand-tagline">Behind every good operation</Text>
+          <Pressable onPress={loadWeather} style={[styles.refreshBtn, { marginTop: spacing.sm }]} testID="refresh-weather-btn">
+            <Icon name="refresh" size={18} color={colors.onSurface} />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView
@@ -254,11 +279,15 @@ function Stat({ label, value, icon, testID }: { label: string; value: string; ic
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md },
+  headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md },
   greeting: { color: colors.muted, fontSize: 13, fontWeight: "600" },
+  farmerName: { color: colors.onSurface, fontSize: 24, fontWeight: "800", marginTop: 2 },
+  prompt: { color: colors.brandPrimary, fontSize: 14, fontWeight: "700", marginTop: 4, fontStyle: "italic" },
+  brand: { color: colors.brandPrimary, fontSize: 18, fontWeight: "800", letterSpacing: 0.3 },
+  brandTagline: { color: colors.muted, fontSize: 10, fontStyle: "italic", marginTop: 2, textAlign: "right" },
   title: { color: colors.onSurface, fontSize: 26, fontWeight: "800", marginTop: 2 },
   tagline: { color: colors.muted, fontSize: 12, fontStyle: "italic", marginTop: 2 },
-  refreshBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
+  refreshBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
   weatherCard: { padding: spacing.lg },
   weatherHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md },
   weatherTitle: { fontSize: 15, fontWeight: "700", color: colors.onSurfaceSecondary },

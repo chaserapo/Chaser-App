@@ -197,7 +197,7 @@ export type SprayJobProduct = {
   total_qty_unit?: string;
 };
 
-export type SprayJobStatus = "draft" | "active" | "completed";
+export type SprayJobStatus = "draft" | "planned" | "active" | "completed";
 
 export type SprayJob = {
   id: ID;

@@ -296,6 +296,15 @@ export default function NewSprayJob() {
     router.back();
   }
 
+  async function savePlanned() {
+    const business = await repo.getBusiness();
+    if (!business) return;
+    const job = buildJob("planned");
+    job.business_id = business.id;
+    await repo.sprayJobs.save(job);
+    router.replace("/spray");
+  }
+
   const missingCount = Object.values(showMissing).filter(Boolean).length;
 
   return (
@@ -532,6 +541,8 @@ export default function NewSprayJob() {
 
           <View style={{ height: spacing.md }} />
           <Button title={starting ? "Starting…" : "Start Job"} icon="play-circle" size="lg" onPress={startJob} loading={starting} testID="start-job-btn" />
+          <View style={{ height: spacing.sm }} />
+          <Button title="Save as Planned" icon="calendar-clock" variant="outline" onPress={savePlanned} testID="save-planned-btn" />
           <View style={{ height: spacing.sm }} />
           <Button title="Save Draft" icon="content-save-outline" variant="secondary" onPress={saveDraft} testID="save-draft-btn" />
           <View style={{ height: spacing.sm }} />

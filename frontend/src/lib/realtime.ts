@@ -34,11 +34,14 @@ export function useRealtime(tables: Table[], onChange: () => void, extraDeps: un
     const businessId = getActiveBusinessId();
     if (!businessId) return;
 
-    const channel = supabase.channel(`rt-${tables.join("_")}-${businessId}`);
+    // Per-mount random suffix — Supabase caches channels by topic, so if this
+    // component remounts before removeChannel() has finished awaiting server
+    // ack, the old topic is still registered and .on() throws
+    // "cannot add postgres_changes callbacks ... after subscribe()".
+    const suffix = Math.random().toString(36).slice(2, 10);
+    const channel = supabase.channel(`rt-${tables.join("_")}-${businessId}-${suffix}`);
     tables.forEach((t) => {
       channel.on(
-        // The postgres_changes payload type is generic; we don't need the row body,
-        // just the notification — screens re-fetch via repo (which honours RLS).
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "postgres_changes" as any,
         { event: "*", schema: "public", table: t, filter: `business_id=eq.${businessId}` },

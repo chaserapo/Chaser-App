@@ -3,16 +3,17 @@ import { View, Text, ScrollView, StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
-import { Button, Card } from "@/src/components/ui";
+import { Button, Card, StatusBadge } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
+import { useRealtime } from "@/src/lib/realtime";
 import type { SprayJob } from "@/src/lib/types";
 
 const TOOLS = [
-  { key: "records", title: "Spray Records / History", subtitle: "Search & review completed jobs", icon: "clipboard-text-outline", route: "/records" },
+  { key: "records", title: "All Spray Records", subtitle: "Search & filter history", icon: "clipboard-text-outline", route: "/records" },
   { key: "spray-rate", title: "Spray Calculator", subtitle: "Rate, coverage & flow", icon: "calculator", route: "/calculators/spray-rate" },
   { key: "tank-mix", title: "Tank Mix Calculator", subtitle: "Multi-product tank mix", icon: "beaker-outline", route: "/calculators/tank-mix" },
-  { key: "nozzle", title: "Nozzle Calculator", subtitle: "ISO flat-fan size suggestion", icon: "sprinkler-variant", route: "/calculators/nozzle-guide" },
+  { key: "nozzle", title: "Nozzle Guide", subtitle: "ISO flat-fan sizing", icon: "sprinkler-variant", route: "/calculators/nozzle-guide" },
   { key: "delta-t", title: "Delta T", subtitle: "Wet-bulb depression", icon: "chart-bell-curve-cumulative", route: "/calculators/delta-t" },
 ];
 
@@ -20,44 +21,113 @@ export default function SprayHub() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [active, setActive] = useState<SprayJob | null>(null);
-  const [completedCount, setCompletedCount] = useState(0);
+  const [planned, setPlanned] = useState<SprayJob[]>([]);
+  const [completed, setCompleted] = useState<SprayJob[]>([]);
 
-  useFocusEffect(useCallback(() => {
-    (async () => {
-      const [act, done] = await Promise.all([repo.sprayJobs.active(), repo.sprayJobs.completed()]);
-      setActive(act);
-      setCompletedCount(done.length);
-    })();
-  }, []));
+  const load = useCallback(async () => {
+    const [act, plannedList, done] = await Promise.all([
+      repo.sprayJobs.active(),
+      repo.sprayJobs.list().then((all) => all.filter((j) => (j.status as string) === "planned")),
+      repo.sprayJobs.completed(),
+    ]);
+    setActive(act);
+    setPlanned(plannedList.sort((a, b) => a.date.localeCompare(b.date)));
+    setCompleted(done.slice(0, 5));
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useRealtime(["spray_jobs", "spray_job_products"], load, [load]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
       <View style={styles.header}>
-        <Text style={styles.title}>Spray</Text>
-        <Text style={styles.sub}>Start a job, review history or open a calculator</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Spray</Text>
+          <Text style={styles.sub}>{planned.length} planned · {active ? 1 : 0} in progress · {completed.length} recent</Text>
+        </View>
+        <Pressable style={styles.newBtn} onPress={() => router.push("/records/new")} testID="new-job-btn">
+          <Icon name="plus" size={18} color={colors.onBrandPrimary} />
+          <Text style={styles.newBtnText}>New Job</Text>
+        </Pressable>
       </View>
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}>
+
+        {/* IN PROGRESS */}
         {active ? (
-          <Button title="Resume Active Spray Job" icon="play-circle" size="lg" onPress={() => router.push({ pathname: "/active-job/[id]", params: { id: active.id } })} testID="spray-resume-btn" />
+          <>
+            <Text style={styles.sectionTitle}>In Progress</Text>
+            <Card testID="active-job-card" style={{ borderLeftWidth: 4, borderLeftColor: colors.warning }}>
+              <View style={styles.rowTop}>
+                <View style={[styles.rowIcon, { backgroundColor: "#FEF3C7" }]}><Icon name="progress-clock" size={22} color={colors.warning} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>{active.paddock_name ?? active.farm_name ?? "Spray job"}</Text>
+                  <Text style={styles.rowSub}>{active.crop ?? "—"} · {active.actual_area_ha ?? active.area_ha ?? "—"} ha · {active.operator ?? "—"}</Text>
+                  <Text style={styles.rowMeta}>Started {active.start_time ?? "—"}</Text>
+                </View>
+                <StatusBadge status="due_soon" testID="active-status" />
+              </View>
+              <View style={{ height: spacing.md }} />
+              <Button title="COMPLETE JOB" icon="check-decagram" size="lg" onPress={() => router.push({ pathname: "/active-job/[id]", params: { id: active.id } })} testID="active-complete-btn" />
+            </Card>
+          </>
+        ) : null}
+
+        {/* PLANNED */}
+        <Text style={styles.sectionTitle}>Planned</Text>
+        {planned.length === 0 ? (
+          <Card><Text style={styles.empty}>No planned jobs. Tap New Job to plan or start one.</Text></Card>
         ) : (
-          <Button title="Start Spray Job" icon="play-circle-outline" size="lg" onPress={() => router.push("/records/new")} testID="spray-start-btn" />
+          planned.map((j) => (
+            <Card key={j.id} style={{ marginBottom: spacing.sm }} onPress={() => router.push({ pathname: "/records/new", params: { plannedId: j.id } })} testID={`planned-${j.id}`}>
+              <View style={styles.rowTop}>
+                <View style={[styles.rowIcon, { backgroundColor: "#DBEAFE" }]}><Icon name="calendar-clock" size={20} color="#1E40AF" /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>{j.paddock_name ?? j.farm_name ?? "Spray job"}</Text>
+                  <Text style={styles.rowSub}>{j.date} · {j.crop ?? "—"} · {j.area_ha ?? "—"} ha</Text>
+                  <Text style={styles.rowMeta}>{j.operator ?? "Not assigned"} · {j.machinery_name ?? "No machine"}</Text>
+                </View>
+                <View style={styles.plannedBadge}><Text style={styles.plannedBadgeText}>PLANNED</Text></View>
+              </View>
+            </Card>
+          ))
         )}
 
-        <Text style={styles.sectionTitle}>Records & Tools</Text>
+        {/* COMPLETED */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>Recently Completed</Text>
+          <Pressable onPress={() => router.push("/records")} testID="see-all-completed-btn">
+            <Text style={styles.link}>See all →</Text>
+          </Pressable>
+        </View>
+        {completed.length === 0 ? (
+          <Card><Text style={styles.empty}>No completed spray jobs yet.</Text></Card>
+        ) : (
+          completed.map((j) => (
+            <Card key={j.id} style={{ marginBottom: spacing.sm }} onPress={() => router.push({ pathname: "/records/[id]", params: { id: j.id } })} testID={`completed-${j.id}`}>
+              <View style={styles.rowTop}>
+                <View style={styles.rowIcon}><Icon name="check-decagram" size={20} color={colors.brandPrimary} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>{j.paddock_name ?? j.farm_name ?? "Spray job"}</Text>
+                  <Text style={styles.rowSub}>{j.date} · {j.actual_area_ha ?? j.area_ha ?? "—"} ha · {j.target ?? "—"}</Text>
+                  <Text style={styles.rowMeta}>{j.operator ?? "—"} · {j.machinery_name ?? "—"}</Text>
+                </View>
+                <Icon name="chevron-right" size={20} color={colors.muted} />
+              </View>
+            </Card>
+          ))
+        )}
+
+        {/* TOOLS */}
+        <Text style={styles.sectionTitle}>Tools</Text>
         {TOOLS.map((t) => (
-          <Card key={t.key} style={{ marginBottom: spacing.md }} onPress={() => router.push(t.route as any)} testID={`tool-${t.key}`}>
+          <Card key={t.key} style={{ marginBottom: spacing.sm, padding: 12 }} onPress={() => router.push(t.route as any)} testID={`tool-${t.key}`}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={styles.iconBox}>
-                <Icon name={t.icon as any} size={26} color={colors.brandPrimary} />
-              </View>
+              <View style={styles.toolIcon}><Icon name={t.icon as any} size={22} color={colors.brandPrimary} /></View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.itemTitle}>{t.title}</Text>
-                <Text style={styles.itemSub}>{t.subtitle}</Text>
+                <Text style={styles.toolTitle}>{t.title}</Text>
+                <Text style={styles.toolSub}>{t.subtitle}</Text>
               </View>
-              {t.key === "records" && completedCount > 0 ? (
-                <View style={styles.countBadge}><Text style={styles.countText}>{completedCount}</Text></View>
-              ) : null}
-              <Icon name="chevron-right" size={24} color={colors.muted} />
+              <Icon name="chevron-right" size={22} color={colors.muted} />
             </View>
           </Card>
         ))}
@@ -67,13 +137,23 @@ export default function SprayHub() {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md, gap: spacing.md },
   title: { fontSize: 26, fontWeight: "800", color: colors.onSurface },
   sub: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  sectionTitle: { fontSize: 13, fontWeight: "700", color: colors.muted, marginTop: spacing.xl, marginBottom: spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 },
-  iconBox: { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center", marginRight: 14 },
-  itemTitle: { fontSize: 16, fontWeight: "700", color: colors.onSurface },
-  itemSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  countBadge: { backgroundColor: colors.brandPrimary, minWidth: 26, height: 26, paddingHorizontal: 8, borderRadius: 13, alignItems: "center", justifyContent: "center", marginRight: 8 },
-  countText: { color: colors.onBrandPrimary, fontWeight: "800", fontSize: 12 },
+  newBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.brandPrimary, paddingHorizontal: 14, height: 40, borderRadius: 999 },
+  newBtnText: { color: colors.onBrandPrimary, fontWeight: "700" },
+  sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.lg, marginBottom: spacing.sm },
+  sectionTitle: { fontSize: 13, fontWeight: "800", color: colors.muted, marginTop: spacing.lg, marginBottom: spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 },
+  link: { color: colors.brandPrimary, fontWeight: "700", fontSize: 13 },
+  rowTop: { flexDirection: "row", alignItems: "center" },
+  rowIcon: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center", marginRight: 12 },
+  rowTitle: { fontSize: 15, fontWeight: "700", color: colors.onSurface },
+  rowSub: { fontSize: 12, color: colors.onSurfaceTertiary, marginTop: 2 },
+  rowMeta: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  plannedBadge: { backgroundColor: "#DBEAFE", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  plannedBadgeText: { color: "#1E40AF", fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
+  toolIcon: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center", marginRight: 12 },
+  toolTitle: { fontSize: 14, fontWeight: "700", color: colors.onSurface },
+  toolSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  empty: { color: colors.muted, textAlign: "center", fontSize: 13 },
 });
