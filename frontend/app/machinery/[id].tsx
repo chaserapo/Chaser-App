@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, Pressable, Alert } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
@@ -7,6 +7,7 @@ import { ScreenHeader } from "@/src/components/header";
 import { Button, Card, Input, StatusBadge } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo, maintenanceStatus } from "@/src/lib/storage";
+import { confirm } from "@/src/lib/confirm";
 import { MACHINE_TYPES } from "@/src/lib/types";
 import type { Machinery, Maintenance, MaintenanceCompletion, MachineType } from "@/src/lib/types";
 
@@ -93,13 +94,15 @@ export default function MachineDetail() {
 
   function confirmDelete() {
     if (!m) return;
-    Alert.alert("Delete Machine", `Delete ${m.name}? Maintenance and service history will remain.`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
-        await repo.machinery.remove(m.id);
-        router.back();
-      } },
-    ]);
+    confirm({
+      title: "Delete Machine",
+      message: `Delete ${m.name}? Maintenance and service history will remain.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    }, async () => {
+      await repo.machinery.remove(m.id);
+      router.back();
+    });
   }
 
   if (!m) {
@@ -283,14 +286,16 @@ export default function MachineDetail() {
                       </Pressable>
                       <Pressable
                         onPress={() => {
-                          Alert.alert("Delete Schedule", `Remove ${mn.maintenance_type}?`, [
-                            { text: "Cancel", style: "cancel" },
-                            { text: "Delete", style: "destructive", onPress: async () => {
-                              await repo.maintenance.remove(mn.id);
-                              const mm = await repo.maintenance.forMachine(m.id);
-                              setMaints(mm.sort((a, b) => (a.next_service_hours ?? Infinity) - (b.next_service_hours ?? Infinity)));
-                            } },
-                          ]);
+                          confirm({
+                            title: "Delete Schedule",
+                            message: `Remove ${mn.maintenance_type}?`,
+                            confirmLabel: "Delete",
+                            destructive: true,
+                          }, async () => {
+                            await repo.maintenance.remove(mn.id);
+                            const mm = await repo.maintenance.forMachine(m.id);
+                            setMaints(mm.sort((a, b) => (a.next_service_hours ?? Infinity) - (b.next_service_hours ?? Infinity)));
+                          });
                         }}
                         style={styles.iconBtn}
                         testID={`delete-maint-${mn.id}`}

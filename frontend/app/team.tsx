@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, Pressable, Alert, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Pressable, KeyboardAvoidingView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
@@ -7,6 +7,7 @@ import { ScreenHeader } from "@/src/components/header";
 import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { useAuth } from "@/src/lib/auth-context";
+import { confirm } from "@/src/lib/confirm";
 import { membersRepo, invitationsRepo, BusinessMember, MemberInvitation } from "@/src/lib/members";
 
 type Role = "manager" | "operator";
@@ -60,13 +61,15 @@ export default function TeamScreen() {
 
   function confirmRemove(m: BusinessMember) {
     if (m.user_id === user?.id) { setError("You can't remove yourself."); return; }
-    Alert.alert("Remove member", `Remove ${m.email} from ${business?.name}? They'll lose access immediately.`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: async () => {
-        try { await membersRepo.remove(m.user_id); await load(); setNotice(`${m.email} removed.`); }
-        catch (e: any) { setError(e?.message ?? "Failed to remove"); }
-      } },
-    ]);
+    confirm({
+      title: "Remove member",
+      message: `Remove ${m.email} from ${business?.name}? They'll lose access immediately.`,
+      confirmLabel: "Remove",
+      destructive: true,
+    }, async () => {
+      try { await membersRepo.remove(m.user_id); await load(); setNotice(`${m.email} removed.`); }
+      catch (e: any) { setError(e?.message ?? "Failed to remove"); }
+    });
   }
 
   async function resendInvite(inv: MemberInvitation) {
@@ -75,13 +78,16 @@ export default function TeamScreen() {
   }
 
   async function revokeInvite(inv: MemberInvitation) {
-    Alert.alert("Revoke invitation", `Cancel the invite for ${inv.email}?`, [
-      { text: "Keep it", style: "cancel" },
-      { text: "Revoke", style: "destructive", onPress: async () => {
-        try { await invitationsRepo.revoke(inv.id); setNotice(`Invitation to ${inv.email} revoked.`); await load(); }
-        catch (e: any) { setError(e?.message ?? "Failed to revoke"); }
-      } },
-    ]);
+    confirm({
+      title: "Revoke invitation",
+      message: `Cancel the invite for ${inv.email}?`,
+      confirmLabel: "Revoke",
+      cancelLabel: "Keep it",
+      destructive: true,
+    }, async () => {
+      try { await invitationsRepo.revoke(inv.id); setNotice(`Invitation to ${inv.email} revoked.`); await load(); }
+      catch (e: any) { setError(e?.message ?? "Failed to revoke"); }
+    });
   }
 
   return (

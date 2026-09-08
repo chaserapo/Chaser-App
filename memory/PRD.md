@@ -30,8 +30,9 @@ Repository layer (`repo` in `src/lib/storage.ts`) is a Proxy that routes to `loc
 - Marker file `@hectarehq/migrated-v1:<userId>:<businessId>` records completion.
 
 ## Not yet built (parked)
-- Invite-a-member flow + members management screen
 - Realtime subscriptions for multi-device live updates
 - Offline outbox / write-behind sync (schema is already sync-ready)
 - APVMA product search integration
+- Rename business inline from Account card
+- Reset demo data action
 

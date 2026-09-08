@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, Pressable, Linking, Alert } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Pressable, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
@@ -8,6 +8,7 @@ import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { LINK_CATEGORIES } from "@/src/lib/links";
 import { useAuth } from "@/src/lib/auth-context";
+import { confirm } from "@/src/lib/confirm";
 import type { ExternalLink } from "@/src/lib/types";
 
 const TOOLS = [
@@ -29,10 +30,12 @@ export default function More() {
   useFocusEffect(useCallback(() => { repo.links.list().then(setLinks); }, []));
 
   function confirmSignOut() {
-    Alert.alert("Sign out", "You'll be signed out of the cloud. Your local backup stays on this device.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: () => { signOut(); } },
-    ]);
+    confirm({
+      title: "Sign out",
+      message: "You'll be signed out of the cloud. Your local backup stays on this device.",
+      confirmLabel: "Sign out",
+      destructive: true,
+    }, () => { signOut(); });
   }
 
   return (
