@@ -47,8 +47,19 @@ Repository layer (`repo` in `src/lib/storage.ts`) is a Proxy that routes to `loc
 ## Not yet built (parked)
 - Home "Today's Jobs" tiles (Planned / In Progress / Completed) — future pass
 - History filters on /records (date, paddock, crop, chemical, operator, machine)
-- Convert-planned-to-active prefill in /records/new when opened with plannedId
-- Offline outbox / write-behind sync
 - APVMA product search
 - Fertiliser / seeding / harvest records under paddock history
+
+## Beta Launch-Readiness Pass (shipped)
+- **Planned → Active prefill** in `/records/new` when opened with `plannedId`: the form is hydrated from the planned SprayJob row and Start Job reuses the same UUID, so planned→active→completed remains a single row (verified end-to-end in iteration_19).
+- **Required-field validation** on New Job: farm, paddock, operator, machine, area, water rate. Start Job is blocked with a red banner + inline field highlights when anything is missing.
+- **Offline resilience for spray jobs** (`src/lib/offline-queue.ts` + `cloud-repo.ts`): every `sprayJobs.save()` mirrors to AsyncStorage BEFORE the cloud upsert, cloud failures are swallowed and queued for retry, `sprayJobs.active/get` fall back to the shadow when the cloud lookup fails. Retry runs on app focus, every 60s, and on the active-job "Retry" banner (`testID='offline-banner'`).
+- **Failure-state hardening**: `fetchWeather` races GPS lookups against 2.5s/4s timeouts and Open-Meteo against a 6s abort — the app never traps on a denied/slow GPS. `startFinishFlow` renders the finish form synchronously and captures weather + deduction preview in the background. `cancelJob` now routes through `confirm.ts` to prevent accidental deletion.
+- **Legal pages**: `/legal/[slug].tsx` renders long-form Australian-appropriate Privacy Policy, Terms & Agricultural Disclaimer, and Help & Support content. All placeholders (business name, ABN, registered address, state of jurisdiction) are marked in [SQUARE BRACKETS] and a yellow "Beta draft" banner flags them for solicitor review. Linked from More → About.
+
+## Beta launch checklist (recommended before public release)
+- [ ] Replace [SQUARE BRACKET] placeholders in `/legal/[slug].tsx` with registered business name, ABN, address and state of jurisdiction; have Privacy + Terms reviewed by an Australian solicitor.
+- [ ] Run a two-context Playwright RLS A/B sanity check at merge time.
+- [ ] Real-device pass: GPS permission, camera/photo permission, WebView paddock map, notification permission (if enabled).
+
 

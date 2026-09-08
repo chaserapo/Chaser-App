@@ -23,20 +23,42 @@ export async function fetchWeather(): Promise<WeatherSnapshot> {
   let lat = -35.117;
   let lon = 147.356;
 
+  // Race the location lookup against a short timeout so a stalled GPS prompt
+  // (e.g. web headless or a phone with location temporarily unavailable) never
+  // traps the caller — the app falls back to the default coordinates cleanly.
   try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status === "granted") {
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      lat = loc.coords.latitude;
-      lon = loc.coords.longitude;
+    const perm = await Promise.race([
+      Location.requestForegroundPermissionsAsync(),
+      new Promise<{ status: "denied" }>((resolve) => setTimeout(() => resolve({ status: "denied" }), 2500)),
+    ]);
+    if ((perm as any).status === "granted") {
+      const loc = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+      ]);
+      if (loc && (loc as any).coords) {
+        lat = (loc as any).coords.latitude;
+        lon = (loc as any).coords.longitude;
+      }
     }
   } catch {
     // fall through with defaults
   }
 
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m&wind_speed_unit=kmh&timezone=auto`;
-  const res = await fetch(url);
-  const data = await res.json();
+  // Time-box the fetch as well so an offline caller doesn't hang forever.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  let data: any = {};
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    data = await res.json();
+  } catch {
+    // Return best-effort snapshot with zeros so calc doesn't NaN and the user
+    // can enter values manually.
+  } finally {
+    clearTimeout(timer);
+  }
   const c = data.current ?? {};
   const t = Number(c.temperature_2m ?? 0);
   const rh = Number(c.relative_humidity_2m ?? 0);

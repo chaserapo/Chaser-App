@@ -206,6 +206,37 @@ export default function More() {
           );
         })}
 
+        <Text style={styles.sectionTitle}>About</Text>
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <Pressable
+            onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "privacy" } })}
+            testID="link-privacy"
+            style={({ pressed }) => [styles.row, styles.rowBorder, pressed && { backgroundColor: colors.surface }]}
+          >
+            <Icon name="shield-lock-outline" size={22} color={colors.brandPrimary} />
+            <Text style={styles.rowText}>Privacy Policy</Text>
+            <Icon name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "terms" } })}
+            testID="link-terms"
+            style={({ pressed }) => [styles.row, styles.rowBorder, pressed && { backgroundColor: colors.surface }]}
+          >
+            <Icon name="file-document-outline" size={22} color={colors.brandPrimary} />
+            <Text style={styles.rowText}>Terms & Agricultural Disclaimer</Text>
+            <Icon name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "support" } })}
+            testID="link-support"
+            style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]}
+          >
+            <Icon name="lifebuoy" size={22} color={colors.brandPrimary} />
+            <Text style={styles.rowText}>Help & Support</Text>
+            <Icon name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+        </Card>
+
         <View style={{ height: spacing.md }} />
         <Pressable onPress={() => router.push("/links")} testID="manage-all-links-btn" style={styles.manageBtn}>
           <Icon name="playlist-edit" size={20} color={colors.brandPrimary} />

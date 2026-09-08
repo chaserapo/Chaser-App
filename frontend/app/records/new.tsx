@@ -30,7 +30,7 @@ function uniqueByName<T extends { name: string }>(list: T[]): T[] {
 export default function NewSprayJob() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ draft?: string }>();
+  const params = useLocalSearchParams<{ draft?: string; plannedId?: string; paddockId?: string }>();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [paddocks, setPaddocks] = useState<Paddock[]>([]);
   const [machs, setMachs] = useState<Machinery[]>([]);
@@ -79,8 +79,9 @@ export default function NewSprayJob() {
   // Draft resume
   useEffect(() => {
     (async () => {
-      if (!params.draft) return;
-      const draft = await repo.sprayJobs.get(params.draft as string);
+      const sourceId = (params.plannedId as string) || (params.draft as string);
+      if (!sourceId) return;
+      const draft = await repo.sprayJobs.get(sourceId);
       if (!draft) return;
       setF((s) => ({
         ...s,
@@ -101,7 +102,7 @@ export default function NewSprayJob() {
       }));
       setProducts(draft.products.map((p) => ({ ...p, rateStr: p.rate.toString() })));
     })();
-  }, [params.draft]);
+  }, [params.draft, params.plannedId]);
 
   useEffect(() => { captureWeather(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
@@ -215,7 +216,7 @@ export default function NewSprayJob() {
   function buildJob(status: SprayJobStatus): SprayJob {
     const area = parseFloat(f.area_ha) || 0;
     return {
-      id: params.draft ? (params.draft as string) : uuid(),
+      id: (params.plannedId as string) || (params.draft as string) || uuid(),
       business_id: "",
       status,
       farm_id: f.farm_id || undefined, farm_name: f.farm_name || undefined,

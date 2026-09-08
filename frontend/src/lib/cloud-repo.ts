@@ -4,6 +4,7 @@
 
 import { supabase } from "./supabase";
 import { getActiveBusinessId } from "./backend";
+import { offlineQueue } from "./offline-queue";
 import type {
   Business, Farm, Paddock, Chemical, ChemicalBatch, Machinery, Maintenance,
   MaintenanceCompletion, SprayJob, SprayJobProduct, ExternalLink, Operator, StockMovement,
@@ -42,30 +43,54 @@ function stripProducts(job: SprayJob): Omit<SprayJob, "products"> {
 }
 
 async function saveSprayJob(job: SprayJob) {
-  await upsertRow("spray_jobs", stripProducts(job) as any);
-  // Upsert current products, delete removed ones.
-  const productRows = (job.products ?? []).map((p) => ({
-    id: p.id,
-    business_id: bid(),
-    spray_job_id: job.id,
-    chemical_id: p.chemical_id,
-    chemical_name: p.chemical_name,
-    rate: p.rate,
-    unit: p.unit,
-    custom_unit_label: p.custom_unit_label ?? null,
-    total_qty: p.total_qty ?? null,
-    total_qty_unit: p.total_qty_unit ?? null,
-  }));
-  if (productRows.length > 0) {
-    const { error } = await supabase.from("spray_job_products").upsert(productRows, { onConflict: "id", defaultToNull: false });
-    if (error) throw error;
+  // 1) Always mirror to local shadow FIRST so a crash / network drop can't
+  //    lose the farmer's active job or entered spray information.
+  const businessId = bid();
+  const jobWithBiz: SprayJob = { ...job, business_id: businessId };
+  try {
+    await offlineQueue.mirror(businessId, jobWithBiz);
+  } catch (e) {
+    // AsyncStorage should never fail on a real device; swallow so we still try
+    // the cloud path.
+    console.warn("offline mirror failed", e);
   }
-  // Delete any products for this job that are no longer in the list (hard delete — child table)
-  const keepIds = productRows.map((p) => p.id);
-  let delQ = supabase.from("spray_job_products").delete().eq("spray_job_id", job.id).eq("business_id", bid());
-  if (keepIds.length > 0) delQ = delQ.not("id", "in", `(${keepIds.map((i) => `"${i}"`).join(",")})`);
-  const { error: delErr } = await delQ;
-  if (delErr) throw delErr;
+
+  // 2) Attempt the cloud upsert (job + products).
+  try {
+    await upsertRow("spray_jobs", stripProducts(jobWithBiz) as any);
+    const productRows = (jobWithBiz.products ?? []).map((p) => ({
+      id: p.id,
+      business_id: businessId,
+      spray_job_id: jobWithBiz.id,
+      chemical_id: p.chemical_id,
+      chemical_name: p.chemical_name,
+      rate: p.rate,
+      unit: p.unit,
+      custom_unit_label: p.custom_unit_label ?? null,
+      total_qty: p.total_qty ?? null,
+      total_qty_unit: p.total_qty_unit ?? null,
+    }));
+    if (productRows.length > 0) {
+      const { error } = await supabase.from("spray_job_products").upsert(productRows, { onConflict: "id", defaultToNull: false });
+      if (error) throw error;
+    }
+    const keepIds = productRows.map((p) => p.id);
+    let delQ = supabase.from("spray_job_products").delete().eq("spray_job_id", jobWithBiz.id).eq("business_id", businessId);
+    if (keepIds.length > 0) delQ = delQ.not("id", "in", `(${keepIds.map((i) => `"${i}"`).join(",")})`);
+    const { error: delErr } = await delQ;
+    if (delErr) throw delErr;
+
+    // 3) Cloud write succeeded — clear the pending flag.
+    await offlineQueue.markSynced(businessId, jobWithBiz.id);
+  } catch (e) {
+    // Cloud write failed — record the error but let the save() call succeed so
+    // the UI can move forward. The shadow is still there and will retry on
+    // next focus / flush.
+    await offlineQueue.markFailed(businessId, jobWithBiz.id, e);
+    // Swallow rather than throw: for the beta we prefer the farmer to keep
+    // working with cached data over blocking the flow on a network hiccup.
+    console.warn("spray job cloud save failed — kept in offline queue", e);
+  }
 }
 
 async function hydrateJobs(jobs: any[]): Promise<SprayJob[]> {
@@ -235,18 +260,41 @@ export const cloudRepo = {
     remove: (id: string) => softDelete("maintenance_completions", id),
   },
   sprayJobs: {
-    list: async () => hydrateJobs(await listRows<any>("spray_jobs")),
-    active: async () => {
-      const jobs = await hydrateJobs(await listRows<any>("spray_jobs", { extraEq: [["status", "active"]] }));
-      return jobs[0] ?? null;
+    list: async () => {
+      try { return await hydrateJobs(await listRows<any>("spray_jobs")); }
+      catch (e) {
+        console.warn("sprayJobs.list cloud fail, using shadow", e);
+        const local = await offlineQueue.findLocalActive(bid());
+        return local ? [local] : [];
+      }
     },
-    completed: async () => hydrateJobs(await listRows<any>("spray_jobs", { extraEq: [["status", "completed"]] })),
+    active: async () => {
+      // Cloud-first, shadow-fallback so a farmer running an active job never
+      // loses sight of it during a reception blackspot.
+      try {
+        const jobs = await hydrateJobs(await listRows<any>("spray_jobs", { extraEq: [["status", "active"]] }));
+        if (jobs[0]) return jobs[0];
+      } catch (e) {
+        console.warn("sprayJobs.active cloud fail, using shadow", e);
+      }
+      return await offlineQueue.findLocalActive(bid());
+    },
+    completed: async () => {
+      try { return await hydrateJobs(await listRows<any>("spray_jobs", { extraEq: [["status", "completed"]] })); }
+      catch (e) { console.warn("sprayJobs.completed cloud fail", e); return []; }
+    },
     save: saveSprayJob,
     remove: (id: string) => softDelete("spray_jobs", id),
     get: async (id: string) => {
-      const rows = await listRows<any>("spray_jobs", { extraEq: [["id", id]] });
-      const jobs = await hydrateJobs(rows);
-      return jobs[0] ?? null;
+      try {
+        const rows = await listRows<any>("spray_jobs", { extraEq: [["id", id]] });
+        const jobs = await hydrateJobs(rows);
+        if (jobs[0]) return jobs[0];
+      } catch (e) {
+        console.warn("sprayJobs.get cloud fail, using shadow", e);
+      }
+      // Shadow fallback — critical for active jobs when reception drops.
+      return await offlineQueue.getShadow(bid(), id);
     },
   },
   operators: {
@@ -280,3 +328,25 @@ export const cloudRepo = {
   async markLinksSeeded() { /* no-op */ },
   async clearAll() { /* refuse to wipe cloud from client */ },
 };
+
+/**
+ * Retry any spray jobs that failed to reach Supabase (offline / timeout).
+ * Safe to call on app focus / after sign-in. No-op when nothing pending.
+ */
+export async function flushOfflineSprayJobs(): Promise<{ attempted: number; synced: number }> {
+  const businessId = getActiveBusinessId();
+  if (!businessId) return { attempted: 0, synced: 0 };
+  const pending = await offlineQueue.listPending();
+  let synced = 0;
+  for (const { business_id, job } of pending) {
+    if (business_id !== businessId) continue; // don't touch other business queues
+    try {
+      // Reuse saveSprayJob so we get identical write semantics (mirror included).
+      await saveSprayJob(job);
+      if (!(await offlineQueue.isPending(business_id, job.id))) synced += 1;
+    } catch (e) {
+      console.warn("flushOfflineSprayJobs retry failed", e);
+    }
+  }
+  return { attempted: pending.length, synced };
+}

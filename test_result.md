@@ -101,3 +101,144 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Chaser - Beta Launch-Readiness Pass. This iteration must (1) verify end-to-end spray-job workflow
+  on a fresh signup — signup → create/select farm → paddock → machinery → planned spray job → start
+  → active → complete → verify record; (2) verify no duplicate rows are produced between planned
+  and started jobs and that RLS keeps different businesses isolated; (3) confirm the offline
+  resilience layer (spray-job shadow + retry queue in /app/frontend/src/lib/offline-queue.ts)
+  keeps an active job available when Supabase reads/writes fail; (4) confirm legal pages render
+  from /legal/[slug].tsx and are linked from the More tab; (5) confirm form validation blocks
+  "Start Job" without required fields.
+
+frontend:
+  - task: "Planned Job prefill from Spray hub"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/records/new.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "params.plannedId (same code path as params.draft) hydrates form from the planned SprayJob row. On Start Job we reuse the same id so the planned row is upserted to status='active' — no duplicate. Please verify: (a) opening a planned card from /spray prefills paddock/machinery/products, (b) tapping Start Job promotes the same row and Spray hub shows 1 active + 0 planned for that job."
+
+  - task: "Required-field validation blocks Start Job"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/records/new.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "REQUIRED = farm_id, paddock_id, operator_id, machinery_id, area_ha, water_rate. validate() highlights missing fields and blocks the cloud save. Verify a blank form cannot start a job and the red banner shows the missing count."
+
+  - task: "Offline resilience for active spray job"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/lib/offline-queue.ts, /app/frontend/src/lib/cloud-repo.ts, /app/frontend/app/active-job/[id].tsx, /app/frontend/app/_layout.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "cloudRepo.sprayJobs.save now mirrors to AsyncStorage BEFORE the cloud upsert; cloud failures are swallowed but the local shadow stays pending and is retried on app focus, every 60s, or when the user taps Retry on the active-job banner. cloudRepo.sprayJobs.active/get fall back to the shadow when the cloud query fails or returns nothing. Verify: (i) an active job persists across a hard reload of the web preview, (ii) the offline banner appears when Supabase is unreachable and clears when sync succeeds."
+
+  - task: "Legal pages (Privacy / Terms / Support) and More-tab links"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/legal/[slug].tsx, /app/frontend/app/(tabs)/more.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Legal pages render structured sections with a Beta-draft yellow banner flagging [SQUARE BRACKET] placeholders that need the business's real ABN/address and a solicitor review. More → About links to /legal/privacy, /legal/terms, /legal/support."
+
+  - task: "End-to-end signup → farm → paddock → machinery → planned job → start → complete flow"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/**"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Please run the whole happy-path with a fresh signup pattern hqauto<TS>@gmail.com / Test1234!. Verify the completed record shows correct paddock, machine, operator, tank-mix products, and no duplicate spray_jobs rows land in Supabase (planned→active→completed reuses the same id)."
+
+backend:
+  - task: "Multi-tenant RLS isolation on core tables (businesses, business_members, farms, paddocks, spray_jobs, spray_job_products, machinery, chemicals)"
+    implemented: true
+    working: "NA"
+    file: "Supabase project (see /app/frontend/src/lib/cloud-repo.ts)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Please sign up two distinct businesses (A and B), create data in each, and confirm from Supabase logs / the app that neither can see or mutate the other's rows. In particular, confirm spray_jobs and spray_job_products cannot be listed/updated cross-business."
+
+  - task: "Backend /api/invitations email dispatch endpoint remains healthy"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/routes/invitations.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Smoke test the invitation endpoint responds (400 on missing fields, 200 or provider-passthrough on a valid payload). Not blocking beta if send fails at Resend layer."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 18
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "End-to-end signup → farm → paddock → machinery → planned job → start → complete flow"
+    - "Planned Job prefill from Spray hub"
+    - "Required-field validation blocks Start Job"
+    - "Offline resilience for active spray job"
+    - "Legal pages (Privacy / Terms / Support) and More-tab links"
+    - "Multi-tenant RLS isolation on core tables (businesses, business_members, farms, paddocks, spray_jobs, spray_job_products, machinery, chemicals)"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Beta Launch-Readiness Pass code complete. Please run the full P0 test list above with the
+      web preview at http://localhost:3000. Sign up with hqauto<TIMESTAMP>@gmail.com / Test1234!
+      Business = "Chaser Beta Test <TS>". Do NOT use @hectarehq.com. Cover: (1) happy-path spray
+      workflow with a planned job, (2) validation blocks empty Start Job, (3) RLS isolation with
+      two separate businesses, (4) offline resilience (there is a "Saved locally" banner on the
+      active-job screen when Supabase is unreachable). Return: test_reports/iteration_18.json.
+  - agent: "testing"
+    message: |
+      iteration_18: Backend 6/6 PASS, Frontend 9/10 PASS. Flagged one MEDIUM (finish-spray-job-btn
+      not visibly committing — likely blocked on GPS-permission-await) and one LOW (window.confirm
+      blocks headless A/B RLS cross-check). No cross-business leaks observed in per-session data.
+  - agent: "main"
+    message: |
+      Applied fixes: (a) startFinishFlow now sets finishMode synchronously and fetches weather /
+      previews in the background so a stalled GPS prompt cannot trap the farmer; (b) fetchWeather
+      races GPS lookups against 2.5s/4s timeouts and Open-Meteo fetch against a 6s abort;
+      (c) cancelJob now goes through confirm.ts to avoid accidental job deletion.
+  - agent: "testing"
+    message: |
+      iteration_19: All three fixes PASS in headless. Finish form renders in 0.03s, Start Job
+      reachable in 0.01s with no GPS, cancelJob goes through confirm.ts. Planned→active→completed
+      preserves a single spray_jobs id (verified end-to-end with live Supabase). No product bugs
+      found. `retest_needed: false`. Ready for beta launch on this scope.

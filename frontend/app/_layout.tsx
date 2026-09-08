@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
-import { LogBox, View, ActivityIndicator } from "react-native";
+import { LogBox, View, ActivityIndicator, AppState } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useEffect, useState } from "react";
@@ -12,11 +12,31 @@ import { colors } from "@/src/theme";
 import { AuthProvider, useAuth } from "@/src/lib/auth-context";
 import { AuthScreen } from "@/src/features/auth/AuthScreen";
 import { MigrationScreen } from "@/src/features/auth/MigrationScreen";
+import { flushOfflineSprayJobs } from "@/src/lib/cloud-repo";
+import { getBackendMode } from "@/src/lib/backend";
 
 LogBox.ignoreAllLogs(true);
 
 function AuthGate() {
   const { loading, session, business, migration } = useAuth();
+
+  // Offline queue: flush any pending spray-job writes as soon as we have a
+  // business (post sign-in / bootstrap) and whenever the app comes back to
+  // the foreground. This is what lets a job saved during a reception blackspot
+  // reach Supabase when service returns.
+  useEffect(() => {
+    if (!business) return;
+    const attemptFlush = () => {
+      if (getBackendMode() !== "cloud") return;
+      flushOfflineSprayJobs().catch((e) => console.warn("flush error", e));
+    };
+    attemptFlush();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") attemptFlush();
+    });
+    const t = setInterval(attemptFlush, 60_000); // periodic retry — cheap, no-op when queue empty
+    return () => { sub.remove(); clearInterval(t); };
+  }, [business]);
 
   if (loading) {
     return (

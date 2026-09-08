@@ -10,6 +10,10 @@ import { repo } from "@/src/lib/storage";
 import { fetchWeather } from "@/src/lib/weather";
 import { previewDeductions, applyDeductions, DeductionPreview } from "@/src/lib/stock";
 import { productTotalForJob } from "@/src/lib/calculators";
+import { offlineQueue } from "@/src/lib/offline-queue";
+import { flushOfflineSprayJobs } from "@/src/lib/cloud-repo";
+import { getActiveBusinessId } from "@/src/lib/backend";
+import { confirm } from "@/src/lib/confirm";
 import type { SprayJob } from "@/src/lib/types";
 
 function formatElapsed(ms: number) {
@@ -34,8 +38,30 @@ export default function ActiveJob() {
   const [capturingFinishWx, setCapturingFinishWx] = useState(false);
   const [deductStock, setDeductStock] = useState(true);
   const [previews, setPreviews] = useState<DeductionPreview[]>([]);
+  const [offlinePending, setOfflinePending] = useState(false);
+  const [retryingSync, setRetryingSync] = useState(false);
 
   useFocusEffect(useCallback(() => { if (id) repo.sprayJobs.get(id as string).then((j) => { setJob(j); if (j?.area_ha) setActualHa(j.area_ha.toString()); }); }, [id]));
+
+  // Poll pending-sync status so the farmer knows their changes are safe even
+  // when reception is down.
+  useEffect(() => {
+    if (!id) return;
+    const check = async () => {
+      const businessId = getActiveBusinessId();
+      if (!businessId) return;
+      setOfflinePending(await offlineQueue.isPending(businessId, id as string));
+    };
+    check();
+    const t = setInterval(check, 4_000);
+    return () => clearInterval(t);
+  }, [id]);
+
+  async function retrySync() {
+    setRetryingSync(true);
+    try { await flushOfflineSprayJobs(); }
+    finally { setRetryingSync(false); }
+  }
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -53,19 +79,27 @@ export default function ActiveJob() {
   }, [job]);
 
   async function startFinishFlow() {
+    // Render the finish UI IMMEDIATELY — do not block on weather capture or
+    // location permission. Weather + deduction preview are populated in the
+    // background so a slow GPS prompt (or an outright denial) never traps the
+    // farmer on the active screen.
+    setFinishMode(true);
     setCapturingFinishWx(true);
-    try {
-      const w = await fetchWeather();
-      setFinishWeather({
-        t: w.temperature_c.toFixed(1),
-        h: w.humidity.toFixed(0),
-        dt: w.delta_t.toFixed(1),
-        ws: w.wind_speed.toFixed(0),
-        wd: w.wind_direction,
-        at: w.captured_at,
-      });
-    } catch (e) { console.warn(e); }
-    finally { setCapturingFinishWx(false); setFinishMode(true); }
+    // Kick off weather async (non-blocking)
+    (async () => {
+      try {
+        const w = await fetchWeather();
+        setFinishWeather({
+          t: w.temperature_c.toFixed(1),
+          h: w.humidity.toFixed(0),
+          dt: w.delta_t.toFixed(1),
+          ws: w.wind_speed.toFixed(0),
+          wd: w.wind_direction,
+          at: w.captured_at,
+        });
+      } catch (e) { console.warn("finish weather fetch failed", e); }
+      finally { setCapturingFinishWx(false); }
+    })();
     // Compute deduction preview based on current job products + actualHa (or planned area)
     if (job) {
       const area = parseFloat(actualHa) || job.area_ha || 0;
@@ -77,8 +111,10 @@ export default function ActiveJob() {
           return { ...p, total_qty: area > 0 ? t.amount : undefined, total_qty_unit: area > 0 ? t.unit : undefined };
         }),
       };
-      const preview = await previewDeductions(withTotals);
-      setPreviews(preview);
+      try {
+        const preview = await previewDeductions(withTotals);
+        setPreviews(preview);
+      } catch (e) { console.warn("deduction preview failed", e); }
     }
   }
 
@@ -105,8 +141,15 @@ export default function ActiveJob() {
 
   async function cancelJob() {
     if (!job) return;
-    await repo.sprayJobs.remove(job.id);
-    router.replace("/(tabs)");
+    confirm({
+      title: "Cancel this spray job?",
+      message: "The active job will be deleted from your records. This can't be undone.",
+      confirmLabel: "Delete Job",
+      destructive: true,
+    }, async () => {
+      await repo.sprayJobs.remove(job.id);
+      router.replace("/(tabs)");
+    });
   }
 
   if (!job) {
@@ -125,6 +168,17 @@ export default function ActiveJob() {
             <Text style={styles.timer} testID="active-timer">{formatElapsed(now - startMs)}</Text>
             <Text style={styles.startInfo}>Started {job.start_time ?? "—"}</Text>
           </Card>
+
+          {offlinePending ? (
+            <Pressable onPress={retrySync} testID="offline-banner" style={styles.offlineBanner}>
+              <Icon name="cloud-off-outline" size={18} color={colors.warning} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.offlineTitle}>Saved locally — waiting for reception</Text>
+                <Text style={styles.offlineSub}>Your job and any updates are safe on this device. Tap to retry now.</Text>
+              </View>
+              <Text style={styles.offlineRetry}>{retryingSync ? "Retrying…" : "Retry"}</Text>
+            </Pressable>
+          ) : null}
 
           <Card style={{ marginTop: spacing.md }}>
             <Text style={styles.h1}>{job.paddock_name ?? "Paddock"}</Text>
@@ -274,4 +328,8 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12, color: colors.muted, marginTop: 8, fontWeight: "600" },
   discl: { fontSize: 11, color: colors.muted, marginTop: 8, lineHeight: 15 },
   empty: { color: colors.muted, textAlign: "center", fontStyle: "italic" },
+  offlineBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: spacing.md, backgroundColor: "#FFFBEB", borderColor: colors.warning, borderWidth: 1, borderRadius: radius.md, padding: spacing.md },
+  offlineTitle: { fontSize: 13, fontWeight: "800", color: colors.warning },
+  offlineSub: { fontSize: 11, color: colors.onSurfaceTertiary, marginTop: 2 },
+  offlineRetry: { fontSize: 12, fontWeight: "800", color: colors.warning, textTransform: "uppercase", letterSpacing: 0.5 },
 });
