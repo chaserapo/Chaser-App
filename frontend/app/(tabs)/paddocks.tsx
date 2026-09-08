@@ -30,6 +30,9 @@ export default function PaddocksTab() {
   const [gpsOn, setGpsOn] = useState(false);
   const mapRef = useRef<PaddockMapHandle>(null);
   const gpsWatch = useRef<Location.LocationSubscription | null>(null);
+  const driveWatch = useRef<Location.LocationSubscription | null>(null);
+  const lastDrivePoint = useRef<{ lat: number; lon: number; ts: number } | null>(null);
+  const [driving, setDriving] = useState(false);
 
   const load = useCallback(async () => {
     const list = await repo.paddocks.active();
@@ -39,7 +42,46 @@ export default function PaddocksTab() {
   useRealtime(["paddocks"], load, [load]);
 
   // Cleanup GPS on unmount
-  useEffect(() => () => { gpsWatch.current?.remove(); }, []);
+  useEffect(() => () => { gpsWatch.current?.remove(); driveWatch.current?.remove(); }, []);
+
+  function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
+    const R = 6371000; const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat); const dLon = toRad(b.lon - a.lon);
+    const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(s));
+  }
+
+  async function toggleDrive() {
+    if (driving) {
+      driveWatch.current?.remove(); driveWatch.current = null;
+      lastDrivePoint.current = null;
+      setDriving(false);
+      return;
+    }
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") { alert("Location permission is required to drive a boundary."); return; }
+    setDriving(true);
+    // Enter draw mode so drawn points render on the map
+    if (mode !== "draw") { setMode("draw"); mapRef.current?.setMode("draw"); }
+    // Seed with the first fix
+    const first = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
+    mapRef.current?.addPoint(first.coords.latitude, first.coords.longitude);
+    mapRef.current?.setPosition(first.coords.latitude, first.coords.longitude, true);
+    lastDrivePoint.current = { lat: first.coords.latitude, lon: first.coords.longitude, ts: Date.now() };
+    driveWatch.current = await Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.Highest, timeInterval: 2000, distanceInterval: 3 },
+      (loc) => {
+        const p = { lat: loc.coords.latitude, lon: loc.coords.longitude, ts: Date.now() };
+        mapRef.current?.setPosition(p.lat, p.lon, false);
+        const last = lastDrivePoint.current;
+        // Add a point every ~5m or 4s, whichever first
+        if (!last || haversine(last, p) >= 5 || p.ts - last.ts >= 4000) {
+          mapRef.current?.addPoint(p.lat, p.lon);
+          lastDrivePoint.current = p;
+        }
+      },
+    );
+  }
 
   async function toggleGps() {
     if (gpsOn) {
@@ -67,6 +109,9 @@ export default function PaddocksTab() {
     mapRef.current?.clear();
   }
   function cancelDraw() {
+    driveWatch.current?.remove(); driveWatch.current = null;
+    lastDrivePoint.current = null;
+    setDriving(false);
     mapRef.current?.clear();
     mapRef.current?.setMode("view");
     setMode("view"); setDrawInfo({ count: 0, areaHa: 0 });
@@ -137,10 +182,17 @@ export default function PaddocksTab() {
               <Input label="Crop (optional)" value={crop} onChangeText={setCrop} placeholder="e.g. Wheat" testID="draw-crop" />
               <Text style={styles.drawMeta}>
                 {drawInfo.count === 0
-                  ? "Tap the map to add corner points. You need at least 3 points."
-                  : `${drawInfo.count} point${drawInfo.count === 1 ? "" : "s"} · ${drawInfo.areaHa.toFixed(2)} ha`}
+                  ? "Tap the map to add corner points, or hit Drive to record while driving the boundary."
+                  : `${drawInfo.count} point${drawInfo.count === 1 ? "" : "s"} · ${drawInfo.areaHa.toFixed(2)} ha${driving ? "  •  RECORDING" : ""}`}
               </Text>
               <Text style={styles.drawHint}>Drag a point to move it · long-press to remove it</Text>
+              <View style={{ height: 8 }} />
+              <Pressable onPress={toggleDrive} style={[styles.driveBtn, driving && styles.driveBtnOn]} testID="drive-toggle-btn">
+                <Icon name={driving ? "stop-circle-outline" : "car-connected"} size={18} color={driving ? colors.onBrandPrimary : colors.brandPrimary} />
+                <Text style={[styles.driveBtnText, driving && { color: colors.onBrandPrimary }]}>
+                  {driving ? "Stop recording" : "Drive boundary (GPS)"}
+                </Text>
+              </Pressable>
             </Card>
             <View style={styles.drawRow}>
               <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.undo()} disabled={drawInfo.count === 0} testID="draw-undo-btn">
@@ -235,4 +287,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
   emptyBody: { color: colors.muted, marginTop: 4, fontSize: 13, lineHeight: 18 },
   savingOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.4)" },
+  driveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 40, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.brandPrimary, backgroundColor: colors.surface },
+  driveBtnOn: { backgroundColor: colors.error, borderColor: colors.error },
+  driveBtnText: { fontWeight: "700", color: colors.brandPrimary, fontSize: 13 },
 });

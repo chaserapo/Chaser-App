@@ -184,6 +184,12 @@ export const MAP_HTML = `<!doctype html>
           break;
         case 'undo': drawPoints.pop(); renderDrawing(); postPointsUpdate(); break;
         case 'clear': drawPoints = []; renderDrawing(); postPointsUpdate(); break;
+        case 'addPoint':
+          if (typeof msg.lon === 'number' && typeof msg.lat === 'number') {
+            drawPoints.push([msg.lon, msg.lat]);
+            renderDrawing(); postPointsUpdate();
+          }
+          break;
         case 'save':
           if (drawPoints.length < 3) { post({ type: 'save', error: 'Need at least 3 points' }); return; }
           const coords = [...drawPoints, drawPoints[0]];

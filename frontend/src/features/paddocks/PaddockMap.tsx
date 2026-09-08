@@ -16,6 +16,7 @@ export type PaddockMapHandle = {
   undo: () => void;
   clear: () => void;
   save: () => void;
+  addPoint: (lat: number, lon: number) => void;
   setPosition: (lat: number, lon: number, recenter?: boolean) => void;
   focusPaddock: (id: string) => void;
 };
@@ -50,6 +51,7 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
     undo: () => send({ type: "undo" }),
     clear: () => send({ type: "clear" }),
     save: () => send({ type: "save" }),
+    addPoint: (lat, lon) => send({ type: "addPoint", lat, lon }),
     setPosition: (lat, lon, recenter) => send({ type: "setPosition", lat, lon, recenter }),
     focusPaddock: (id) => send({ type: "focusPaddock", id }),
   }), [send]);
@@ -110,6 +112,7 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
     undo: () => send({ type: "undo" }),
     clear: () => send({ type: "clear" }),
     save: () => send({ type: "save" }),
+    addPoint: (lat, lon) => send({ type: "addPoint", lat, lon }),
     setPosition: (lat, lon, recenter) => send({ type: "setPosition", lat, lon, recenter }),
     focusPaddock: (id) => send({ type: "focusPaddock", id }),
   }), [send]);
