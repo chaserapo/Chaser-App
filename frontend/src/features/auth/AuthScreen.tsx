@@ -42,8 +42,8 @@ export function AuthScreen() {
         >
           <View style={styles.brand}>
             <View style={styles.logo}><Icon name="sprout" size={32} color={colors.onBrandPrimary} /></View>
-            <Text style={styles.title}>HectareHQ</Text>
-            <Text style={styles.sub}>Farm spraying & machinery, in one place.</Text>
+            <Text style={styles.title}>Chaser</Text>
+            <Text style={styles.sub}>Behind every good operation</Text>
           </View>
 
           <View style={styles.tabs}>

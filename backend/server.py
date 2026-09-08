@@ -52,6 +52,10 @@ async def get_status_checks():
     status_checks = await db.status_checks.find().to_list(1000)
     return [StatusCheck(**status_check) for status_check in status_checks]
 
+# Feature routes
+from routes.invitations import router as invitations_router  # noqa: E402
+api_router.include_router(invitations_router)
+
 # Include the router in the main app
 app.include_router(api_router)
 

@@ -17,6 +17,11 @@ A mobile-first spray application & machinery management app for Australian broad
 - **Machinery**: dashboard with fleet summary tiles (Machines / Due Soon / Overdue); machine detail with view + edit mode, sprayer-specific setup card, Connected Data stub (for future telematics), full maintenance schedule + "Mark Complete" workflow with permanent Service History and auto-rescheduling (editable next-due).
 - **More/Tools**: calculators + external Australian resources grouped Weather / Chemicals & Labels / Spray Application / Agronomy.
 
+# Chaser · Behind every good operation
+
+Chaser (formerly HectareHQ) is an Australian farm operations app for broadacre farmers.
+Multi-tenant, Supabase-backed, mobile-first for use in tractors, sprayers, utes and around machinery.
+
 ## Data model (Supabase-backed, deployed)
 Multi-tenant Postgres schema with role-based RLS + soft deletes:
 `businesses`, `business_members` (owner/manager/operator), `farms`, `paddocks`, `chemicals`, `chemical_batches`, `stock_movements`, `machinery`, `maintenance_schedules`, `maintenance_completions`, `spray_jobs`, `spray_job_products`, `operators`, `external_links`.

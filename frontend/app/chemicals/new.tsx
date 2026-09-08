@@ -78,7 +78,7 @@ export default function NewChemical() {
 
           <Text style={styles.section}>Default rate (yours)</Text>
           <Card>
-            <Text style={styles.hint}>HectareHQ never suggests application rates. Save your own default here.</Text>
+            <Text style={styles.hint}>Chaser never suggests application rates. Save your own default here.</Text>
             <View style={{ flexDirection: "row", gap: 8 }}>
               <View style={{ flex: 1 }}>
                 <Input label="Rate" value={f.default_rate} onChangeText={(v) => setF({ ...f, default_rate: v })} keyboardType="decimal-pad" testID="input-default-rate" />

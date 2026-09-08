@@ -7,6 +7,7 @@ import { Button, Card, SectionTitle, StatusBadge } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { fetchWeather, WeatherSnapshot } from "@/src/lib/weather";
 import { repo, maintenanceStatus } from "@/src/lib/storage";
+import { useRealtime } from "@/src/lib/realtime";
 import type { SprayJob, Maintenance } from "@/src/lib/types";
 
 function formatUpdated(iso?: string) {
@@ -77,6 +78,11 @@ export default function Home() {
 
   useEffect(() => { loadWeather(); }, [loadWeather]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+  useRealtime(
+    ["machinery", "maintenance_schedules", "maintenance_completions", "spray_jobs"],
+    loadData,
+    [loadData],
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -89,7 +95,8 @@ export default function Home() {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.greeting}>Good day</Text>
-          <Text style={styles.title}>HectareHQ</Text>
+          <Text style={styles.title}>Chaser</Text>
+          <Text style={styles.tagline}>Behind every good operation</Text>
         </View>
         <Pressable onPress={loadWeather} style={styles.refreshBtn} testID="refresh-weather-btn">
           <Icon name="refresh" size={22} color={colors.onSurface} />
@@ -250,6 +257,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md },
   greeting: { color: colors.muted, fontSize: 13, fontWeight: "600" },
   title: { color: colors.onSurface, fontSize: 26, fontWeight: "800", marginTop: 2 },
+  tagline: { color: colors.muted, fontSize: 12, fontStyle: "italic", marginTop: 2 },
   refreshBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
   weatherCard: { padding: spacing.lg },
   weatherHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md },

@@ -6,6 +6,7 @@ import Icon from "@react-native-vector-icons/material-design-icons";
 import { Card } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
+import { useRealtime } from "@/src/lib/realtime";
 
 const HUB = [
   { key: "search", title: "Search Chemicals", subtitle: "Find products in your register", icon: "magnify", route: "/chemicals" },
@@ -24,24 +25,25 @@ export default function ChemicalsHub() {
   const [expiringSoon, setExpiringSoon] = useState(0);
   const [expired, setExpired] = useState(0);
 
-  useFocusEffect(useCallback(() => {
-    (async () => {
-      const list = await repo.chemicals.active();
-      setTotal(list.length);
-      setLowStock(list.filter((c) => c.stock_qty != null && c.stock_qty <= 1).length);
-      const batches = await repo.chemicalBatches.list();
-      const now = Date.now();
-      let soon = 0, exp = 0;
-      for (const b of batches) {
-        if (!b.expiry_date) continue;
-        const days = Math.floor((new Date(b.expiry_date).getTime() - now) / 86400000);
-        if (days < 0) exp++;
-        else if (days <= 30) soon++;
-      }
-      setExpiringSoon(soon);
-      setExpired(exp);
-    })();
-  }, []));
+  const load = useCallback(async () => {
+    const list = await repo.chemicals.active();
+    setTotal(list.length);
+    setLowStock(list.filter((c) => c.stock_qty != null && c.stock_qty <= 1).length);
+    const batches = await repo.chemicalBatches.list();
+    const now = Date.now();
+    let soon = 0, exp = 0;
+    for (const b of batches) {
+      if (!b.expiry_date) continue;
+      const days = Math.floor((new Date(b.expiry_date).getTime() - now) / 86400000);
+      if (days < 0) exp++;
+      else if (days <= 30) soon++;
+    }
+    setExpiringSoon(soon);
+    setExpired(exp);
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useRealtime(["chemicals", "chemical_batches", "stock_movements"], load, [load]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>

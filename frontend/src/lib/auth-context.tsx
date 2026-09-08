@@ -24,6 +24,7 @@ type Ctx = {
   signOut: () => Promise<void>;
   retryMigration: () => Promise<void>;
   clearMigrationSuccess: () => void;
+  renameBusiness: (newName: string) => Promise<void>;
 };
 
 const AuthCtx = createContext<Ctx | null>(null);
@@ -135,6 +136,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { mounted = false; sub.subscription.unsubscribe(); };
   }, [bootstrapBusiness]);
 
+  // React to remote business changes (rename by another owner device, role change,
+  // or removal from the business by an owner). Keeps every device honest without
+  // requiring a manual refresh.
+  useEffect(() => {
+    if (!business) return;
+    const channel = supabase.channel(`biz-${business.id}`);
+    channel.on(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      "postgres_changes" as any,
+      { event: "UPDATE", schema: "public", table: "businesses", filter: `id=eq.${business.id}` },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (payload: any) => {
+        const next = payload?.new;
+        if (next?.name && next.name !== business.name) {
+          setBusiness((b) => (b ? { ...b, name: next.name } : b));
+        }
+      },
+    );
+    if (session?.user) {
+      channel.on(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "postgres_changes" as any,
+        { event: "*", schema: "public", table: "business_members", filter: `business_id=eq.${business.id}` },
+        async () => {
+          // Membership may have been revoked or role changed — re-probe the row.
+          const { data: mem } = await supabase
+            .from("business_members")
+            .select("role")
+            .eq("business_id", business.id)
+            .eq("user_id", session.user!.id)
+            .maybeSingle();
+          if (!mem) {
+            // We've been removed — sign out to force a clean state.
+            await supabase.auth.signOut();
+            return;
+          }
+          if (mem.role !== business.role) {
+            setBusiness((b) => (b ? { ...b, role: mem.role as ActiveBusiness["role"] } : b));
+          }
+        },
+      );
+    }
+    channel.subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [business, session]);
+
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) throw error;
@@ -174,14 +221,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (migration.kind === "success") setMigration({ kind: "idle" });
   }, [migration]);
 
+  const renameBusiness = useCallback(async (newName: string) => {
+    const name = newName.trim();
+    if (!business) throw new Error("No active business");
+    if (!name) throw new Error("Business name cannot be empty");
+    if (business.role !== "owner") throw new Error("Only the owner can rename the business");
+    const { error } = await supabase.from("businesses").update({ name }).eq("id", business.id);
+    if (error) throw error;
+    setBusiness({ ...business, name });
+  }, [business]);
+
   const value = useMemo<Ctx>(() => ({
     loading,
     session,
     user: session?.user ?? null,
     business,
     migration,
-    signIn, signUp, signOut, retryMigration, clearMigrationSuccess,
-  }), [loading, session, business, migration, signIn, signUp, signOut, retryMigration, clearMigrationSuccess]);
+    signIn, signUp, signOut, retryMigration, clearMigrationSuccess, renameBusiness,
+  }), [loading, session, business, migration, signIn, signUp, signOut, retryMigration, clearMigrationSuccess, renameBusiness]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }

@@ -46,7 +46,7 @@ export function jobsToCsv(jobs: SprayJob[]): string {
 
 export async function exportJobsCsv(jobs: SprayJob[]): Promise<{ ok: boolean; message?: string }> {
   const csv = jobsToCsv(jobs);
-  const filename = `hectarehq-spray-records-${new Date().toISOString().slice(0, 10)}.csv`;
+  const filename = `chaser-spray-records-${new Date().toISOString().slice(0, 10)}.csv`;
 
   if (Platform.OS === "web") {
     try {

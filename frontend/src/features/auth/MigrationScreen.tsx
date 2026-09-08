@@ -64,7 +64,7 @@ export function MigrationScreen() {
             </View>
           </Card>
           <View style={{ height: spacing.md }} />
-          <Button title="Continue to HectareHQ" icon="arrow-right" onPress={clearMigrationSuccess} testID="continue-to-app-btn" />
+          <Button title="Continue to Chaser" icon="arrow-right" onPress={clearMigrationSuccess} testID="continue-to-app-btn" />
         </>
       ) : (
         <View style={styles.centerBrand}>

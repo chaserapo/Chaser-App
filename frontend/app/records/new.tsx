@@ -445,7 +445,7 @@ export default function NewSprayJob() {
             </Pressable>
 
             {products.length === 0 ? (
-              <Text style={styles.emptyProducts}>No products added yet. Rates are only entered by you — HectareHQ never recommends application rates.</Text>
+              <Text style={styles.emptyProducts}>No products added yet. Rates are only entered by you — Chaser never recommends application rates.</Text>
             ) : (
               products.map((p, idx) => {
                 const area = parseFloat(f.area_ha) || 0;
@@ -583,7 +583,7 @@ export default function NewSprayJob() {
                   />
                 </View>
                 <Text style={{ fontSize: 11, color: colors.muted, fontStyle: "italic", marginTop: spacing.md, textAlign: "center", paddingHorizontal: 12 }}>
-                  Live APVMA lookup is on the roadmap. HectareHQ never fabricates product information.
+                  Live APVMA lookup is on the roadmap. Chaser never fabricates product information.
                 </Text>
               </View>
             }

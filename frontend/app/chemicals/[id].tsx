@@ -199,7 +199,7 @@ export default function ChemicalDetail() {
         <Text style={styles.section}>Default rate</Text>
         <Card>
           <Field label="Rate" value={c.default_rate != null ? `${c.default_rate} ${c.default_unit ?? ""}` : undefined} />
-          <Text style={styles.hint}>HectareHQ never suggests application rates. This is your saved default.</Text>
+          <Text style={styles.hint}>Chaser never suggests application rates. This is your saved default.</Text>
         </Card>
 
         <Text style={styles.section}>Inventory</Text>

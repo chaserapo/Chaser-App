@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable, Linking } from "react-na
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
-import { Card } from "@/src/components/ui";
+import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { LINK_CATEGORIES } from "@/src/lib/links";
@@ -24,10 +24,31 @@ const TOOLS = [
 export default function More() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, business, signOut } = useAuth();
+  const { user, business, signOut, renameBusiness } = useAuth();
   const [links, setLinks] = useState<ExternalLink[]>([]);
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => { repo.links.list().then(setLinks); }, []));
+
+  function startRename() {
+    setNewName(business?.name ?? "");
+    setRenameError(null);
+    setEditingName(true);
+  }
+  async function saveRename() {
+    setRenameError(null);
+    if (!newName.trim()) { setRenameError("Name can't be empty."); return; }
+    setRenameBusy(true);
+    try {
+      await renameBusiness(newName);
+      setEditingName(false);
+    } catch (e: any) {
+      setRenameError(e?.message ?? "Rename failed");
+    } finally { setRenameBusy(false); }
+  }
 
   function confirmSignOut() {
     confirm({
@@ -52,7 +73,26 @@ export default function More() {
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <View style={styles.accountIcon}><Icon name="account-circle-outline" size={30} color={colors.brandPrimary} /></View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.accountName} numberOfLines={1}>{business?.name ?? "My Farm"}</Text>
+                  {editingName ? (
+                    <Input
+                      value={newName}
+                      onChangeText={setNewName}
+                      autoCapitalize="words"
+                      placeholder="Farm / Business name"
+                      testID="rename-input"
+                    />
+                  ) : (
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Text style={styles.accountName} numberOfLines={1} testID="account-business-name">
+                        {business?.name ?? "My Farm"}
+                      </Text>
+                      {business?.role === "owner" ? (
+                        <Pressable onPress={startRename} style={{ marginLeft: 8 }} testID="rename-btn" hitSlop={8}>
+                          <Icon name="pencil-outline" size={16} color={colors.brandPrimary} />
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  )}
                   <Text style={styles.accountEmail} numberOfLines={1}>{user.email}</Text>
                   {business?.role ? (
                     <View style={styles.roleChip}>
@@ -65,6 +105,20 @@ export default function More() {
                   <Text style={styles.cloudBadgeText}>Synced</Text>
                 </View>
               </View>
+              {editingName ? (
+                <>
+                  {renameError ? <Text style={{ color: colors.error, fontSize: 12, marginTop: spacing.sm }}>{renameError}</Text> : null}
+                  <View style={{ height: spacing.sm }} />
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <Button title="Save" icon="content-save-outline" onPress={saveRename} loading={renameBusy} disabled={renameBusy || !newName.trim()} testID="save-rename-btn" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Button title="Cancel" variant="outline" onPress={() => setEditingName(false)} testID="cancel-rename-btn" />
+                    </View>
+                  </View>
+                </>
+              ) : null}
               <View style={{ height: spacing.md }} />
               <Pressable onPress={confirmSignOut} style={styles.signOutBtn} testID="sign-out-btn">
                 <Icon name="logout-variant" size={18} color={colors.error} />
@@ -151,7 +205,7 @@ export default function More() {
           <Text style={styles.manageBtnText}>Manage Links</Text>
         </Pressable>
 
-        <Text style={styles.footer}>HectareHQ · v1.0 (Demo Mode)</Text>
+        <Text style={styles.footer}>Chaser · Behind every good operation · v1.0</Text>
       </ScrollView>
     </View>
   );

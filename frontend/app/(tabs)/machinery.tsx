@@ -6,6 +6,7 @@ import Icon from "@react-native-vector-icons/material-design-icons";
 import { Button, Card, StatusBadge } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo, maintenanceStatus } from "@/src/lib/storage";
+import { useRealtime } from "@/src/lib/realtime";
 import type { Machinery, MaintenanceStatus } from "@/src/lib/types";
 
 type EnrichedMachine = Machinery & {
@@ -21,44 +22,36 @@ export default function MachineryTab() {
   const router = useRouter();
   const [list, setList] = useState<EnrichedMachine[]>([]);
 
-  useFocusEffect(useCallback(() => {
-    (async () => {
-      const [m, ms] = await Promise.all([repo.machinery.list(), repo.maintenance.list()]);
-      const enriched: EnrichedMachine[] = m
-        .filter((x) => !x.archived_at)
-        .map((x) => {
-          const machMaints = ms.filter((mm) => mm.machinery_id === x.id);
-          let next: number | undefined;
-          let dueCount = 0;
-          let overdueCount = 0;
-          machMaints.forEach((mn) => {
-            if (mn.next_service_hours != null) {
-              if (next == null || mn.next_service_hours < next) next = mn.next_service_hours;
-            }
-            const status = maintenanceStatus(x.current_hours, mn.next_service_hours);
-            if (status === "due_soon") dueCount += 1;
-            if (status === "overdue") overdueCount += 1;
-          });
-          // Overall status is the worst status among its maintenance entries
-          const overallStatus: MaintenanceStatus = overdueCount > 0 ? "overdue" : dueCount > 0 ? "due_soon" : "good";
-          return {
-            ...x,
-            status: overallStatus,
-            nextService: next,
-            dueCount,
-            overdueCount,
-            totalMaint: machMaints.length,
-          };
+  const load = useCallback(async () => {
+    const [m, ms] = await Promise.all([repo.machinery.list(), repo.maintenance.list()]);
+    const enriched: EnrichedMachine[] = m
+      .filter((x) => !x.archived_at)
+      .map((x) => {
+        const machMaints = ms.filter((mm) => mm.machinery_id === x.id);
+        let next: number | undefined;
+        let dueCount = 0;
+        let overdueCount = 0;
+        machMaints.forEach((mn) => {
+          if (mn.next_service_hours != null) {
+            if (next == null || mn.next_service_hours < next) next = mn.next_service_hours;
+          }
+          const status = maintenanceStatus(x.current_hours, mn.next_service_hours);
+          if (status === "due_soon") dueCount += 1;
+          if (status === "overdue") overdueCount += 1;
         });
-      // Sort: overdue -> due_soon -> good, then by name
-      enriched.sort((a, b) => {
-        const rank = { overdue: 0, due_soon: 1, good: 2 } as const;
-        if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
-        return a.name.localeCompare(b.name);
+        const overallStatus: MaintenanceStatus = overdueCount > 0 ? "overdue" : dueCount > 0 ? "due_soon" : "good";
+        return { ...x, status: overallStatus, nextService: next, dueCount, overdueCount, totalMaint: machMaints.length };
       });
-      setList(enriched);
-    })();
-  }, []));
+    enriched.sort((a, b) => {
+      const rank = { overdue: 0, due_soon: 1, good: 2 } as const;
+      if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
+      return a.name.localeCompare(b.name);
+    });
+    setList(enriched);
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useRealtime(["machinery", "maintenance_schedules", "maintenance_completions"], load, [load]);
 
   const totalMachines = list.length;
   const totalDueSoon = list.reduce((s, m) => s + m.dueCount, 0);

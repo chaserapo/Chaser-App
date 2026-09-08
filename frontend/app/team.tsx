@@ -9,6 +9,7 @@ import { colors, radius, spacing } from "@/src/theme";
 import { useAuth } from "@/src/lib/auth-context";
 import { confirm } from "@/src/lib/confirm";
 import { membersRepo, invitationsRepo, BusinessMember, MemberInvitation } from "@/src/lib/members";
+import { useRealtime } from "@/src/lib/realtime";
 
 type Role = "manager" | "operator";
 
@@ -35,6 +36,11 @@ export default function TeamScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+  useRealtime(
+    ["business_members", "member_invitations"],
+    load,
+    [load],
+  );
 
   async function sendInvite() {
     setError(null); setNotice(null);

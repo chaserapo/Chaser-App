@@ -82,13 +82,16 @@ export const invitationsRepo = {
       invited_by: u.user.id,
       invited_at: new Date().toISOString(),
     };
-    // Upsert on (business_id, email) so re-inviting a revoked address just refreshes it.
     const { data, error } = await supabase
       .from("member_invitations")
       .upsert({ ...row, accepted_at: null, revoked_at: null }, { onConflict: "business_id,email" })
       .select()
       .single();
     if (error) throw error;
+    // Fire-and-forget email. If the email service fails we still keep the invite
+    // (owner can Resend). We surface errors to caller so UI can hint about it.
+    try { await sendInvitationEmail(data.id); }
+    catch (e) { console.warn("Invitation email failed:", e); }
     return data as MemberInvitation;
   },
 
@@ -99,6 +102,8 @@ export const invitationsRepo = {
       .eq("id", id)
       .eq("business_id", bid());
     if (error) throw error;
+    try { await sendInvitationEmail(id); }
+    catch (e) { console.warn("Resend email failed:", e); }
   },
 
   async revoke(id: string): Promise<void> {
@@ -120,4 +125,25 @@ export async function acceptPendingInvitations(): Promise<number> {
     return 0;
   }
   return (data as number) ?? 0;
+}
+
+// Fire the backend endpoint that sends the actual invitation email via Emergent-managed Resend.
+// The backend re-validates the caller's authority via RLS using the same JWT.
+export async function sendInvitationEmail(invitationId: string): Promise<void> {
+  const { data: sess } = await supabase.auth.getSession();
+  const jwt = sess.session?.access_token;
+  if (!jwt) throw new Error("Not signed in");
+  const base = process.env.EXPO_PUBLIC_BACKEND_URL ?? "";
+  const url = `${base.replace(/\/$/, "")}/api/invitations/${invitationId}/send-email`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${jwt}`,
+    },
+  });
+  if (!r.ok) {
+    const text = await r.text().catch(() => "");
+    throw new Error(`Email failed (${r.status}): ${text}`);
+  }
 }

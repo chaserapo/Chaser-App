@@ -58,7 +58,7 @@ export default function RecordDetail() {
   const isCompleted = j.status === "completed";
 
   async function shareRecord() {
-    const summary = `HectareHQ Spray Record\n${j!.date} · ${j!.farm_name ?? ""} · ${j!.paddock_name ?? ""}\nCrop: ${j!.crop ?? "—"} · Target: ${j!.target ?? "—"}\nArea: ${j!.actual_area_ha ?? j!.area_ha ?? "—"} ha\nOperator: ${j!.operator ?? "—"}\nMachine: ${j!.machinery_name ?? "—"}\nProducts:\n${j!.products.map((p) => `  · ${p.chemical_name} ${p.rate} ${p.unit}${p.total_qty ? ` (total ${p.total_qty.toFixed(2)})` : ""}`).join("\n")}\nWeather: ${j!.temperature_c ?? "—"}°C, RH ${j!.humidity ?? "—"}%, Delta T ${j!.delta_t ?? "—"}, Wind ${j!.wind_speed ?? "—"} km/h ${j!.wind_direction ?? ""}`;
+    const summary = `Chaser Spray Record\n${j!.date} · ${j!.farm_name ?? ""} · ${j!.paddock_name ?? ""}\nCrop: ${j!.crop ?? "—"} · Target: ${j!.target ?? "—"}\nArea: ${j!.actual_area_ha ?? j!.area_ha ?? "—"} ha\nOperator: ${j!.operator ?? "—"}\nMachine: ${j!.machinery_name ?? "—"}\nProducts:\n${j!.products.map((p) => `  · ${p.chemical_name} ${p.rate} ${p.unit}${p.total_qty ? ` (total ${p.total_qty.toFixed(2)})` : ""}`).join("\n")}\nWeather: ${j!.temperature_c ?? "—"}°C, RH ${j!.humidity ?? "—"}%, Delta T ${j!.delta_t ?? "—"}, Wind ${j!.wind_speed ?? "—"} km/h ${j!.wind_direction ?? ""}`;
     try { await Share.share({ message: summary }); } catch {}
   }
 
