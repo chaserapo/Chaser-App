@@ -59,6 +59,16 @@ api_router.include_router(invitations_router)
 # Include the router in the main app
 app.include_router(api_router)
 
+# Kubernetes liveness / readiness probe — must be reachable without the /api
+# prefix so the ingress health check doesn't rely on the ingress rewrite.
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+@app.get("/api/health")
+async def api_health():
+    return {"status": "ok"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
