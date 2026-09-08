@@ -146,9 +146,33 @@ export const cloudRepo = {
     remove: (id: string) => softDelete("farms", id),
   },
   paddocks: {
-    list: () => listRows<Paddock>("paddocks"),
-    active: () => listRows<Paddock>("paddocks", { activeOnly: true }),
-    save: (p: Paddock) => upsertRow("paddocks", p),
+    list: async () => {
+      const { data, error } = await supabase.rpc("list_paddocks_with_boundary", { p_business_id: bid() });
+      if (error) throw error;
+      return ((data ?? []) as any[]).map((r) => ({ ...r, boundary: r.boundary_geojson ?? null })) as Paddock[];
+    },
+    active: async () => {
+      const { data, error } = await supabase.rpc("list_paddocks_with_boundary", { p_business_id: bid() });
+      if (error) throw error;
+      return ((data ?? []) as any[])
+        .filter((r) => !r.archived_at && !r.deleted_at)
+        .map((r) => ({ ...r, boundary: r.boundary_geojson ?? null })) as Paddock[];
+    },
+    save: async (p: Paddock) => {
+      const { boundary, ...rest } = p as any;
+      const payload: any = { ...rest, business_id: bid(), deleted_at: null };
+      // Encode boundary as EWKT if provided, or explicit null to clear.
+      if (boundary === null) {
+        payload.boundary = null;
+      } else if (boundary && boundary.type === "Polygon") {
+        const ring = boundary.coordinates[0]
+          .map((c: number[]) => `${c[0]} ${c[1]}`)
+          .join(",");
+        payload.boundary = `SRID=4326;POLYGON((${ring}))`;
+      }
+      const { error } = await supabase.from("paddocks").upsert(payload, { onConflict: "id", defaultToNull: false });
+      if (error) throw error;
+    },
     remove: (id: string) => softDelete("paddocks", id),
   },
   chemicals: {

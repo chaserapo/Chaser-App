@@ -35,9 +35,10 @@ Repository layer (`repo` in `src/lib/storage.ts`) is a Proxy that routes to `loc
 - Marker file `@hectarehq/migrated-v1:<userId>:<businessId>` records completion.
 
 ## Not yet built (parked)
-- Realtime subscriptions for multi-device live updates
+- **Phase 3 — Multi-Product Tank Mix / New Job workflow**: rebuild spray job with paddock prefill, multi-product tank mix, unit conversions, start/complete flow, tank-mix summary
+- Realtime subscriptions for multi-device live updates (done for paddocks/machinery/team; extend to spray jobs when Phase 3 lands)
 - Offline outbox / write-behind sync (schema is already sync-ready)
 - APVMA product search integration
-- Rename business inline from Account card
 - Reset demo data action
+- Fertiliser / seeding / harvest records under paddock history (structure ready)
 

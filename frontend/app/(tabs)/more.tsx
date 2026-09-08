@@ -153,6 +153,13 @@ export default function More() {
 
         <Text style={styles.sectionTitle}>Tools</Text>
         <Card style={{ padding: 0, overflow: "hidden" }}>
+          <Pressable onPress={() => router.push("/chemicals")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-chemicals-btn">
+            <Icon name="flask-outline" size={22} color={colors.brandPrimary} />
+            <Text style={styles.rowText}>Chemicals</Text>
+            <Icon name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+        </Card>
+        <Card style={{ padding: 0, overflow: "hidden" }}>
           {TOOLS.map((t, i) => (
             <Pressable
               key={t.title}

@@ -18,15 +18,18 @@ export type Farm = {
   created_at: string;
 };
 
+export type PaddockBoundary = { type: "Polygon"; coordinates: number[][][] };
+
 export type Paddock = {
   id: ID;
   business_id: ID;
-  farm_id: ID;
+  farm_id?: ID | null;
   name: string;
   area_ha?: number;
   crop?: string;
   variety?: string;
   notes?: string;
+  boundary?: PaddockBoundary | null;
   archived_at?: string;
   created_at: string;
 };

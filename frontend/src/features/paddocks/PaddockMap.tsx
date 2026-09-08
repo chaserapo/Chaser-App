@@ -1,5 +1,5 @@
-import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import { Platform, StyleSheet, View } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import { MAP_HTML } from "./map-html";
 
@@ -28,7 +28,70 @@ type Props = {
   style?: any;
 };
 
-export const PaddockMap = forwardRef<PaddockMapHandle, Props>(function PaddockMap(
+// -----------------------------------------------------------------------------
+// Web fallback: iframe with srcDoc pointing at the same MAP_HTML template so the
+// map works in the preview and in Expo Web. Native builds keep using WebView.
+// -----------------------------------------------------------------------------
+const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
+  { paddocks, onSelect, onPointsUpdate, onSaveGeometry, style }, ref
+) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const readyRef = useRef(false);
+  const pending = useRef(paddocks);
+  pending.current = paddocks;
+
+  const send = useCallback((msg: object) => {
+    const s = JSON.stringify(msg);
+    iframeRef.current?.contentWindow?.postMessage(s, "*");
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    setMode: (mode) => send({ type: "setMode", mode }),
+    undo: () => send({ type: "undo" }),
+    clear: () => send({ type: "clear" }),
+    save: () => send({ type: "save" }),
+    setPosition: (lat, lon, recenter) => send({ type: "setPosition", lat, lon, recenter }),
+    focusPaddock: (id) => send({ type: "focusPaddock", id }),
+  }), [send]);
+
+  useEffect(() => {
+    function handler(e: MessageEvent) {
+      if (typeof e.data !== "string") return;
+      let msg: any; try { msg = JSON.parse(e.data); } catch { return; }
+      if (!msg || typeof msg !== "object") return;
+      switch (msg.type) {
+        case "ready":
+          readyRef.current = true;
+          send({ type: "setPaddocks", paddocks: pending.current });
+          break;
+        case "select": onSelect?.(msg.id); break;
+        case "points": onPointsUpdate?.(msg.count ?? 0, msg.areaHa ?? 0); break;
+        case "save": if (msg.geojson) onSaveGeometry?.(msg.geojson, msg.areaHa ?? 0); break;
+      }
+    }
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [send, onSelect, onPointsUpdate, onSaveGeometry]);
+
+  const paddocksStr = useMemo(() => JSON.stringify(paddocks), [paddocks]);
+  const lastStr = useRef(paddocksStr);
+  if (lastStr.current !== paddocksStr) {
+    lastStr.current = paddocksStr;
+    if (readyRef.current) send({ type: "setPaddocks", paddocks });
+  }
+
+  return (
+    <View style={[styles.container, style]}>
+      {/* @ts-expect-error web-only element */}
+      <iframe ref={iframeRef} srcDoc={MAP_HTML} style={{ width: "100%", height: "100%", border: 0, background: "#E8ECE9" }} />
+    </View>
+  );
+});
+
+// -----------------------------------------------------------------------------
+// Native (iOS/Android): uses react-native-webview.
+// -----------------------------------------------------------------------------
+const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
   { paddocks, onSelect, onPointsUpdate, onSaveGeometry, style }, ref
 ) {
   const webviewRef = useRef<WebView>(null);
@@ -39,7 +102,6 @@ export const PaddockMap = forwardRef<PaddockMapHandle, Props>(function PaddockMa
   const send = useCallback((msg: object) => {
     const s = JSON.stringify(msg);
     webviewRef.current?.postMessage(s);
-    // Fallback for web platforms: inject directly
     webviewRef.current?.injectJavaScript(`(function(){ try { window.postMessage(${JSON.stringify(s)}, "*"); } catch(e) {} })(); true;`);
   }, []);
 
@@ -54,31 +116,16 @@ export const PaddockMap = forwardRef<PaddockMapHandle, Props>(function PaddockMa
 
   const onMessage = useCallback((e: WebViewMessageEvent) => {
     try {
-      const raw = e.nativeEvent.data;
-      const msg = JSON.parse(raw);
+      const msg = JSON.parse(e.nativeEvent.data);
       switch (msg.type) {
-        case "ready":
-          readyRef.current = true;
-          send({ type: "setPaddocks", paddocks: pendingPaddocks.current });
-          break;
-        case "select":
-          onSelect?.(msg.id);
-          break;
-        case "points":
-          onPointsUpdate?.(msg.count ?? 0, msg.areaHa ?? 0);
-          break;
-        case "save":
-          if (msg.geojson) onSaveGeometry?.(msg.geojson, msg.areaHa ?? 0);
-          break;
-        case "log":
-          // eslint-disable-next-line no-console
-          console.log("[map]", msg.msg);
-          break;
+        case "ready": readyRef.current = true; send({ type: "setPaddocks", paddocks: pendingPaddocks.current }); break;
+        case "select": onSelect?.(msg.id); break;
+        case "points": onPointsUpdate?.(msg.count ?? 0, msg.areaHa ?? 0); break;
+        case "save": if (msg.geojson) onSaveGeometry?.(msg.geojson, msg.areaHa ?? 0); break;
       }
     } catch { /* ignore */ }
   }, [onSelect, onPointsUpdate, onSaveGeometry, send]);
 
-  // Push updated paddocks whenever the list changes (after ready).
   const paddocksStr = useMemo(() => JSON.stringify(paddocks), [paddocks]);
   const paddocksStrRef = useRef(paddocksStr);
   if (paddocksStrRef.current !== paddocksStr) {
@@ -102,6 +149,10 @@ export const PaddockMap = forwardRef<PaddockMapHandle, Props>(function PaddockMa
       />
     </View>
   );
+});
+
+export const PaddockMap = forwardRef<PaddockMapHandle, Props>(function PaddockMap(props, ref) {
+  return Platform.OS === "web" ? <WebMap {...props} ref={ref} /> : <NativeMap {...props} ref={ref} />;
 });
 
 const styles = StyleSheet.create({
