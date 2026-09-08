@@ -9,14 +9,14 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.spraytrackfarm.wk7mwg"
+      "bundleIdentifier": "com.midwestag.chaser"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.emergent.spraytrackfarm.wk7mwg"
+      "package": "com.midwestag.chaser"
     },
     "web": {
       "bundler": "metro",
