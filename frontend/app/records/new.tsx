@@ -10,6 +10,7 @@ import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { fetchWeather } from "@/src/lib/weather";
 import { deltaT, nozzleFlowLpm, numNozzles, fmt, productTotalForJob, productPerTank } from "@/src/lib/calculators";
+import { stagesForCrop, stageLabel } from "@/src/lib/crop-stages";
 import type { Farm, Paddock, Machinery, Chemical, RateUnit, SprayJob, SprayJobProduct, SprayJobStatus, Operator } from "@/src/lib/types";
 import { RATE_UNITS } from "@/src/lib/types";
 
@@ -50,6 +51,7 @@ export default function NewSprayJob() {
   const [f, setF] = useState({
     farm_id: "", farm_name: "", paddock_id: "", paddock_name: "",
     crop: "", variety: "", target: "",
+    crop_stage: "", crop_stage_custom: "",
     operator_id: "", operator_name: "",
     machinery_id: "", machinery_name: "",
     area_ha: "", water_rate: "", speed_kmh: "",
@@ -88,6 +90,7 @@ export default function NewSprayJob() {
         farm_id: draft.farm_id ?? "", farm_name: draft.farm_name ?? "",
         paddock_id: draft.paddock_id ?? "", paddock_name: draft.paddock_name ?? "",
         crop: draft.crop ?? "", variety: draft.variety ?? "", target: draft.target ?? "",
+        crop_stage: draft.crop_stage ?? "", crop_stage_custom: draft.crop_stage_custom ?? "",
         operator_id: draft.operator_id ?? s.operator_id, operator_name: draft.operator ?? s.operator_name,
         machinery_id: draft.machinery_id ?? "", machinery_name: draft.machinery_name ?? "",
         area_ha: draft.area_ha?.toString() ?? "",
@@ -222,6 +225,8 @@ export default function NewSprayJob() {
       farm_id: f.farm_id || undefined, farm_name: f.farm_name || undefined,
       paddock_id: f.paddock_id || undefined, paddock_name: f.paddock_name || undefined,
       crop: f.crop || undefined, variety: f.variety || undefined, target: f.target || undefined,
+      crop_stage: f.crop_stage || undefined,
+      crop_stage_custom: (f.crop_stage === "other" || f.crop_stage === "custom") ? (f.crop_stage_custom || undefined) : undefined,
       date: new Date().toISOString().slice(0, 10),
       start_time: f.start_time || undefined,
       operator_id: f.operator_id || undefined, operator: f.operator_name || undefined,
@@ -360,6 +365,38 @@ export default function NewSprayJob() {
               <View style={{ flex: 1 }}><Input label="Variety" value={f.variety} onChangeText={(v) => setF({ ...f, variety: v })} testID="input-variety" /></View>
             </View>
             <Input label="Target weed / pest" value={f.target} onChangeText={(v) => setF({ ...f, target: v })} testID="input-target" />
+
+            {/* Crop growth stage — chosen list depends on the crop, custom entry always available. */}
+            <Text style={styles.pickerLabel}>Crop stage</Text>
+            {(() => {
+              const { stages, group } = stagesForCrop(f.crop);
+              return (
+                <>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow} testID="crop-stage-chips">
+                    {stages.map((s) => (
+                      <Chip
+                        key={s.id}
+                        label={s.hint ? `${s.label} · ${s.hint}` : s.label}
+                        active={f.crop_stage === s.id}
+                        onPress={() => setF({ ...f, crop_stage: s.id })}
+                        testID={`crop-stage-${s.id}`}
+                      />
+                    ))}
+                  </ScrollView>
+                  {(f.crop_stage === "other" || f.crop_stage === "custom") ? (
+                    <Input
+                      label="Custom stage description"
+                      value={f.crop_stage_custom}
+                      onChangeText={(v) => setF({ ...f, crop_stage_custom: v })}
+                      placeholder="e.g. GS30 boot, pre-swath, early bud"
+                      testID="crop-stage-custom-input"
+                    />
+                  ) : null}
+                  <Text style={styles.overrideHint}>{group} stage list — pick "Other" to enter your own.</Text>
+                </>
+              );
+            })()}
+
             <Input label="Area to be treated" value={f.area_ha} onChangeText={(v) => { setF({ ...f, area_ha: v }); if (v) setShowMissing((s) => ({ ...s, area_ha: false })); }} keyboardType="decimal-pad" suffix="ha" testID="input-area" error={missing("area_ha")} />
             {f.paddock_id ? <Text style={styles.overrideHint}>Auto-filled from paddock — you can override for this job without changing the paddock record.</Text> : null}
           </Card>

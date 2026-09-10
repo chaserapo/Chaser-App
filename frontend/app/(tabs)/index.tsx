@@ -9,6 +9,7 @@ import { fetchWeather, WeatherSnapshot } from "@/src/lib/weather";
 import { repo, maintenanceStatus } from "@/src/lib/storage";
 import { useRealtime } from "@/src/lib/realtime";
 import { useAuth } from "@/src/lib/auth-context";
+import { useOnboarding, profileRepo } from "@/src/lib/onboarding";
 import type { SprayJob, Maintenance } from "@/src/lib/types";
 
 const LOGO = require("../../assets/images/chaser-logo.png");
@@ -37,6 +38,7 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session, business } = useAuth();
+  const { percent: onboardingPercent, profile: onboardingProfile, reload: reloadOnboarding, userId: onboardingUserId } = useOnboarding();
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
   const [loadingWeather, setLoadingWeather] = useState(true);
   const [locationLabel, setLocationLabel] = useState("Your location");
@@ -185,6 +187,28 @@ export default function Home() {
             )}
           </Pressable>
         </View>
+
+        {/* ── Onboarding progress (only while partially complete) ─── */}
+        {onboardingProfile && onboardingProfile.onboarding_completed_at && onboardingPercent > 0 && onboardingPercent < 100 ? (
+          <Pressable
+            onPress={async () => {
+              if (!onboardingUserId) return;
+              await profileRepo.resume(onboardingUserId);
+              await reloadOnboarding();
+            }}
+            style={styles.setupCard}
+            testID="home-setup-card"
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.setupTitle}>Finish setting up Chaser</Text>
+              <Text style={styles.setupSub}>You're {onboardingPercent}% of the way there — add the rest whenever you like.</Text>
+              <View style={styles.setupBar}>
+                <View style={[styles.setupBarFill, { width: `${onboardingPercent}%` }]} />
+              </View>
+            </View>
+            <Icon name="chevron-right" size={22} color={colors.brandPrimary} />
+          </Pressable>
+        ) : null}
 
         {/* ── Hero action ──────────────────────────────────────── */}
         <View style={{ height: spacing.lg }} />
@@ -504,4 +528,20 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     marginTop: spacing.xl,
   },
+  setupCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.brandSecondary,
+    borderWidth: 1,
+    borderColor: colors.brandPrimary,
+  },
+  setupTitle: { color: colors.brandPrimary, fontSize: 14, fontWeight: "800" },
+  setupSub: { color: colors.onSurfaceTertiary, fontSize: 12, marginTop: 2 },
+  setupBar: { height: 4, backgroundColor: colors.surface, borderRadius: 999, marginTop: 8, overflow: "hidden" },
+  setupBarFill: { height: 4, backgroundColor: colors.brandPrimary, borderRadius: 999 },
 });

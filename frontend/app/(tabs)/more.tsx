@@ -9,6 +9,7 @@ import { repo } from "@/src/lib/storage";
 import { LINK_CATEGORIES } from "@/src/lib/links";
 import { useAuth } from "@/src/lib/auth-context";
 import { confirm } from "@/src/lib/confirm";
+import { profileRepo, useOnboarding } from "@/src/lib/onboarding";
 import type { ExternalLink } from "@/src/lib/types";
 
 const TOOLS = [
@@ -25,6 +26,7 @@ export default function More() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, business, signOut, renameBusiness } = useAuth();
+  const { percent, reload: reloadOnboarding, userId } = useOnboarding();
   const [links, setLinks] = useState<ExternalLink[]>([]);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
@@ -151,6 +153,29 @@ export default function More() {
           </>
         ) : null}
 
+        <Text style={styles.sectionTitle}>Setup</Text>
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <Pressable
+            onPress={async () => {
+              if (!userId) return;
+              // Re-open the onboarding wizard so the user can revisit any skipped
+              // step. Marking onboarding_completed_at back to null flips the
+              // PostAuthShell over to <Onboarding/>.
+              await profileRepo.resume(userId);
+              await reloadOnboarding();
+            }}
+            testID="link-setup-chaser"
+            style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]}
+          >
+            <Icon name="rocket-launch-outline" size={22} color={colors.brandPrimary} />
+            <Text style={styles.rowText}>Setup Chaser</Text>
+            {percent < 100 ? (
+              <View style={styles.setupBadge}><Text style={styles.setupBadgeText}>{percent}%</Text></View>
+            ) : null}
+            <Icon name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+        </Card>
+
         <Text style={styles.sectionTitle}>Tools</Text>
         <Card style={{ padding: 0, overflow: "hidden" }}>
           <Pressable onPress={() => router.push("/chemicals")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-chemicals-btn">
@@ -269,6 +294,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: "800", color: colors.onSurface },
   sub: { fontSize: 13, color: colors.muted, marginTop: 2 },
   sectionTitle: { fontSize: 13, fontWeight: "700", color: colors.muted, marginTop: spacing.lg, marginBottom: spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 },
+  setupBadge: { backgroundColor: colors.brandSecondary, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, marginRight: 4 },
+  setupBadgeText: { color: colors.brandPrimary, fontSize: 11, fontWeight: "800" },
   linkSectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   manage: { fontSize: 13, fontWeight: "700", color: colors.brandPrimary, marginTop: spacing.lg },
   row: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, minHeight: 56, gap: 12 },

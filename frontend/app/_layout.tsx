@@ -14,6 +14,8 @@ import { AuthScreen } from "@/src/features/auth/AuthScreen";
 import { MigrationScreen } from "@/src/features/auth/MigrationScreen";
 import { flushOfflineSprayJobs } from "@/src/lib/cloud-repo";
 import { getBackendMode } from "@/src/lib/backend";
+import { useOnboarding } from "@/src/lib/onboarding";
+import Onboarding from "./onboarding";
 
 LogBox.ignoreAllLogs(true);
 
@@ -49,6 +51,27 @@ function AuthGate() {
   if (migration.kind === "running" || migration.kind === "error" || migration.kind === "success" || !business) {
     return <MigrationScreen />;
   }
+  return <PostAuthShell />;
+}
+
+/**
+ * Rendered once a signed-in user has an active business. Decides between the
+ * first-time Onboarding wizard and the full tab stack based on user_profiles.
+ * Existing beta users were backfilled with onboarding_completed_at = now(),
+ * so they skip the wizard entirely.
+ */
+function PostAuthShell() {
+  const { needsOnboarding, loading, profile } = useOnboarding();
+  // Wait until we've actually loaded a profile (or errored) before deciding —
+  // otherwise a brand-new user could see the tabs flash before the wizard.
+  if (loading && !profile) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={colors.brandPrimary} />
+      </View>
+    );
+  }
+  if (needsOnboarding) return <Onboarding />;
   return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }} />;
 }
 

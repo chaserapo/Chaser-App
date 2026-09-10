@@ -219,7 +219,25 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Beta Launch-Readiness Pass code complete. Please run the full P0 test list above with the
+      Iteration 21 shipping the first-time onboarding wizard + crop stage + editable-weather
+      display. SQL migration (user_profiles, operator roster columns, spray_jobs.crop_stage /
+      crop_stage_custom) is already applied by the human. Please verify:
+      (1) A brand-new signup lands on /onboarding automatically; existing beta users (backfilled
+      onboarding_completed_at) go straight to /(tabs).
+      (2) All 7 steps run and every "I'll do this later" advances without saving. Adding a farm/
+      paddock/machine/chemical/team-member persists via existing repos (farms/paddocks/machinery/
+      chemicals/operators) — verify rows appear in Supabase.
+      (3) Skipping every non-essential step still lets the user finish and land on Home.
+      (4) On the Home screen a "Finish setting up Chaser" banner appears when a user has partial
+      progress (percent 0 < x < 100 and completed_at set). More → Setup Chaser reopens the wizard.
+      (5) New Spray Job: crop stage chips render, list depends on crop (e.g. "Wheat" shows Zadoks
+      stages), "Other" reveals a custom text field. Value saves and shows on the completed record
+      with the correct stage label.
+      (6) Completed record shows "Operator-edited" or "Auto-captured" badge on the Weather section
+      and, when edited, an "Original auto-captured reading" audit strip.
+      (7) RLS still holds — a second business does not see the first's user_profile or operator
+      roster.
+
       web preview at http://localhost:3000. Sign up with hqauto<TIMESTAMP>@gmail.com / Test1234!
       Business = "Chaser Beta Test <TS>". Do NOT use @hectarehq.com. Cover: (1) happy-path spray
       workflow with a planned job, (2) validation blocks empty Start Job, (3) RLS isolation with

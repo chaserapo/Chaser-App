@@ -8,6 +8,7 @@ import { ScreenHeader } from "@/src/components/header";
 import { Button, Card } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
+import { stageLabel } from "@/src/lib/crop-stages";
 import type { SprayJob } from "@/src/lib/types";
 
 function buildSignOffPayload(j: SprayJob) {
@@ -114,6 +115,7 @@ export default function RecordDetail() {
         <Text style={styles.section}>Job</Text>
         <Card>
           <Field label="Crop" value={j.crop} />
+          <Field label="Crop stage" value={j.crop_stage || j.crop_stage_custom ? stageLabel(j.crop_stage, j.crop_stage_custom, j.crop) : undefined} />
           <Field label="Target" value={j.target} />
           <Field label="Operator" value={j.operator} />
           <Field label="Machine" value={j.machinery_name} />
@@ -131,12 +133,38 @@ export default function RecordDetail() {
           <Field label="Pressure" value={j.pressure ? `${j.pressure} bar` : undefined} />
         </Card>
 
-        <Text style={styles.section}>Starting weather</Text>
+        <View style={styles.wxHeaderRow}>
+          <Text style={[styles.section, { marginTop: 0 }]}>Starting weather</Text>
+          {j.weather_edited ? (
+            <View style={styles.editedBadge} testID="record-weather-edited-badge">
+              <Icon name="pencil" size={11} color={colors.warning} />
+              <Text style={styles.editedBadgeText}>Operator-edited</Text>
+            </View>
+          ) : (
+            <View style={styles.autoBadge}>
+              <Icon name="cloud-outline" size={11} color={colors.brandPrimary} />
+              <Text style={styles.autoBadgeText}>Auto-captured</Text>
+            </View>
+          )}
+        </View>
         <Card>
           <Field label="Temperature" value={j.temperature_c != null ? `${j.temperature_c} °C` : undefined} />
           <Field label="Relative humidity" value={j.humidity != null ? `${j.humidity} %` : undefined} />
           <Field label="Delta T" value={j.delta_t != null ? `${j.delta_t}` : undefined} />
           <Field label="Wind" value={j.wind_speed != null ? `${j.wind_speed} km/h ${j.wind_direction ?? ""}` : undefined} />
+          {j.weather_edited && (j.temperature_c_auto != null || j.wind_speed_auto != null) ? (
+            <View style={styles.autoNote} testID="record-auto-original">
+              <Text style={styles.autoNoteTitle}>Original auto-captured reading (audit)</Text>
+              <Text style={styles.autoNoteBody}>
+                {j.temperature_c_auto != null ? `${j.temperature_c_auto.toFixed(1)} °C · ` : ""}
+                {j.humidity_auto != null ? `${j.humidity_auto.toFixed(0)}% RH · ` : ""}
+                {j.delta_t_auto != null ? `ΔT ${j.delta_t_auto.toFixed(1)} · ` : ""}
+                {j.wind_speed_auto != null ? `${j.wind_speed_auto.toFixed(0)} km/h ` : ""}
+                {j.wind_direction_auto ?? ""}
+              </Text>
+              <Text style={styles.autoNoteMeta}>Weather data was operator-verified — saved values above take precedence.</Text>
+            </View>
+          ) : null}
         </Card>
 
         {j.finish_temperature_c != null || j.finish_wind_speed != null ? (
@@ -207,4 +235,13 @@ const styles = StyleSheet.create({
   qrIconBox: { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center", marginRight: 14 },
   qrPreviewTitle: { fontSize: 15, fontWeight: "700", color: colors.onSurface },
   qrPreviewSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  wxHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.lg, marginBottom: spacing.sm },
+  editedBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEF3C7", paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
+  editedBadgeText: { color: colors.warning, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4 },
+  autoBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.brandSecondary, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
+  autoBadgeText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4 },
+  autoNote: { marginTop: spacing.sm, padding: spacing.sm, backgroundColor: colors.surfaceSecondary, borderRadius: radius.sm, borderLeftWidth: 3, borderLeftColor: colors.muted },
+  autoNoteTitle: { fontSize: 11, color: colors.muted, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4 },
+  autoNoteBody: { fontSize: 13, color: colors.onSurface, marginTop: 3, fontWeight: "600" },
+  autoNoteMeta: { fontSize: 10, color: colors.muted, marginTop: 4, fontStyle: "italic" },
 });

@@ -92,6 +92,11 @@ export type Operator = {
   id: ID;
   business_id: ID;
   name: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
   is_default_user?: boolean;
   archived_at?: string;
   created_at: string;
@@ -209,6 +214,8 @@ export type SprayJob = {
   paddock_name?: string;
   crop?: string;
   variety?: string;
+  crop_stage?: string;
+  crop_stage_custom?: string;
   target?: string;
   date: string;
   start_time?: string;

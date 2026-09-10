@@ -1,0 +1,64 @@
+{
+  "summary": "Iteration 21 covers the new onboarding wizard + crop-stage + editable-weather-audit release. Backend: pytest 6/6 PASS (health, status create+GET roundtrip, 4 invitations auth/validation edge cases). Frontend: end-to-end wizard smoke against a brand-new signup (hqob1789013587@gmail.com / OB 1789013587 / Test1234!) on mobile viewport 390x844 — signup → migration Continue-to-Chaser → onboarding wizard forced (role-owner + onboarding-skip-all both rendered). Advanced through all 7 steps: role-owner→role-continue-btn (advanced), team-yes + add-team-member-btn + member-save-btn (member saved: finish shows Team members=3 including backfilled operators), farms add-farm-btn + farm-save-btn (Farms=3), paddocks add-paddock-btn + paddock-save-btn with Wheat crop (Paddocks=6), machinery mach-skip-btn (skipped), chemicals add-chem-btn + chem-save-btn (Chemicals=6), finish-onboarding-btn → routed to /(tabs). link-setup-chaser present in More→Setup. All testIDs listed in the spec are present in the DOM. Deprecated packages: none new introduced (only pre-existing RN-web shadow*/pointerEvents deprecation warnings). SafeAreaView: fine. No React Native red screens. No 500s in backend logs. HOWEVER 3 defects were found that need main-agent attention (details below). Crop-stage on records/new + records/[id] and weather-edited badges wiring were confirmed via code review — the UI end-to-end for those was not exercised in this pass but the JSX + state plumbing looks correct and preserves older records without crop_stage. RLS cross-tenant read for user_profiles was NOT verified in this pass (needs two-context test).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Onboarding / FinishStep (role summary)",
+        "issue": "Role is stored as 'Not set' on the Finish summary even though role-owner was selected and role-continue-btn advanced the wizard (proving RoleStep.save() did not throw). Likely one of: (a) UPDATE RLS policy missing on public.user_profiles so supabase-js .update({ role }) returns 0 rows without an error, or (b) profileRepo.setRole writes updated_at but the migration didn't add that column so the update silently no-ops on some Supabase configs, or (c) ensureProfile's insert-then-update race. Reproduce: signup → complete role step → jump to Finish → 'Role: Not set'. Reference: /app/frontend/src/lib/onboarding.ts:59-66 and /app/frontend/app/onboarding.tsx:679-687.",
+        "testID": "finish-onboarding-btn / role-owner",
+        "priority": "HIGH"
+      },
+      {
+        "component": "useOnboarding().percent — skipped counted as done",
+        "issue": "Formula counts BOTH done and skipped as 'hit', so a user who touches all 6 steps (any mix of skip/complete) ends at percent=100 and the home-setup-card never appears. The spec says the banner must show for 'partial progress (some done + some skipped, percent between 1 and 99)'. Confirmed empirically: skipped machinery in the smoke run → percent=100 → home-setup-card count=0 on Home immediately after finish. Fix: only completedSteps[s]?.done should increment hit. Reference: /app/frontend/src/lib/onboarding.ts:126-134.",
+        "testID": "home-setup-card",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Resume-wizard from More (and Home banner) — state not shared across useOnboarding() instances",
+        "issue": "Tapping link-setup-chaser (More) or home-setup-card (Home) calls profileRepo.resume(userId) + local reloadOnboarding(), but PostAuthShell in app/_layout.tsx holds its OWN useOnboarding() instance whose needsOnboarding flag is not refreshed. Result: onboarding_completed_at is nulled in the DB but the app does NOT switch back to <Onboarding/>. Confirmed empirically: after tapping link-setup-chaser, role-owner count still 0 and onboarding-skip-all count still 0 — user stays on tabs, wizard never opens. Fix options: (a) lift useOnboarding into a React context provided at _layout so all consumers share state, (b) after resume() do a router.replace('/onboarding') to force navigation, or (c) fire a broadcast (e.g. AppState / event emitter) that PostAuthShell listens on to reload. Reference: /app/frontend/app/(tabs)/more.tsx:158-176, /app/frontend/app/(tabs)/index.tsx:192-211, /app/frontend/app/_layout.tsx:63-76.",
+        "testID": "link-setup-chaser, home-setup-card",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "RLS cross-tenant read on public.user_profiles",
+        "issue": "Not verified in this pass — needs a two-context (browser.new_context()) run to confirm User B's supabase.from('user_profiles').select().eq('user_id', UserA_id) returns empty. Please re-verify next iteration once role-persist bug is fixed.",
+        "affected_testIDs": []
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_21.json",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/backend/tests/test_beta_backend.py"
+  ],
+  "action_items": [
+    "FIX 1 (HIGH): Make selected role actually persist to public.user_profiles.role. Verify the UPDATE RLS policy exists AND updated_at column is present. Reproduce: signup → pick role-owner → role-continue-btn → jump to finish; Finish must show the chosen role, not 'Not set'.",
+    "FIX 2 (HIGH): In /app/frontend/src/lib/onboarding.ts percent calc, count ONLY .done (not .skipped) toward the numerator, so users with a mix of done+skipped land between 1-99% and the home-setup-card + More badge actually appear.",
+    "FIX 3 (HIGH): Make link-setup-chaser and home-setup-card actually re-open the wizard. Simplest robust fix: lift useOnboarding() into a shared context provided from app/_layout.tsx so both PostAuthShell and any tab consumer share the same needsOnboarding state. Alternatively router.replace('/onboarding') after profileRepo.resume() if you keep <Onboarding/> reachable as a route rather than a conditional render.",
+    "After fixes: retest brand-new signup end-to-end, plus a two-context RLS check on user_profiles."
+  ],
+  "critical_code_review_comments": [
+    "onboarding.ts:69 — markStep merges progress without a serialize guard; concurrent double taps could race but low risk given per-step busy flag in wizard.",
+    "onboarding.tsx:52 STEP_TITLES is complete and matches ONBOARDING_STEPS order — good.",
+    "records/[id].tsx:118 correctly guards 'Crop stage' field so older records without crop_stage render without a crash (stageLabel returns '—' when both null).",
+    "records/[id].tsx:139-167 weather-edited/auto badges + audit strip are wired to weather_edited/*_auto columns — matches spec.",
+    "records/new.tsx:375 crop-stage-chips render depends on stagesForCrop(f.crop); typing 'Wheat' → CEREALS Zadoks set — matches spec.",
+    "auth-context / migration: unchanged from iter 20; migration continue-to-app-btn still works."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "6/6 = 100% (pytest_results.xml)",
+    "frontend": "3 of 15 onboarding-related test items FAIL (role-persistence, percent-formula, wizard-resume-from-tabs). Remaining 12 items PASS or are code-review-verified. Crop-stage/weather-badge UI end-to-end not exercised this pass; wiring OK."
+  },
+  "seed_data_creation": "Created 1 live Supabase signup during test: hqob1789013587@gmail.com / OB 1789013587 / Test1234! (has 3 farms, 6 paddocks, 3 machinery, 6 chemicals, 3 operators after step-through — includes migration-seeded rows).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "3 concrete onboarding bugs above are the blockers. After they are fixed, retest with a fresh hqob<TS>@gmail.com signup on mobile viewport 390x844. Expect: (i) Finish shows correct Role. (ii) A user who runs wizard with any skipped step lands with percent<100 and sees home-setup-card + a percent badge on link-setup-chaser. (iii) Tapping link-setup-chaser OR home-setup-card actually switches back to the wizard on any step. Also verify RLS: sign up two businesses (A, B) in separate browser contexts and confirm B cannot SELECT A's user_profiles row via direct Supabase REST. Crop-stage + editable-weather flow needs an end-to-end UI test too (new job with Wheat → tillering chip → start → complete → /records/[id] shows 'Tillering' + auto-captured pill, then edit weather and verify record-weather-edited-badge + record-auto-original render).",
+  "rca_of_issue": "Bug 1 (role not persisted): most likely explanation is that the migration created SELECT/INSERT RLS policies on user_profiles but not UPDATE. supabase-js .update() with no matching UPDATE policy returns { data: null, error: null, count: 0 } — no throw — so save() proceeds to onDone() and advances step. Bug 2 (percent): logic bug — spec expects only 'done' to count. Bug 3 (resume broken): each useOnboarding() call is its own useState; local reload doesn't reach PostAuthShell's copy — needs a shared context or a route push."
+}
