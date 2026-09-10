@@ -7,13 +7,20 @@
     "icon": "./assets/images/icon.png",
     "scheme": "chaser",
     "userInterfaceStyle": "automatic",
+    "primaryColor": "#0F5132",
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.midwestag.chaser",
+      "bundleIdentifier": "au.com.chaserag.chaser",
+      "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Chaser uses your location to capture weather at your paddock and record spray-job GPS.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Chaser uses your location to record paddock boundaries and capture weather during a spray job.",
-        "NSLocationAlwaysUsageDescription": "Chaser uses your location to record paddock boundaries and capture weather during a spray job."
+        "NSLocationAlwaysUsageDescription": "Chaser uses your location to record paddock boundaries and capture weather during a spray job.",
+        "NSCameraUsageDescription": "Chaser uses the camera to attach photos to spray records and machinery documents.",
+        "NSPhotoLibraryUsageDescription": "Chaser lets you attach photos from your library to spray records and machinery documents.",
+        "NSPhotoLibraryAddUsageDescription": "Chaser saves generated spray-record images to your photo library on request.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -21,8 +28,16 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.midwestag.chaser",
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+      "package": "au.com.chaserag.chaser",
+      "versionCode": 1,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -59,6 +74,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    },
+    "owner": "REPLACE_WITH_EXPO_ACCOUNT_USERNAME"
   }
 }
