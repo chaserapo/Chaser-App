@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable, ActivityIndicator, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { useAuth } from "@/src/lib/auth-context";
+
+const ICON = require("../../../assets/images/chaser-icon.png");
 
 type Mode = "signin" | "signup";
 
@@ -41,7 +43,7 @@ export function AuthScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.brand}>
-            <View style={styles.logo}><Icon name="sprout" size={32} color={colors.onBrandPrimary} /></View>
+            <Image source={ICON} style={styles.logo} resizeMode="contain" accessibilityLabel="Chaser" />
             <Text style={styles.title}>Chaser</Text>
             <Text style={styles.sub}>Behind every good operation</Text>
           </View>
@@ -102,7 +104,7 @@ export function AuthScreen() {
 
 const styles = StyleSheet.create({
   brand: { alignItems: "center", marginBottom: spacing.xl },
-  logo: { width: 64, height: 64, borderRadius: radius.lg, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" },
+  logo: { width: 96, height: 96, borderRadius: 22 },
   title: { fontSize: 28, fontWeight: "800", color: colors.onSurface, marginTop: spacing.md },
   sub: { color: colors.muted, marginTop: 4, fontSize: 13 },
   tabs: { flexDirection: "row", backgroundColor: colors.surfaceTertiary, borderRadius: radius.pill, padding: 4, marginBottom: spacing.md },

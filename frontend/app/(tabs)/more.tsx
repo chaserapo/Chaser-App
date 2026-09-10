@@ -209,6 +209,21 @@ export default function More() {
         <Text style={styles.sectionTitle}>About</Text>
         <Card style={{ padding: 0, overflow: "hidden" }}>
           <Pressable
+            onPress={() => {
+              const subject = encodeURIComponent("Chaser Beta feedback");
+              const body = encodeURIComponent(
+                `Hi Chaser team,\n\nFeedback / bug / feature request:\n\n\n— — — — — — — — — — — —\nBusiness: ${business?.name ?? "—"}\nRole: ${business?.role ?? "—"}\nEmail: ${user?.email ?? "—"}\n`
+              );
+              Linking.openURL(`mailto:chaserapp@outlook.com?subject=${subject}&body=${body}`);
+            }}
+            testID="link-feedback"
+            style={({ pressed }) => [styles.row, styles.rowBorder, pressed && { backgroundColor: colors.surface }]}
+          >
+            <Icon name="message-alert-outline" size={22} color={colors.brandPrimary} />
+            <Text style={styles.rowText}>Send Beta Feedback</Text>
+            <Icon name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+          <Pressable
             onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "privacy" } })}
             testID="link-privacy"
             style={({ pressed }) => [styles.row, styles.rowBorder, pressed && { backgroundColor: colors.surface }]}
