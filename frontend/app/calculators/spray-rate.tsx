@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/material-design-icons";
@@ -7,6 +7,8 @@ import { Input, Card } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { nozzleFlowLpm, numNozzles, totalBoomFlowLpm, hectaresPerTank, chemicalPerTank, fmt } from "@/src/lib/calculators";
 import { NOZZLES, checkNozzle, type Nozzle } from "@/src/lib/nozzles";
+import { repo } from "@/src/lib/storage";
+import type { Machinery } from "@/src/lib/types";
 
 export default function SprayRateCalc() {
   const insets = useSafeAreaInsets();
@@ -19,6 +21,29 @@ export default function SprayRateCalc() {
   const [nozzleId, setNozzleId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [brandFilter, setBrandFilter] = useState<string | null>(null);
+  const [sprayers, setSprayers] = useState<Machinery[]>([]);
+  const [machineryPickerOpen, setMachineryPickerOpen] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const all = await repo.machinery.active();
+        setSprayers(all.filter((m: Machinery) => m.machine_type === "Self-propelled sprayer" || m.machine_type === "Tow-behind sprayer"));
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
+  function loadFromMachinery(m: Machinery) {
+    if (m.default_water_rate_lha) setRate(String(m.default_water_rate_lha));
+    if (m.default_speed_kmh)      setSpeed(String(m.default_speed_kmh));
+    if (m.nozzle_spacing_m)       setSpacing(String(m.nozzle_spacing_m));
+    if (m.boom_width_m)           setBoom(String(m.boom_width_m));
+    if (m.tank_capacity_l)        setTank(String(m.tank_capacity_l));
+    if (m.default_nozzle && NOZZLES.find((n) => n.id === m.default_nozzle)) {
+      setNozzleId(m.default_nozzle);
+    }
+    setMachineryPickerOpen(false);
+  }
 
   const r = parseFloat(rate) || 0;
   const s = parseFloat(speed) || 0;
@@ -52,6 +77,34 @@ export default function SprayRateCalc() {
       <ScreenHeader title="Spray Tools" back />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }} keyboardShouldPersistTaps="handled">
+          {sprayers.length > 0 ? (
+            <>
+              <Pressable onPress={() => setMachineryPickerOpen((v) => !v)} testID="load-from-sprayer-btn" style={styles.loadSprayerBtn}>
+                <Icon name="tractor-variant" size={18} color={colors.brandPrimary} />
+                <Text style={styles.loadSprayerText}>Load from my sprayer</Text>
+                <Icon name={machineryPickerOpen ? "chevron-up" : "chevron-down"} size={18} color={colors.brandPrimary} />
+              </Pressable>
+              {machineryPickerOpen ? (
+                <View style={styles.sprayerList} testID="sprayer-list">
+                  {sprayers.map((m) => (
+                    <Pressable key={m.id} onPress={() => loadFromMachinery(m)} style={styles.sprayerRow} testID={`sprayer-${m.id}`}>
+                      <Icon name="sprinkler-variant" size={18} color={colors.brandPrimary} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.sprayerName}>{m.name}</Text>
+                        <Text style={styles.sprayerSub}>
+                          {m.default_nozzle && NOZZLES.find((n) => n.id === m.default_nozzle) ? NOZZLES.find((n) => n.id === m.default_nozzle)!.label : "No default nozzle"}
+                          {m.boom_width_m ? ` · ${m.boom_width_m}m boom` : ""}
+                          {m.default_water_rate_lha ? ` · ${m.default_water_rate_lha} L/ha` : ""}
+                        </Text>
+                      </View>
+                      <Icon name="chevron-right" size={18} color={colors.muted} />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+              <View style={{ height: spacing.md }} />
+            </>
+          ) : null}
           <Card>
             <Input label="Application rate" value={rate} onChangeText={setRate} keyboardType="decimal-pad" suffix="L/ha" testID="input-rate" />
             <Input label="Speed" value={speed} onChangeText={setSpeed} keyboardType="decimal-pad" suffix="km/h" testID="input-speed" />
@@ -223,4 +276,10 @@ const styles = StyleSheet.create({
   suitMsg: { fontSize: 11, color: colors.onSurfaceTertiary, marginTop: 2, lineHeight: 15 },
   formula: { fontSize: 12, color: colors.muted, textAlign: "center", marginTop: spacing.lg, fontStyle: "italic" },
   disclaimer: { fontSize: 10, color: colors.muted, textAlign: "center", marginTop: 6, fontStyle: "italic", lineHeight: 13 },
+  loadSprayerBtn: { flexDirection: "row", alignItems: "center", gap: 8, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.brandSecondary, borderWidth: 1, borderColor: colors.brandPrimary },
+  loadSprayerText: { flex: 1, fontSize: 14, color: colors.brandPrimary, fontWeight: "800" },
+  sprayerList: { marginTop: 6, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
+  sprayerRow: { flexDirection: "row", alignItems: "center", padding: spacing.md, gap: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  sprayerName: { fontSize: 14, fontWeight: "700", color: colors.onSurface },
+  sprayerSub: { fontSize: 11, color: colors.muted, marginTop: 2 },
 });

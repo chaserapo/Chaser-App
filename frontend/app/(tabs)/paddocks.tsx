@@ -10,7 +10,8 @@ import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { useRealtime } from "@/src/lib/realtime";
 import { useAuth } from "@/src/lib/auth-context";
-import { PaddockMap, PaddockMapHandle } from "@/src/features/paddocks/PaddockMap";
+import { PaddockMap, PaddockMapHandle, FarmPin } from "@/src/features/paddocks/PaddockMap";
+import { supabase } from "@/src/lib/supabase";
 import type { Paddock, PaddockBoundary, Farm } from "@/src/lib/types";
 
 type Mode = "view" | "draw";
@@ -23,6 +24,7 @@ export default function PaddocksTab() {
   const canEdit = business?.role === "owner" || business?.role === "manager";
   const [paddocks, setPaddocks] = useState<Paddock[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
+  const [farmPins, setFarmPins] = useState<FarmPin[]>([]);
   const [mode, setMode] = useState<Mode>("view");
   const [viewKind, setViewKind] = useState<ViewKind>("map");
   const [collapsedFarmIds, setCollapsedFarmIds] = useState<Record<string, boolean>>({});
@@ -42,7 +44,26 @@ export default function PaddocksTab() {
     const [pList, fList] = await Promise.all([repo.paddocks.active(), repo.farms.active()]);
     setPaddocks(pList);
     setFarms(fList);
-  }, []);
+    // Load farm pins from weather_locations so operators can see all their
+    // properties on the map even before drawing paddock boundaries. Silent
+    // fail-safe if the SQL migration hasn't been run yet.
+    try {
+      const businessId = business?.id;
+      if (!businessId) return;
+      const { data, error } = await supabase
+        .from("weather_locations")
+        .select("id, lat, lon, label, farm_id")
+        .eq("business_id", businessId)
+        .eq("is_active", true);
+      if (error || !data) return;
+      const nameByFarm = new Map(fList.map((f) => [f.id, f.name]));
+      setFarmPins(
+        data
+          .filter((r: any) => typeof r.lat === "number" && typeof r.lon === "number")
+          .map((r: any) => ({ id: r.id, lat: r.lat, lon: r.lon, name: r.label || (r.farm_id ? nameByFarm.get(r.farm_id) : "Farm") || "Farm" }))
+      );
+    } catch { /* fail-safe */ }
+  }, [business?.id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useRealtime(["paddocks", "farms"], load, [load]);
 
@@ -296,6 +317,7 @@ export default function PaddocksTab() {
           paddocks={paddocks.map((p) => ({
             id: p.id, name: p.name, area_ha: p.area_ha, crop: p.crop, boundary_geojson: p.boundary ?? null,
           }))}
+          farmPins={farmPins}
           onSelect={(id) => { if (mode === "view") { setSelectedId(id); mapRef.current?.focusPaddock(id); } }}
           onPointsUpdate={(count, areaHa) => setDrawInfo({ count, areaHa })}
           onSaveGeometry={persistPaddock}

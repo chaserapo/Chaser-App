@@ -3,17 +3,20 @@ import { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Pre
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { v4 as uuid } from "uuid";
+import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
 import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { MACHINE_TYPES, MachineType } from "@/src/lib/types";
+import { NOZZLES } from "@/src/lib/nozzles";
 import type { Machinery } from "@/src/lib/types";
 
 export default function NewMachine() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [type, setType] = useState<MachineType>("Tractor");
+  const [nozzlePickerOpen, setNozzlePickerOpen] = useState(false);
   const [f, setF] = useState({
     name: "", make: "", model: "", year: "",
     serial_number: "", registration: "",
@@ -21,6 +24,8 @@ export default function NewMachine() {
     tank_capacity_l: "", boom_width_m: "", nozzle_spacing_m: "", nozzle_positions: "",
     default_nozzle: "", default_speed_kmh: "", default_water_rate_lha: "",
   });
+
+  const selectedNozzle = NOZZLES.find((n) => n.id === f.default_nozzle) ?? null;
 
   const isSprayer = type === "Self-propelled sprayer" || type === "Tow-behind sprayer";
 
@@ -96,7 +101,39 @@ export default function NewMachine() {
                   <View style={{ flex: 1 }}><Input label="Nozzle spacing" value={f.nozzle_spacing_m} onChangeText={(v) => setF({ ...f, nozzle_spacing_m: v })} keyboardType="decimal-pad" suffix="mm" testID="input-spacing" /></View>
                   <View style={{ flex: 1 }}><Input label="Nozzle positions" value={f.nozzle_positions} onChangeText={(v) => setF({ ...f, nozzle_positions: v })} keyboardType="numeric" testID="input-positions" /></View>
                 </View>
-                <Input label="Default nozzle" value={f.default_nozzle} onChangeText={(v) => setF({ ...f, default_nozzle: v })} testID="input-def-nozzle" />
+                <Text style={styles.pickerLabel}>Default nozzle</Text>
+                <Pressable onPress={() => setNozzlePickerOpen((v) => !v)} testID="mach-nozzle-select" style={styles.nozzleBtn}>
+                  <Text style={styles.nozzleBtnText}>
+                    {selectedNozzle ? selectedNozzle.label : "Select a nozzle (optional)"}
+                  </Text>
+                  <Icon name={nozzlePickerOpen ? "chevron-up" : "chevron-down"} size={18} color={colors.muted} />
+                </Pressable>
+                {nozzlePickerOpen ? (
+                  <View style={styles.nozzlePickerWrap} testID="mach-nozzle-picker">
+                    <ScrollView style={{ maxHeight: 260 }} nestedScrollEnabled>
+                      <Pressable onPress={() => { setF({ ...f, default_nozzle: "" }); setNozzlePickerOpen(false); }} style={styles.nozzleRow}>
+                        <Text style={styles.nozzleClear}>None — clear selection</Text>
+                      </Pressable>
+                      {NOZZLES.map((n) => {
+                        const active = f.default_nozzle === n.id;
+                        return (
+                          <Pressable
+                            key={n.id}
+                            onPress={() => { setF({ ...f, default_nozzle: n.id }); setNozzlePickerOpen(false); }}
+                            style={[styles.nozzleRow, active && { backgroundColor: colors.brandSecondary }]}
+                            testID={`mach-nozzle-option-${n.id}`}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.nozzleName}>{n.label}</Text>
+                              <Text style={styles.nozzleSub}>{n.type} · {n.ratedFlowLpm.toFixed(2)} L/min @ {n.ratedPressureBar} bar</Text>
+                            </View>
+                            {active ? <Icon name="check" size={18} color={colors.brandPrimary} /> : null}
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                ) : null}
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <View style={{ flex: 1 }}><Input label="Default speed" value={f.default_speed_kmh} onChangeText={(v) => setF({ ...f, default_speed_kmh: v })} keyboardType="decimal-pad" suffix="km/h" testID="input-def-speed" /></View>
                   <View style={{ flex: 1 }}><Input label="Default water rate" value={f.default_water_rate_lha} onChangeText={(v) => setF({ ...f, default_water_rate_lha: v })} keyboardType="decimal-pad" suffix="L/ha" testID="input-def-water" /></View>
@@ -119,5 +156,13 @@ const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
   chip: { paddingHorizontal: 12, height: 36, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, alignItems: "center", justifyContent: "center" },
   chipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
+  pickerLabel: { fontSize: 12, color: colors.muted, marginBottom: 6, marginTop: 12, fontWeight: "600" },
+  nozzleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, borderRadius: radius.sm, paddingHorizontal: 12, height: 44, marginBottom: 4 },
+  nozzleBtnText: { fontSize: 14, color: colors.onSurface, fontWeight: "600" },
+  nozzlePickerWrap: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radius.sm, marginTop: 4, padding: 4 },
+  nozzleRow: { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: radius.sm, gap: 8 },
+  nozzleName: { fontSize: 13, fontWeight: "700", color: colors.onSurface },
+  nozzleSub: { fontSize: 11, color: colors.muted, marginTop: 1 },
+  nozzleClear: { fontSize: 12, color: colors.error, fontWeight: "700" },
   chipText: { fontSize: 12, fontWeight: "700", color: colors.onSurfaceTertiary },
 });

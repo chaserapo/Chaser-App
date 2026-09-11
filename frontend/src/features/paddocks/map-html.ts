@@ -32,6 +32,23 @@ export const MAP_HTML = `<!doctype html>
       width: 16px; height: 16px; border-radius: 999px; background:#2563EB;
       border: 3px solid #ffffff; box-shadow: 0 0 0 6px rgba(37,99,235,0.2);
     }
+    .farm-pin {
+      display:flex; flex-direction:column; align-items:center; cursor:pointer;
+      transform: translateY(-14px);
+    }
+    .farm-pin .bubble {
+      background:#3B6E3B; color:#fff; padding:4px 8px; border-radius:6px;
+      font: 700 11px -apple-system, system-ui, sans-serif;
+      white-space:nowrap; border:2px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35); max-width:160px;
+      overflow:hidden; text-overflow:ellipsis;
+    }
+    .farm-pin .tail {
+      width:0; height:0; margin-top:-2px;
+      border-left:6px solid transparent; border-right:6px solid transparent;
+      border-top:8px solid #3B6E3B;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25));
+    }
   </style>
 </head>
 <body>
@@ -65,6 +82,8 @@ export const MAP_HTML = `<!doctype html>
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
     let paddocks = [];
+    let farmPins = [];      // [{ id, name, lat, lon }]
+    let farmMarkers = [];   // parallel maplibre markers
     let mode = 'view'; // 'view' | 'draw'
     let drawPoints = []; // [[lng,lat], ...]
     let pinMarkers = [];
@@ -99,6 +118,28 @@ export const MAP_HTML = `<!doctype html>
     function renderPaddocks() {
       const src = map.getSource('paddocks');
       if (src) src.setData(paddockGeoJSON());
+    }
+
+    // Renders one green "farm" bubble marker per weather_locations pin so
+    // operators can see every property on the map even before they've drawn
+    // paddock boundaries.
+    function renderFarmPins() {
+      farmMarkers.forEach(m => m.remove());
+      farmMarkers = farmPins.map(p => {
+        const wrap = document.createElement('div');
+        wrap.className = 'farm-pin';
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = p.name || 'Farm';
+        const tail = document.createElement('div');
+        tail.className = 'tail';
+        wrap.appendChild(bubble);
+        wrap.appendChild(tail);
+        wrap.addEventListener('click', () => post({ type: 'farmSelect', id: p.id }));
+        return new maplibregl.Marker({ element: wrap, anchor: 'bottom' })
+          .setLngLat([p.lon, p.lat])
+          .addTo(map);
+      });
     }
     function renderDrawing() {
       const g = drawingGeoJSON();
@@ -139,10 +180,23 @@ export const MAP_HTML = `<!doctype html>
     function fitToPaddocks() {
       if (fitted) return;
       const g = paddockGeoJSON();
-      if (g.features.length === 0) return;
+      let bboxSource = null;
+      if (g.features.length > 0) {
+        bboxSource = g;
+      } else if (farmPins.length > 0) {
+        // No paddock polygons yet — fit around the farm pins instead so the
+        // user sees their properties on first open.
+        bboxSource = {
+          type: 'FeatureCollection',
+          features: farmPins.map(p => ({
+            type: 'Feature', geometry: { type: 'Point', coordinates: [p.lon, p.lat] }, properties: {}
+          }))
+        };
+      }
+      if (!bboxSource) return;
       try {
-        const bbox = turf.bbox(g);
-        map.fitBounds(bbox, { padding: 40, duration: 0, maxZoom: 15 });
+        const bbox = turf.bbox(bboxSource);
+        map.fitBounds(bbox, { padding: 60, duration: 0, maxZoom: farmPins.length && !g.features.length ? 12 : 15 });
         fitted = true;
       } catch (e) { log(e); }
     }
@@ -178,6 +232,7 @@ export const MAP_HTML = `<!doctype html>
       let msg; try { msg = JSON.parse(raw); } catch (e) { return; }
       switch (msg.type) {
         case 'setPaddocks': paddocks = msg.paddocks || []; if (map.loaded()) { renderPaddocks(); fitToPaddocks(); } break;
+        case 'setFarmPins': farmPins = msg.pins || []; if (map.loaded()) { renderFarmPins(); fitToPaddocks(); } break;
         case 'setMode':
           mode = msg.mode;
           if (mode === 'view') { drawPoints = []; renderDrawing(); postPointsUpdate(); }

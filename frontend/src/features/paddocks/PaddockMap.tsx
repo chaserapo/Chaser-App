@@ -11,6 +11,8 @@ export type PaddockOnMap = {
   boundary_geojson: { type: "Polygon"; coordinates: number[][][] } | null;
 };
 
+export type FarmPin = { id: string; name: string; lat: number; lon: number };
+
 export type PaddockMapHandle = {
   setMode: (mode: "view" | "draw") => void;
   undo: () => void;
@@ -23,7 +25,9 @@ export type PaddockMapHandle = {
 
 type Props = {
   paddocks: PaddockOnMap[];
+  farmPins?: FarmPin[];
   onSelect?: (id: string) => void;
+  onFarmSelect?: (id: string) => void;
   onPointsUpdate?: (count: number, areaHa: number) => void;
   onSaveGeometry?: (geojson: { type: "Polygon"; coordinates: number[][][] }, areaHa: number) => void;
   style?: any;
@@ -34,12 +38,14 @@ type Props = {
 // map works in the preview and in Expo Web. Native builds keep using WebView.
 // -----------------------------------------------------------------------------
 const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
-  { paddocks, onSelect, onPointsUpdate, onSaveGeometry, style }, ref
+  { paddocks, farmPins, onSelect, onFarmSelect, onPointsUpdate, onSaveGeometry, style }, ref
 ) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
   const pending = useRef(paddocks);
   pending.current = paddocks;
+  const pendingPins = useRef(farmPins ?? []);
+  pendingPins.current = farmPins ?? [];
 
   const send = useCallback((msg: object) => {
     const s = JSON.stringify(msg);
@@ -65,21 +71,29 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
         case "ready":
           readyRef.current = true;
           send({ type: "setPaddocks", paddocks: pending.current });
+          send({ type: "setFarmPins", pins: pendingPins.current });
           break;
         case "select": onSelect?.(msg.id); break;
+        case "farmSelect": onFarmSelect?.(msg.id); break;
         case "points": onPointsUpdate?.(msg.count ?? 0, msg.areaHa ?? 0); break;
         case "save": if (msg.geojson) onSaveGeometry?.(msg.geojson, msg.areaHa ?? 0); break;
       }
     }
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [send, onSelect, onPointsUpdate, onSaveGeometry]);
+  }, [send, onSelect, onFarmSelect, onPointsUpdate, onSaveGeometry]);
 
   const paddocksStr = useMemo(() => JSON.stringify(paddocks), [paddocks]);
   const lastStr = useRef(paddocksStr);
   if (lastStr.current !== paddocksStr) {
     lastStr.current = paddocksStr;
     if (readyRef.current) send({ type: "setPaddocks", paddocks });
+  }
+  const pinsStr = useMemo(() => JSON.stringify(farmPins ?? []), [farmPins]);
+  const lastPinsStr = useRef(pinsStr);
+  if (lastPinsStr.current !== pinsStr) {
+    lastPinsStr.current = pinsStr;
+    if (readyRef.current) send({ type: "setFarmPins", pins: farmPins ?? [] });
   }
 
   return (
@@ -94,12 +108,14 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
 // Native (iOS/Android): uses react-native-webview.
 // -----------------------------------------------------------------------------
 const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
-  { paddocks, onSelect, onPointsUpdate, onSaveGeometry, style }, ref
+  { paddocks, farmPins, onSelect, onFarmSelect, onPointsUpdate, onSaveGeometry, style }, ref
 ) {
   const webviewRef = useRef<WebView>(null);
   const readyRef = useRef(false);
   const pendingPaddocks = useRef<PaddockOnMap[]>(paddocks);
   pendingPaddocks.current = paddocks;
+  const pendingPins = useRef<FarmPin[]>(farmPins ?? []);
+  pendingPins.current = farmPins ?? [];
 
   const send = useCallback((msg: object) => {
     const s = JSON.stringify(msg);
@@ -121,19 +137,30 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
     try {
       const msg = JSON.parse(e.nativeEvent.data);
       switch (msg.type) {
-        case "ready": readyRef.current = true; send({ type: "setPaddocks", paddocks: pendingPaddocks.current }); break;
+        case "ready":
+          readyRef.current = true;
+          send({ type: "setPaddocks", paddocks: pendingPaddocks.current });
+          send({ type: "setFarmPins", pins: pendingPins.current });
+          break;
         case "select": onSelect?.(msg.id); break;
+        case "farmSelect": onFarmSelect?.(msg.id); break;
         case "points": onPointsUpdate?.(msg.count ?? 0, msg.areaHa ?? 0); break;
         case "save": if (msg.geojson) onSaveGeometry?.(msg.geojson, msg.areaHa ?? 0); break;
       }
     } catch { /* ignore */ }
-  }, [onSelect, onPointsUpdate, onSaveGeometry, send]);
+  }, [onSelect, onFarmSelect, onPointsUpdate, onSaveGeometry, send]);
 
   const paddocksStr = useMemo(() => JSON.stringify(paddocks), [paddocks]);
   const paddocksStrRef = useRef(paddocksStr);
   if (paddocksStrRef.current !== paddocksStr) {
     paddocksStrRef.current = paddocksStr;
     if (readyRef.current) send({ type: "setPaddocks", paddocks });
+  }
+  const pinsStr = useMemo(() => JSON.stringify(farmPins ?? []), [farmPins]);
+  const pinsStrRef = useRef(pinsStr);
+  if (pinsStrRef.current !== pinsStr) {
+    pinsStrRef.current = pinsStr;
+    if (readyRef.current) send({ type: "setFarmPins", pins: farmPins ?? [] });
   }
 
   return (
