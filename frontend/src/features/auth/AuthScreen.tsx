@@ -16,6 +16,9 @@ export function AuthScreen() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [businessName, setBusinessName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +26,11 @@ export function AuthScreen() {
   async function submit() {
     setError(null);
     if (!email.trim() || !password) { setError("Enter email and password."); return; }
-    if (mode === "signup" && !businessName.trim()) { setError("Enter your farm / business name."); return; }
+    if (mode === "signup") {
+      if (!businessName.trim()) { setError("Enter your farm / business name."); return; }
+      if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+      if (password !== confirmPassword) { setError("Passwords don't match."); return; }
+    }
     setBusy(true);
     try {
       if (mode === "signin") await signIn(email, password);
@@ -68,7 +75,20 @@ export function AuthScreen() {
               />
             ) : null}
             <Input label="Email" value={email} onChangeText={setEmail} placeholder="you@farm.com.au" keyboardType="default" autoCapitalize="none" testID="input-email" />
-            <Input label="Password" value={password} onChangeText={setPassword} placeholder="Minimum 6 characters" secureTextEntry autoCapitalize="none" testID="input-password" />
+            <View>
+              <Input label="Password" value={password} onChangeText={setPassword} placeholder="Minimum 6 characters" secureTextEntry={!showPassword} autoCapitalize="none" testID="input-password" />
+              <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={10} style={styles.eyeBtn} testID="toggle-password-visibility">
+                <Icon name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={colors.muted} />
+              </Pressable>
+            </View>
+            {mode === "signup" ? (
+              <View>
+                <Input label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Re-enter password" secureTextEntry={!showConfirm} autoCapitalize="none" testID="input-confirm-password" />
+                <Pressable onPress={() => setShowConfirm((v) => !v)} hitSlop={10} style={styles.eyeBtn} testID="toggle-confirm-visibility">
+                  <Icon name={showConfirm ? "eye-off-outline" : "eye-outline"} size={20} color={colors.muted} />
+                </Pressable>
+              </View>
+            ) : null}
             {error ? (
               <View style={styles.errorBox} testID="auth-error">
                 <Icon name="alert-circle-outline" size={16} color={colors.error} />
@@ -115,4 +135,5 @@ const styles = StyleSheet.create({
   errorBox: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.sm, backgroundColor: "#FEE2E2", padding: 10, borderRadius: radius.md },
   errorText: { color: colors.error, fontWeight: "600", fontSize: 13, flex: 1 },
   footer: { marginTop: spacing.lg, color: colors.muted, fontSize: 12, textAlign: "center", lineHeight: 17 },
+  eyeBtn: { position: "absolute", right: 12, top: 34, padding: 4 },
 });

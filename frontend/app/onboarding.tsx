@@ -24,6 +24,8 @@ import {
   ONBOARDING_STEPS, OnboardingStep, OnboardingRole, profileRepo, useOnboarding,
 } from "@/src/lib/onboarding";
 import { invitationsRepo } from "@/src/lib/members";
+import { geocodeAddress } from "@/src/lib/geocoding";
+import { supabase } from "@/src/lib/supabase";
 import type { Farm, Paddock, Machinery, Chemical, Operator, MachineType } from "@/src/lib/types";
 import { MACHINE_TYPES, CHEMICAL_CATEGORIES } from "@/src/lib/types";
 
@@ -311,12 +313,14 @@ function FarmsStep({ onDone, onSkip }: { onDone: () => Promise<void>; onSkip: ()
   const [showForm, setShowForm] = useState(false);
   const [draft, setDraft] = useState({ name: "", region: "", address: "", notes: "" });
   const [busy, setBusy] = useState(false);
+  const [pinNote, setPinNote] = useState<string | null>(null);
 
   useEffect(() => { repo.farms.active().then(setFarms).catch(() => {}); }, []);
 
   async function saveFarm() {
     if (!draft.name.trim()) return;
     setBusy(true);
+    setPinNote(null);
     try {
       const business = await repo.getBusiness();
       if (!business) throw new Error("No active business");
@@ -324,15 +328,42 @@ function FarmsStep({ onDone, onSkip }: { onDone: () => Promise<void>; onSkip: ()
         id: uuid(),
         business_id: business.id,
         name: draft.name.trim(),
-        region: draft.region.trim() || undefined,
+        region: draft.region.trim() || undefined, // stored column — semantic label is now "Area / State"
         address: draft.address.trim() || undefined,
         notes: draft.notes.trim() || undefined,
         created_at: new Date().toISOString(),
       };
       await repo.farms.save(f);
+
+      // If the farmer typed an address, geocode it (free, OSM Nominatim) and
+      // drop a weather_locations pin so the Weather tab / Paddocks map has a
+      // coordinate to work with before any paddock boundary is drawn.
+      const addressQuery = [draft.address.trim(), draft.region.trim()].filter(Boolean).join(", ");
+      if (addressQuery) {
+        try {
+          const geo = await geocodeAddress(addressQuery);
+          if (geo) {
+            await supabase.from("weather_locations").insert({
+              business_id: business.id,
+              farm_id: f.id,
+              lat: geo.lat,
+              lon: geo.lon,
+              label: f.name,
+              is_active: true,
+            });
+            setPinNote(`✓ Pinned at ${geo.lat.toFixed(3)}, ${geo.lon.toFixed(3)} — ${geo.label.split(",").slice(0, 3).join(",")}`);
+          } else {
+            setPinNote("Couldn't find that address on the map. You can still draw a paddock boundary later.");
+          }
+        } catch (e) {
+          console.warn("geocode farm failed", e);
+        }
+      }
+
       setFarms((xs) => [...xs, f]);
+      // Keep the form OPEN with a fresh draft so the farmer can add another
+      // straight away — this is the fix for "only lets me add one".
       setDraft({ name: "", region: "", address: "", notes: "" });
-      setShowForm(false);
     } finally {
       setBusy(false);
     }
@@ -360,12 +391,14 @@ function FarmsStep({ onDone, onSkip }: { onDone: () => Promise<void>; onSkip: ()
       {showForm ? (
         <View style={styles.formCard}>
           <Input label="Farm name" value={draft.name} onChangeText={(v) => setDraft({ ...draft, name: v })} placeholder="Home Block" testID="farm-name" />
-          <Input label="Region / district (optional)" value={draft.region} onChangeText={(v) => setDraft({ ...draft, region: v })} placeholder="Wimmera, VIC" testID="farm-region" />
-          <Input label="Address (optional)" value={draft.address} onChangeText={(v) => setDraft({ ...draft, address: v })} testID="farm-address" />
+          <Input label="Area / State (optional)" value={draft.region} onChangeText={(v) => setDraft({ ...draft, region: v })} placeholder="Wimmera, VIC" testID="farm-region" />
+          <Input label="Address (optional)" value={draft.address} onChangeText={(v) => setDraft({ ...draft, address: v })} placeholder="e.g. 123 Somewhere Rd, Wagga Wagga" testID="farm-address" />
+          <Text style={styles.formHint}>Chaser will drop a map pin at this address so weather works out of the box.</Text>
+          {pinNote ? <Text style={styles.pinNote}>{pinNote}</Text> : null}
           <View style={{ height: spacing.sm }} />
           <Button title="Save farm" icon="content-save" onPress={saveFarm} loading={busy} disabled={!draft.name.trim()} testID="farm-save-btn" />
           <View style={{ height: 4 }} />
-          <Button title="Cancel" variant="outline" onPress={() => setShowForm(false)} testID="farm-cancel-btn" />
+          <Button title="Done adding farms" variant="outline" onPress={() => { setShowForm(false); setPinNote(null); }} testID="farm-cancel-btn" />
         </View>
       ) : (
         <Button title={farms.length === 0 ? "Add farm" : "Add another farm"} icon="plus-circle-outline" variant="secondary" onPress={() => setShowForm(true)} testID="add-farm-btn" />
@@ -515,8 +548,9 @@ function MachineryStep({ onDone, onSkip }: { onDone: () => Promise<void>; onSkip
       };
       await repo.machinery.save(m);
       setItems((xs) => [...xs, m]);
+      // Keep form open with fresh fields so the farmer can queue up another
+      // machine straight away — closes the "only lets me add one" gap.
       setDraft({ name: "", type: "", hours: "", make: "", model: "" });
-      setShowForm(false);
     } finally {
       setBusy(false);
     }
@@ -560,7 +594,7 @@ function MachineryStep({ onDone, onSkip }: { onDone: () => Promise<void>; onSkip
           <View style={{ height: spacing.sm }} />
           <Button title="Save machine" icon="content-save" onPress={saveMachine} loading={busy} disabled={!draft.name.trim()} testID="mach-save-btn" />
           <View style={{ height: 4 }} />
-          <Button title="Cancel" variant="outline" onPress={() => setShowForm(false)} testID="mach-cancel-btn" />
+          <Button title="Done adding machines" variant="outline" onPress={() => setShowForm(false)} testID="mach-cancel-btn" />
         </View>
       ) : (
         <Button title={items.length === 0 ? "Add machinery" : "Add another machine"} icon="plus-circle-outline" variant="secondary" onPress={() => setShowForm(true)} testID="add-machine-btn" />
@@ -765,6 +799,8 @@ const styles = StyleSheet.create({
 
   formCard: { backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginTop: spacing.md, marginBottom: spacing.sm, gap: 4 },
   formLabel: { fontSize: 12, color: colors.muted, marginBottom: 6, fontWeight: "600" },
+  formHint: { fontSize: 11, color: colors.muted, fontStyle: "italic", marginTop: 2 },
+  pinNote: { fontSize: 11, color: colors.brandPrimary, fontWeight: "700", marginTop: 4 },
   helperNote: { fontSize: 11, color: colors.muted, marginTop: 6, fontStyle: "italic" },
   notice: { fontSize: 12, color: colors.brandPrimary, marginTop: 8, fontWeight: "600" },
   errorNotice: { fontSize: 12, color: colors.error, marginTop: 8, fontWeight: "700" },

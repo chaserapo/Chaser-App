@@ -11,7 +11,7 @@ import type { SprayJob } from "@/src/lib/types";
 
 const TOOLS = [
   { key: "records", title: "All Spray Records", subtitle: "Search & filter history", icon: "clipboard-text-outline", route: "/records" },
-  { key: "spray-rate", title: "Spray Calculator", subtitle: "Rate, coverage & flow", icon: "calculator", route: "/calculators/spray-rate" },
+  { key: "spray-rate", title: "Spray Tools", subtitle: "Rate, coverage, nozzle & pressure", icon: "calculator", route: "/calculators/spray-rate" },
   { key: "tank-mix", title: "Tank Mix Calculator", subtitle: "Multi-product tank mix", icon: "beaker-outline", route: "/calculators/tank-mix" },
   { key: "nozzle", title: "Nozzle Guide", subtitle: "ISO flat-fan sizing", icon: "sprinkler-variant", route: "/calculators/nozzle-guide" },
   { key: "delta-t", title: "Delta T", subtitle: "Wet-bulb depression", icon: "chart-bell-curve-cumulative", route: "/calculators/delta-t" },

@@ -240,7 +240,7 @@ export default function Home() {
             testID="spray-calculator-btn"
           >
             <Icon name="calculator-variant-outline" size={20} color={colors.brandPrimary} />
-            <Text style={styles.secondaryBtnText}>Spray Calculator</Text>
+            <Text style={styles.secondaryBtnText}>Spray Tools</Text>
           </Pressable>
           <Pressable
             onPress={() => router.push("/records/new")}
