@@ -167,19 +167,21 @@ export default function Home() {
           <Text style={styles.prompt}>What are we chasing today?</Text>
         </View>
 
-        {/* ── Slim conditions strip ────────────────────────────── */}
-        <View style={styles.conditionsStrip} testID="weather-strip">
+        {/* ── Slim conditions strip (tap to open full Weather tab) ─── */}
+        <Pressable onPress={() => router.push("/(tabs)/weather")} style={styles.conditionsStrip} testID="weather-strip">
           <MiniStat label="Temp" value={weather ? `${weather.temperature_c.toFixed(1)}°` : "–"} icon="thermometer" testID="stat-temp" />
           <MiniStat label="RH" value={weather ? `${Math.round(weather.humidity)}%` : "–"} icon="water-percent" testID="stat-humidity" />
           <MiniStat label="ΔT" value={weather ? weather.delta_t.toFixed(1) : "–"} icon="chart-bell-curve-cumulative" testID="stat-delta-t" />
           <MiniStat label="Wind" value={weather ? `${weather.wind_speed.toFixed(0)}` : "–"} unit={weather ? "km/h" : ""} icon="weather-windy" testID="stat-wind-speed" />
           <MiniStat label="Dir" value={weather ? weather.wind_direction : "–"} icon="compass-outline" testID="stat-wind-dir" />
-        </View>
+        </Pressable>
         <View style={styles.conditionsMeta}>
-          <Text style={styles.conditionsMetaText} numberOfLines={1} testID="weather-meta">
-            {locationLabel} · Updated {weather ? formatUpdated(weather.captured_at) : "—"}
-          </Text>
-          <Pressable onPress={loadWeather} hitSlop={8} testID="refresh-weather-btn">
+          <Pressable onPress={() => router.push("/(tabs)/weather")} style={{ flex: 1 }} hitSlop={4} testID="weather-open-full-btn">
+            <Text style={styles.conditionsMetaText} numberOfLines={1} testID="weather-meta">
+              {locationLabel} · Updated {weather ? formatUpdated(weather.captured_at) : "—"} · Tap for full forecast
+            </Text>
+          </Pressable>
+          <Pressable onPress={loadWeather} hitSlop={8} testID="refresh-weather-btn" style={{ paddingLeft: 8 }}>
             {loadingWeather ? (
               <ActivityIndicator size="small" color={colors.brandPrimary} />
             ) : (

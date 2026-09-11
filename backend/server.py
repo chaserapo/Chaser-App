@@ -54,7 +54,19 @@ async def get_status_checks():
 
 # Feature routes
 from routes.invitations import router as invitations_router  # noqa: E402
+from routes.weather_cron import weather_cron_loop, _cron_tick  # noqa: E402
 api_router.include_router(invitations_router)
+
+# On-demand refresh endpoint — safe to call ad-hoc from admin tools or a cron
+# runner. Idempotent; each call creates one new forecast run per active
+# location.
+@api_router.post("/weather/refresh-all")
+async def weather_refresh_all():
+    try:
+        await _cron_tick()
+        return {"status": "ok"}
+    except Exception as e:  # pragma: no cover
+        return {"status": "error", "message": str(e)}
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -87,3 +99,10 @@ logger = logging.getLogger(__name__)
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+@app.on_event("startup")
+async def _start_weather_cron():
+    # Background weather-forecast fetcher. No-op unless SUPABASE_SERVICE_ROLE_KEY
+    # is configured so local dev/preview works without it.
+    import asyncio
+    asyncio.create_task(weather_cron_loop())

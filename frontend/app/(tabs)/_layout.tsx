@@ -21,6 +21,7 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: ({ color, size }) => <Icon name="home-variant" size={size} color={color} /> }} />
       <Tabs.Screen name="paddocks" options={{ title: "Paddocks", tabBarIcon: ({ color, size }) => <Icon name="map-outline" size={size} color={color} /> }} />
       <Tabs.Screen name="spray" options={{ title: "Spray", tabBarIcon: ({ color, size }) => <Icon name="sprinkler-variant" size={size} color={color} /> }} />
+      <Tabs.Screen name="weather" options={{ title: "Weather", tabBarIcon: ({ color, size }) => <Icon name="weather-partly-cloudy" size={size} color={color} /> }} />
       <Tabs.Screen name="machinery" options={{ title: "Machinery", tabBarIcon: ({ color, size }) => <Icon name="tractor-variant" size={size} color={color} /> }} />
       <Tabs.Screen name="more" options={{ title: "More", tabBarIcon: ({ color, size }) => <Icon name="dots-horizontal" size={size} color={color} /> }} />
       <Tabs.Screen name="chemicals" options={{ href: null }} />
