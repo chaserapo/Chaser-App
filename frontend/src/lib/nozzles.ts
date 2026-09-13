@@ -1,91 +1,124 @@
-// Curated list of common broadacre nozzle tips (AU market).
-//
-// Each entry captures the ISO-04-style colour code and its rated flow at
-// the reference pressure (usually 3 bar). Chaser uses this to check whether
-// a required flow rate is within the nozzle's operating window and, if not,
-// suggests the pressure the operator would need to run at instead.
-//
-// Flow scales with sqrt(pressure) — Q₂ = Q₁ · √(P₂ / P₁).
+// Curated broadacre nozzle library for Chaser.
+// Flow rates use ISO nominal capacities at 3 bar. Pressure windows and application
+// metadata are family-specific and should still be checked against the current
+// manufacturer chart and the chemical label before spraying.
+
+export type ApplicationGoal = "systemic" | "contact" | "fungicide" | "insecticide" | "drift" | "fertiliser";
 
 export type Nozzle = {
   id: string;
-  label: string;             // "TeeJet AIXR 110-02 (Yellow)"
-  brand: string;             // "TeeJet" | "ARAG" | "Hardi" | "Lechler" | "Wilger"
-  iso: string;               // "02" | "03" | "04" | "05" | "06" | "08"
-  colour: string;            // "Yellow"
-  ratedPressureBar: number;  // 3
-  ratedFlowLpm: number;      // 0.79 L/min
-  minPressureBar: number;    // 1
-  maxPressureBar: number;    // 5 (nozzle-dependent)
-  type: string;              // "Air-induction" | "Flat fan" | "TurboTee" | "Drift-reduction"
+  label: string;
+  brand: string;
+  family: string;
+  iso: string;
+  colour: string;
+  ratedPressureBar: number;
+  ratedFlowLpm: number;
+  minPressureBar: number;
+  maxPressureBar: number;
+  type: string;
+  pwmApproved?: boolean;
+  goals?: ApplicationGoal[];
+  dropletRange?: string;
 };
 
-// Reference: TeeJet AIXR / TT / XR nozzle catalogue (2024 AU editions) and
-// ARAG CFA range. Flow rates in L/min at 3 bar.
-export const NOZZLES: Nozzle[] = [
-  { id: "teejet-aixr-01",  label: "TeeJet AIXR 110-01 (Orange)", brand: "TeeJet", iso: "01", colour: "Orange", ratedPressureBar: 3, ratedFlowLpm: 0.39, minPressureBar: 2, maxPressureBar: 6, type: "Air-induction" },
-  { id: "teejet-aixr-015", label: "TeeJet AIXR 110-015 (Green)", brand: "TeeJet", iso: "015", colour: "Green", ratedPressureBar: 3, ratedFlowLpm: 0.59, minPressureBar: 2, maxPressureBar: 6, type: "Air-induction" },
-  { id: "teejet-aixr-02",  label: "TeeJet AIXR 110-02 (Yellow)", brand: "TeeJet", iso: "02", colour: "Yellow", ratedPressureBar: 3, ratedFlowLpm: 0.79, minPressureBar: 2, maxPressureBar: 6, type: "Air-induction" },
-  { id: "teejet-aixr-025", label: "TeeJet AIXR 110-025 (Lilac)", brand: "TeeJet", iso: "025", colour: "Lilac", ratedPressureBar: 3, ratedFlowLpm: 0.99, minPressureBar: 2, maxPressureBar: 6, type: "Air-induction" },
-  { id: "teejet-aixr-03",  label: "TeeJet AIXR 110-03 (Blue)",   brand: "TeeJet", iso: "03", colour: "Blue",   ratedPressureBar: 3, ratedFlowLpm: 1.18, minPressureBar: 2, maxPressureBar: 6, type: "Air-induction" },
-  { id: "teejet-aixr-04",  label: "TeeJet AIXR 110-04 (Red)",    brand: "TeeJet", iso: "04", colour: "Red",    ratedPressureBar: 3, ratedFlowLpm: 1.58, minPressureBar: 2, maxPressureBar: 6, type: "Air-induction" },
-  { id: "teejet-aixr-05",  label: "TeeJet AIXR 110-05 (Brown)",  brand: "TeeJet", iso: "05", colour: "Brown",  ratedPressureBar: 3, ratedFlowLpm: 1.97, minPressureBar: 2, maxPressureBar: 6, type: "Air-induction" },
-  { id: "teejet-aixr-06",  label: "TeeJet AIXR 110-06 (Grey)",   brand: "TeeJet", iso: "06", colour: "Grey",   ratedPressureBar: 3, ratedFlowLpm: 2.37, minPressureBar: 2, maxPressureBar: 6, type: "Air-induction" },
-  { id: "teejet-aixr-08",  label: "TeeJet AIXR 110-08 (White)",  brand: "TeeJet", iso: "08", colour: "White",  ratedPressureBar: 3, ratedFlowLpm: 3.16, minPressureBar: 2, maxPressureBar: 6, type: "Air-induction" },
-  { id: "teejet-tt-02",    label: "TeeJet TT 110-02 (Yellow)",   brand: "TeeJet", iso: "02", colour: "Yellow", ratedPressureBar: 3, ratedFlowLpm: 0.79, minPressureBar: 1, maxPressureBar: 4, type: "TurboTee flat fan" },
-  { id: "teejet-tt-03",    label: "TeeJet TT 110-03 (Blue)",     brand: "TeeJet", iso: "03", colour: "Blue",   ratedPressureBar: 3, ratedFlowLpm: 1.18, minPressureBar: 1, maxPressureBar: 4, type: "TurboTee flat fan" },
-  { id: "teejet-tt-04",    label: "TeeJet TT 110-04 (Red)",      brand: "TeeJet", iso: "04", colour: "Red",    ratedPressureBar: 3, ratedFlowLpm: 1.58, minPressureBar: 1, maxPressureBar: 4, type: "TurboTee flat fan" },
-  { id: "arag-cfa-02",     label: "ARAG CFA 110-02 (Yellow)",    brand: "ARAG",   iso: "02", colour: "Yellow", ratedPressureBar: 3, ratedFlowLpm: 0.80, minPressureBar: 1, maxPressureBar: 5, type: "Air-induction" },
-  { id: "arag-cfa-03",     label: "ARAG CFA 110-03 (Blue)",      brand: "ARAG",   iso: "03", colour: "Blue",   ratedPressureBar: 3, ratedFlowLpm: 1.20, minPressureBar: 1, maxPressureBar: 5, type: "Air-induction" },
-  { id: "arag-cfa-04",     label: "ARAG CFA 110-04 (Red)",       brand: "ARAG",   iso: "04", colour: "Red",    ratedPressureBar: 3, ratedFlowLpm: 1.60, minPressureBar: 1, maxPressureBar: 5, type: "Air-induction" },
-  { id: "arag-cfa-05",     label: "ARAG CFA 110-05 (Brown)",     brand: "ARAG",   iso: "05", colour: "Brown",  ratedPressureBar: 3, ratedFlowLpm: 2.00, minPressureBar: 1, maxPressureBar: 5, type: "Air-induction" },
-  { id: "hardi-minidrift-02", label: "Hardi MiniDrift 02 (Yellow)", brand: "Hardi",   iso: "02", colour: "Yellow", ratedPressureBar: 3, ratedFlowLpm: 0.79, minPressureBar: 1.5, maxPressureBar: 5, type: "Drift-reduction" },
-  { id: "hardi-minidrift-03", label: "Hardi MiniDrift 03 (Blue)",   brand: "Hardi",   iso: "03", colour: "Blue",   ratedPressureBar: 3, ratedFlowLpm: 1.18, minPressureBar: 1.5, maxPressureBar: 5, type: "Drift-reduction" },
-  { id: "hardi-minidrift-04", label: "Hardi MiniDrift 04 (Red)",    brand: "Hardi",   iso: "04", colour: "Red",    ratedPressureBar: 3, ratedFlowLpm: 1.58, minPressureBar: 1.5, maxPressureBar: 5, type: "Drift-reduction" },
+const ISO: Record<string, { colour: string; flow: number }> = {
+  "01": { colour: "Orange", flow: 0.39 },
+  "015": { colour: "Green", flow: 0.59 },
+  "02": { colour: "Yellow", flow: 0.79 },
+  "025": { colour: "Lilac", flow: 0.99 },
+  "03": { colour: "Blue", flow: 1.18 },
+  "04": { colour: "Red", flow: 1.58 },
+  "05": { colour: "Brown", flow: 1.97 },
+  "06": { colour: "Grey", flow: 2.37 },
+  "08": { colour: "White", flow: 3.16 },
+  "10": { colour: "Light blue", flow: 3.95 },
+};
+
+type Family = {
+  key: string;
+  brand: string;
+  family: string;
+  angle: string;
+  sizes: string[];
+  min: number | ((iso: string) => number);
+  max: number;
+  type: string;
+  pwm?: boolean;
+  goals: ApplicationGoal[];
+  droplet?: string;
+};
+
+const FAMILIES: Family[] = [
+  { key: "teejet-aixr", brand: "TeeJet", family: "AIXR", angle: "110", sizes: ["01","015","02","025","03","04","05","06","08"], min: 2, max: 6, type: "Air-induction flat fan", goals: ["systemic","drift"], droplet: "Medium–Ultra Coarse" },
+  { key: "teejet-tt", brand: "TeeJet", family: "Turbo TeeJet TT", angle: "110", sizes: ["015","02","025","03","04","05","06"], min: 1, max: 4, type: "Turbo flat fan", pwm: true, goals: ["systemic","contact","fungicide","insecticide"], droplet: "Medium–Very Coarse" },
+  { key: "teejet-ttj60", brand: "TeeJet", family: "Turbo TwinJet TTJ60", angle: "110", sizes: ["02","025","03","04","05","06","08","10"], min: 1.4, max: 6.2, type: "Twin flat fan", pwm: true, goals: ["contact","fungicide","insecticide","systemic"], droplet: "Medium–Very Coarse" },
+  { key: "teejet-tti60", brand: "TeeJet", family: "TTI TwinJet", angle: "110", sizes: ["02","025","03","04","05","06","08"], min: 1.4, max: 6.9, type: "Air-induction twin flat fan", pwm: true, goals: ["systemic","drift","fertiliser"], droplet: "Coarse–Ultra Coarse" },
+  { key: "teejet-aittj60", brand: "TeeJet", family: "Air Induction Turbo TwinJet", angle: "110", sizes: ["02","025","03","04","05","06","08","10"], min: 1.4, max: 6.2, type: "Air-induction twin flat fan", pwm: true, goals: ["systemic","drift","fungicide","insecticide"], droplet: "Medium–Ultra Coarse" },
+  { key: "teejet-tj60", brand: "TeeJet", family: "TwinJet TJ60", angle: "110", sizes: ["015","02","025","03","04","05","06"], min: 2.1, max: 4.1, type: "Twin flat fan", pwm: true, goals: ["contact","fungicide","insecticide"], droplet: "Very Fine–Medium" },
+
+  { key: "lechler-idk", brand: "Lechler", family: "IDK", angle: "120", sizes: ["01","015","02","025","03","04","05","06","08","10"], min: (s) => ["01","015","02","025","03"].includes(s) ? 1.5 : 1, max: 6, type: "Air-induction flat fan", goals: ["systemic","drift","fertiliser"], droplet: "Ultra Coarse–Medium" },
+  { key: "lechler-idkt", brand: "Lechler", family: "IDKT", angle: "120", sizes: ["02","025","03","04","05","06"], min: 1.5, max: 3, type: "Compact air-induction twin flat fan", goals: ["contact","fungicide","insecticide","systemic"], droplet: "Very Coarse–Medium" },
+  { key: "lechler-idta", brand: "Lechler", family: "IDTA", angle: "120", sizes: ["025","03","04","05","06","08"], min: 4, max: 8, type: "Air-induction asymmetric twin flat fan", goals: ["contact","fungicide","insecticide","systemic"], droplet: "Very Coarse–Coarse" },
+
+  { key: "hardi-minidrift", brand: "Hardi", family: "MiniDrift", angle: "110", sizes: ["015","02","025","03","04","05","06","08"], min: 1.5, max: 5, type: "Drift-reduction flat fan", goals: ["systemic","drift"], droplet: "Coarse–Very Coarse" },
+  { key: "hardi-injet", brand: "Hardi", family: "INJET", angle: "110", sizes: ["015","02","025","03","04","05","06","08"], min: 3, max: 8, type: "Air-induction flat fan", goals: ["systemic","drift"], droplet: "Very Coarse–Ultra Coarse" },
+
+  { key: "hypro-uld", brand: "Hypro", family: "Ultra Lo-Drift ULD", angle: "120", sizes: ["015","02","025","03","04","05","06","08"], min: 1, max: 8, type: "Air-induction flat fan", goals: ["systemic","drift"], droplet: "Medium–Ultra Coarse" },
+  { key: "hypro-guardianair", brand: "Hypro", family: "GuardianAIR", angle: "120", sizes: ["01","015","02","025","03","04","05","06"], min: 1, max: 6, type: "Air-induction flat fan", goals: ["systemic","contact","fungicide","insecticide"], droplet: "Fine–Extremely Coarse" },
+
+  { key: "arag-cfa", brand: "ARAG", family: "CFA", angle: "110", sizes: ["015","02","025","03","04","05","06","08"], min: 1, max: 5, type: "Air-induction flat fan", goals: ["systemic","drift"], droplet: "Coarse–Ultra Coarse" },
 ];
 
-/**
- * Given a required flow rate (L/min per nozzle), compute:
- *   - actual flow at the nozzle's rated pressure
- *   - the pressure the nozzle would need to run at to hit the required flow
- *   - a suitability verdict
- * Flow scales as sqrt(pressure): P₂ = P₁ · (Q₂/Q₁)²
- */
+export const NOZZLES: Nozzle[] = FAMILIES.flatMap((f) => f.sizes.map((iso) => {
+  const cap = ISO[iso];
+  return {
+    id: `${f.key}-${iso}`,
+    label: `${f.brand} ${f.family} ${f.angle}-${iso} (${cap.colour})`,
+    brand: f.brand,
+    family: f.family,
+    iso,
+    colour: cap.colour,
+    ratedPressureBar: 3,
+    ratedFlowLpm: cap.flow,
+    minPressureBar: typeof f.min === "function" ? f.min(iso) : f.min,
+    maxPressureBar: f.max,
+    type: f.type,
+    pwmApproved: f.pwm ?? false,
+    goals: f.goals,
+    dropletRange: f.droplet,
+  };
+}));
+
 export type NozzleCheck = {
   ratedFlowAtRefLpm: number;
   requiredPressureBar: number | null;
   suitability: "good" | "undersized" | "oversized" | "out_of_range";
   message: string;
-  tolerancePct: number; // how far off the rated flow is, +/- percent
+  tolerancePct: number;
 };
 
 export function checkNozzle(nozzle: Nozzle, requiredFlowLpm: number, refPressureBar = 3): NozzleCheck {
-  if (requiredFlowLpm <= 0) {
-    return { ratedFlowAtRefLpm: nozzle.ratedFlowLpm, requiredPressureBar: null, suitability: "out_of_range", message: "Enter a rate + speed to check.", tolerancePct: 0 };
-  }
+  if (requiredFlowLpm <= 0) return { ratedFlowAtRefLpm: nozzle.ratedFlowLpm, requiredPressureBar: null, suitability: "out_of_range", message: "Enter a rate + speed to check.", tolerancePct: 0 };
   const rated = nozzle.ratedFlowLpm;
   const tolerance = ((requiredFlowLpm - rated) / rated) * 100;
-  // Required pressure to match Q_required with this nozzle:
   const reqP = nozzle.ratedPressureBar * (requiredFlowLpm / rated) ** 2;
+  if (reqP < nozzle.minPressureBar) return { ratedFlowAtRefLpm: rated, requiredPressureBar: reqP, suitability: "oversized", message: `Would need ${reqP.toFixed(2)} bar, below this family's recommended range.`, tolerancePct: tolerance };
+  if (reqP > nozzle.maxPressureBar) return { ratedFlowAtRefLpm: rated, requiredPressureBar: reqP, suitability: "undersized", message: `Would need ${reqP.toFixed(2)} bar, above this family's recommended range.`, tolerancePct: tolerance };
+  return { ratedFlowAtRefLpm: rated, requiredPressureBar: reqP, suitability: "good", message: `Suitable at about ${reqP.toFixed(2)} bar.`, tolerancePct: tolerance };
+}
 
-  let suitability: NozzleCheck["suitability"];
-  let message: string;
-
-  if (reqP < nozzle.minPressureBar) {
-    suitability = "oversized";
-    message = `Nozzle is oversized — would need ${reqP.toFixed(2)} bar which is below its ${nozzle.minPressureBar} bar minimum. Choose a smaller (lower ISO) nozzle.`;
-  } else if (reqP > nozzle.maxPressureBar) {
-    suitability = "undersized";
-    message = `Nozzle is undersized — would need ${reqP.toFixed(2)} bar which is above its ${nozzle.maxPressureBar} bar maximum. Choose a bigger (higher ISO) nozzle.`;
-  } else if (Math.abs(tolerance) <= 5) {
-    suitability = "good";
-    message = `Well matched — runs almost at rated ${refPressureBar} bar.`;
-  } else if (tolerance < 0) {
-    suitability = "oversized";
-    message = `Slightly oversized — would run at ${reqP.toFixed(2)} bar (below the ${refPressureBar} bar reference).`;
-  } else {
-    suitability = "undersized";
-    message = `Slightly undersized — would need ${reqP.toFixed(2)} bar to deliver the required flow.`;
-  }
-  return { ratedFlowAtRefLpm: rated, requiredPressureBar: reqP, suitability, message, tolerancePct: tolerance };
+export function recommendNozzles(requiredFlowLpm: number, goal: ApplicationGoal = "systemic", pwm = false, spot = false, limit = 5) {
+  if (requiredFlowLpm <= 0) return [];
+  return NOZZLES.map((nozzle) => {
+    const check = checkNozzle(nozzle, requiredFlowLpm);
+    const inRange = check.requiredPressureBar != null && check.requiredPressureBar >= nozzle.minPressureBar && check.requiredPressureBar <= nozzle.maxPressureBar;
+    let score = inRange ? 100 : 0;
+    if (nozzle.goals?.includes(goal)) score += 25;
+    if (pwm && nozzle.pwmApproved) score += 20;
+    if (pwm && !nozzle.pwmApproved) score -= 15;
+    if (spot && ["systemic","drift"].includes(goal) && /air-induction|drift/i.test(nozzle.type)) score += 8;
+    if (check.requiredPressureBar != null) score -= Math.abs(check.requiredPressureBar - 3) * 3;
+    return { nozzle, check, score, inRange };
+  }).filter((x) => x.inRange).sort((a, b) => b.score - a.score).slice(0, limit);
 }
