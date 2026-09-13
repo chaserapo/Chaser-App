@@ -209,11 +209,11 @@ export default function Home() {
           />
         ) : (
           <Button
-            title="Start Spray Job"
+            title="Start Job"
             icon="play-circle-outline"
             size="lg"
-            onPress={() => router.push("/records/new")}
-            testID="start-spray-job-btn"
+            onPress={() => router.push("/jobs/new")}
+            testID="start-job-btn"
           />
         )}
 
@@ -227,7 +227,7 @@ export default function Home() {
             <Text style={styles.secondaryBtnText}>Spray Tools</Text>
           </Pressable>
           <Pressable
-            onPress={() => router.push("/records/new")}
+            onPress={() => router.push("/jobs/new")}
             style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
             testID="new-job-btn"
           >
