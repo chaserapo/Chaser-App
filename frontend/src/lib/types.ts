@@ -67,7 +67,7 @@ export type StockMovement = {
   business_id: ID;
   chemical_id: ID;
   ts: string;
-  delta: number; // positive added, negative removed
+  delta: number;
   unit?: string;
   reason: StockMovementReason;
   spray_job_id?: ID;
@@ -91,6 +91,7 @@ export type ChemicalBatch = {
 export type Operator = {
   id: ID;
   business_id: ID;
+  user_id?: ID;
   name: string;
   first_name?: string;
   last_name?: string;
@@ -104,6 +105,9 @@ export type Operator = {
 
 export type MachineType = "Tractor" | "Self-propelled sprayer" | "Tow-behind sprayer" | "Air seeder" | "Header/Harvester" | "Spreader" | "Ute/Vehicle" | "Implement" | "Other";
 export const MACHINE_TYPES: MachineType[] = ["Tractor", "Self-propelled sprayer", "Tow-behind sprayer", "Air seeder", "Header/Harvester", "Spreader", "Ute/Vehicle", "Implement", "Other"];
+
+export type SprayerApplicationMode = "broadcast" | "spot";
+export type SprayerApplicationGoal = "systemic" | "contact" | "fungicide" | "insecticide" | "drift" | "fertiliser";
 
 export type Machinery = {
   id: ID;
@@ -126,6 +130,11 @@ export type Machinery = {
   default_nozzle?: string;
   default_speed_kmh?: number;
   default_water_rate_lha?: number;
+  default_application_mode?: SprayerApplicationMode;
+  default_application_goal?: SprayerApplicationGoal;
+  pwm_enabled?: boolean;
+  spot_nozzle_width_m?: number;
+  default_treated_pct?: number;
   external_platform?: string;
   external_machine_id?: string;
   last_sync_at?: string;
@@ -135,7 +144,6 @@ export type Machinery = {
   created_at: string;
 };
 
-// Future-ready data model
 export type MaintenanceCompletion = {
   id: ID;
   business_id: ID;
