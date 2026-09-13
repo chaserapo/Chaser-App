@@ -3,7 +3,7 @@ import { v4 as uuid } from "uuid";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { setBackend } from "./backend";
-import { isMigrated, runMigration, MigrationProgress } from "./migrate";
+import { isMigrated, localBackupBelongsToAnotherAccount, runMigration, MigrationProgress } from "./migrate";
 import { acceptPendingInvitations } from "./members";
 
 export type ActiveBusiness = { id: string; name: string; role: "owner" | "manager" | "operator" };
@@ -86,9 +86,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 2) Migration — ONLY on the device where the business was just created (signup as an owner).
     //    Invited users (acceptedInvites > 0) join an existing business and MUST NOT
-    //    upload their local seed data into someone else's workspace.
+    //    upload their local data into someone else's workspace.
+    //    Likewise, if this phone already has a completed migration marker for a
+    //    different account/business, that local data is the previous account's backup
+    //    and must never be copied into the new account.
     const already = await isMigrated(u.id, biz.id);
-    if (isFreshBusiness && acceptedInvites === 0 && !already) {
+    const belongsToAnotherAccount = isFreshBusiness
+      ? await localBackupBelongsToAnotherAccount(u.id, biz.id)
+      : false;
+
+    if (isFreshBusiness && acceptedInvites === 0 && !already && !belongsToAnotherAccount) {
       setMigration({ kind: "running", progress: { step: "Starting…", uploaded: 0, totalTables: 0, completedTables: 0 } });
       try {
         const result = await runMigration(u.id, biz.id, (p) => setMigration({ kind: "running", progress: p }));
@@ -98,6 +105,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Don't proceed to cloud mode on migration failure — keep local as source of truth.
         return;
       }
+    } else if (isFreshBusiness && belongsToAnotherAccount) {
+      // Start the new account cleanly. The prior account's local backup stays on
+      // the device but remains isolated and is never copied across accounts.
+      setMigration({ kind: "idle" });
     }
 
     // 3) Activate cloud backend now that we have a business (and migration succeeded/was skipped).
