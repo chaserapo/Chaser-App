@@ -18,10 +18,30 @@ export type MigrationProgress = {
   completedTables: number;
 };
 
-const markerKey = (userId: string, businessId: string) => `@hectarehq/migrated-v1:${userId}:${businessId}`;
+const MIGRATION_MARKER_PREFIX = "@hectarehq/migrated-v1:";
+const markerKey = (userId: string, businessId: string) => `${MIGRATION_MARKER_PREFIX}${userId}:${businessId}`;
 
 export async function isMigrated(userId: string, businessId: string): Promise<boolean> {
   return (await AsyncStorage.getItem(markerKey(userId, businessId))) === "true";
+}
+
+/**
+ * Returns true when this device already contains a completed migration marker
+ * for a DIFFERENT user/business.
+ *
+ * Chaser intentionally keeps local data after sign-out as a backup. Without
+ * this guard, creating a second account on the same device can try to upsert
+ * the first account's locally-cached row IDs into the new business. Supabase
+ * RLS correctly blocks that cross-business update. More importantly, the data
+ * should never be copied into another account in the first place.
+ */
+export async function localBackupBelongsToAnotherAccount(userId: string, businessId: string): Promise<boolean> {
+  const currentKey = markerKey(userId, businessId);
+  const keys = await AsyncStorage.getAllKeys();
+  const otherMarkers = keys.filter((k) => k.startsWith(MIGRATION_MARKER_PREFIX) && k !== currentKey);
+  if (otherMarkers.length === 0) return false;
+  const values = await AsyncStorage.multiGet(otherMarkers);
+  return values.some(([, value]) => value === "true");
 }
 
 async function markMigrated(userId: string, businessId: string) {
@@ -52,6 +72,12 @@ export async function runMigration(
   businessId: string,
   onProgress?: (p: MigrationProgress) => void,
 ): Promise<{ tablesMigrated: number; rowsMigrated: number }> {
+  // Defence in depth: callers should check this before invoking migration, but
+  // refuse here as well so another code path can never migrate another account's backup.
+  if (await localBackupBelongsToAnotherAccount(userId, businessId)) {
+    throw new Error("Local backup belongs to another Chaser account and was not copied.");
+  }
+
   // Load every local table first (fast; small volumes)
   const [farms, paddocks, chemicals, chemBatches, stockMoves, machinery, maints, completions, operators, sprayJobs, links] =
     await Promise.all([
