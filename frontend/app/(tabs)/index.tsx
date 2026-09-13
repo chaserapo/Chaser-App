@@ -12,7 +12,7 @@ import { useAuth } from "@/src/lib/auth-context";
 import { useOnboarding, profileRepo } from "@/src/lib/onboarding";
 import type { SprayJob, Maintenance } from "@/src/lib/types";
 
-const LOGO = require("../../assets/images/chaser-logo.png");
+const LOGO = require("../../assets/images/chaser-icon.png");
 
 function formatUpdated(iso?: string) {
   if (!iso) return "";
@@ -22,7 +22,6 @@ function formatUpdated(iso?: string) {
 
 function deriveFirstName(rawName?: string | null, email?: string | null): string | null {
   if (rawName && rawName.trim()) {
-    // "Jake Comley" → "Jake"; "You (Manager)" → skip that role suffix.
     const stripped = rawName.replace(/\s*\(.*?\)\s*$/, "").trim();
     if (stripped) return stripped.split(/\s+/)[0];
   }
@@ -98,7 +97,6 @@ export default function Home() {
       return ar - br;
     });
     setDueCount(enriched.filter((x) => x.status !== "good").length);
-    // Only surface the top 2 most urgent on Home — the rest live in the Machinery tab.
     setMaints(enriched.slice(0, 2));
   }, []);
 
@@ -145,29 +143,24 @@ export default function Home() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surfaceSecondary, paddingTop: insets.top }}>
-      {/* ── Header: logo + feedback pill ─────────────────────────── */}
-      <View style={styles.topBar}>
-        <Image source={LOGO} style={styles.logo} resizeMode="contain" accessibilityLabel="Chaser" />
-        <Pressable onPress={openFeedback} style={styles.feedbackPill} testID="beta-feedback-btn" hitSlop={6}>
-          <Icon name="message-alert-outline" size={14} color={colors.brandPrimary} />
-          <Text style={styles.feedbackText}>Beta feedback</Text>
-        </Pressable>
-      </View>
-
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandPrimary} />}
       >
-        {/* ── Greeting ─────────────────────────────────────────── */}
-        <View style={styles.greetingBlock}>
-          <Text style={styles.greeting} testID="greeting-time">
-            {greeting}{firstName ? "," : ""}
-            {firstName ? <Text style={styles.firstName} testID="greeting-name">{` ${firstName}`}</Text> : null}
-          </Text>
-          <Text style={styles.prompt}>What are we chasing today?</Text>
+        <View style={styles.homeHeader}>
+          <Image source={LOGO} style={styles.homeLogo} resizeMode="cover" accessibilityLabel="Chaser" />
+          <View style={styles.greetingBlock}>
+            <Text style={styles.greeting} testID="greeting-time">
+              {greeting}{firstName ? "," : ""}
+              {firstName ? <Text style={styles.firstName} testID="greeting-name">{` ${firstName}`}</Text> : null}
+            </Text>
+            <Text style={styles.prompt}>What are we chasing today?</Text>
+          </View>
+          <Pressable onPress={openFeedback} style={styles.feedbackBtn} testID="beta-feedback-btn" hitSlop={8}>
+            <Icon name="message-alert-outline" size={18} color={colors.brandPrimary} />
+          </Pressable>
         </View>
 
-        {/* ── Slim conditions strip (tap to open full Weather tab) ─── */}
         <Pressable onPress={() => router.push("/(tabs)/weather")} style={styles.conditionsStrip} testID="weather-strip">
           <MiniStat label="Temp" value={weather ? `${weather.temperature_c.toFixed(1)}°` : "–"} icon="thermometer" testID="stat-temp" />
           <MiniStat label="RH" value={weather ? `${Math.round(weather.humidity)}%` : "–"} icon="water-percent" testID="stat-humidity" />
@@ -182,15 +175,10 @@ export default function Home() {
             </Text>
           </Pressable>
           <Pressable onPress={loadWeather} hitSlop={8} testID="refresh-weather-btn" style={{ paddingLeft: 8 }}>
-            {loadingWeather ? (
-              <ActivityIndicator size="small" color={colors.brandPrimary} />
-            ) : (
-              <Icon name="refresh" size={16} color={colors.muted} />
-            )}
+            {loadingWeather ? <ActivityIndicator size="small" color={colors.brandPrimary} /> : <Icon name="refresh" size={16} color={colors.muted} />}
           </Pressable>
         </View>
 
-        {/* ── Onboarding progress (only while partially complete) ─── */}
         {onboardingProfile && onboardingProfile.onboarding_completed_at && onboardingPercent > 0 && onboardingPercent < 100 ? (
           <Pressable
             onPress={async () => {
@@ -204,15 +192,12 @@ export default function Home() {
             <View style={{ flex: 1 }}>
               <Text style={styles.setupTitle}>Finish setting up Chaser</Text>
               <Text style={styles.setupSub}>You're {onboardingPercent}% of the way there — add the rest whenever you like.</Text>
-              <View style={styles.setupBar}>
-                <View style={[styles.setupBarFill, { width: `${onboardingPercent}%` }]} />
-              </View>
+              <View style={styles.setupBar}><View style={[styles.setupBarFill, { width: `${onboardingPercent}%` }]} /></View>
             </View>
             <Icon name="chevron-right" size={22} color={colors.brandPrimary} />
           </Pressable>
         ) : null}
 
-        {/* ── Hero action ──────────────────────────────────────── */}
         <View style={{ height: spacing.lg }} />
         {activeJob ? (
           <Button
@@ -232,12 +217,11 @@ export default function Home() {
           />
         )}
 
-        {/* ── Secondary row ────────────────────────────────────── */}
         <View style={styles.secondaryRow}>
           <Pressable
             onPress={() => router.push("/(tabs)/spray")}
             style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
-            testID="spray-calculator-btn"
+            testID="spray-tools-btn"
           >
             <Icon name="calculator-variant-outline" size={20} color={colors.brandPrimary} />
             <Text style={styles.secondaryBtnText}>Spray Tools</Text>
@@ -252,7 +236,6 @@ export default function Home() {
           </Pressable>
         </View>
 
-        {/* ── Service reminders (compact) ──────────────────────── */}
         <SectionHeader
           title="Service Reminders"
           rightLabel={dueCount > 0 ? `${dueCount} due` : undefined}
@@ -295,12 +278,7 @@ export default function Home() {
           })
         )}
 
-        {/* ── Recent records (dense) ───────────────────────────── */}
-        <SectionHeader
-          title="Recent Spray Records"
-          onSeeAll={() => router.push("/records")}
-          testID="recent-records-title"
-        />
+        <SectionHeader title="Recent Spray Records" onSeeAll={() => router.push("/records")} testID="recent-records-title" />
         {jobs.length === 0 ? (
           <View style={styles.emptyRow}>
             <View style={styles.checkPill}><Icon name="clipboard-text-outline" size={16} color={colors.brandPrimary} /></View>
@@ -314,42 +292,28 @@ export default function Home() {
               style={({ pressed }) => [styles.recordRow, pressed && styles.rowPressed]}
               testID={`recent-job-${j.id}`}
             >
-              <View style={styles.recordIcon}>
-                <Icon name="spray" size={18} color={colors.brandPrimary} />
-              </View>
+              <View style={styles.recordIcon}><Icon name="spray" size={18} color={colors.brandPrimary} /></View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle} numberOfLines={1}>
-                  {j.paddock_name ?? "Paddock"}{j.crop ? ` · ${j.crop}` : ""}
-                </Text>
-                <Text style={styles.rowSub} numberOfLines={1}>
-                  {j.products.map((p) => p.chemical_name).join(", ") || "—"}
-                </Text>
-                <Text style={styles.rowMeta} numberOfLines={1}>
-                  {j.date} · {j.actual_area_ha ?? j.area_ha ?? 0} ha
-                </Text>
+                <Text style={styles.rowTitle} numberOfLines={1}>{j.paddock_name ?? "Paddock"}{j.crop ? ` · ${j.crop}` : ""}</Text>
+                <Text style={styles.rowSub} numberOfLines={1}>{j.products.map((p) => p.chemical_name).join(", ") || "—"}</Text>
+                <Text style={styles.rowMeta} numberOfLines={1}>{j.date} · {j.actual_area_ha ?? j.area_ha ?? 0} ha</Text>
               </View>
               <Icon name="chevron-right" size={20} color={colors.muted} />
             </Pressable>
           ))
         )}
 
-        <Text style={styles.footerNote}>
-          Chaser — behind every good operation
-        </Text>
+        <Text style={styles.footerNote}>Chaser — behind every good operation</Text>
       </ScrollView>
     </View>
   );
 }
 
-/* ───────── Sub-components ───────── */
-
 function MiniStat({ label, value, icon, unit, testID }: { label: string; value: string; icon: string; unit?: string; testID?: string }) {
   return (
     <View style={styles.miniStat} testID={testID}>
       <Icon name={icon as any} size={16} color={colors.brandPrimary} />
-      <Text style={styles.miniValue} numberOfLines={1}>
-        {value}{unit ? <Text style={styles.miniUnit}> {unit}</Text> : null}
-      </Text>
+      <Text style={styles.miniValue} numberOfLines={1}>{value}{unit ? <Text style={styles.miniUnit}> {unit}</Text> : null}</Text>
       <Text style={styles.miniLabel}>{label}</Text>
     </View>
   );
@@ -366,47 +330,40 @@ function SectionHeader({ title, rightLabel, rightTone, onSeeAll, testID }: {
     <View style={styles.sectionHeader} testID={testID}>
       <Text style={styles.sectionTitle}>{title}</Text>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        {rightLabel ? (
-          <Text style={[styles.sectionBadge, rightTone === "warning" && styles.sectionBadgeWarn]}>{rightLabel}</Text>
-        ) : null}
-        {onSeeAll ? (
-          <Pressable onPress={onSeeAll} hitSlop={8}>
-            <Text style={styles.seeAll}>See all</Text>
-          </Pressable>
-        ) : null}
+        {rightLabel ? <Text style={[styles.sectionBadge, rightTone === "warning" && styles.sectionBadgeWarn]}>{rightLabel}</Text> : null}
+        {onSeeAll ? <Pressable onPress={onSeeAll} hitSlop={8}><Text style={styles.seeAll}>See all</Text></Pressable> : null}
       </View>
     </View>
   );
 }
 
-/* ───────── Styles ───────── */
-
 const styles = StyleSheet.create({
-  topBar: {
+  homeHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xs,
+    gap: 12,
+    paddingTop: spacing.md,
     paddingBottom: spacing.md,
   },
-  logo: { height: 32, width: 150 },
-  feedbackPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: colors.brandSecondary,
+  homeLogo: {
+    width: 58,
+    height: 58,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: colors.surface,
   },
-  feedbackText: { color: colors.brandPrimary, fontWeight: "700", fontSize: 12 },
-
-  greetingBlock: { paddingTop: spacing.sm, paddingBottom: spacing.md },
+  greetingBlock: { flex: 1, justifyContent: "center" },
   greeting: { color: colors.onSurface, fontSize: 22, fontWeight: "800", letterSpacing: -0.3 },
   firstName: { color: colors.brandPrimary, fontSize: 22, fontWeight: "800" },
   prompt: { color: colors.muted, fontSize: 14, fontWeight: "500", marginTop: 4 },
-
+  feedbackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.brandSecondary,
+  },
   conditionsStrip: {
     flexDirection: "row",
     alignItems: "stretch",
@@ -434,7 +391,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   conditionsMetaText: { color: colors.muted, fontSize: 11, flex: 1 },
-
   secondaryRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   secondaryBtn: {
     flex: 1,
@@ -450,7 +406,6 @@ const styles = StyleSheet.create({
   },
   secondaryBtnPressed: { opacity: 0.7 },
   secondaryBtnText: { color: colors.brandPrimary, fontWeight: "700", fontSize: 14 },
-
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -473,7 +428,6 @@ const styles = StyleSheet.create({
   },
   sectionBadgeWarn: { backgroundColor: "#FEF3C7", color: colors.warning },
   seeAll: { color: colors.brandPrimary, fontWeight: "700", fontSize: 13 },
-
   reminderRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -484,7 +438,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.divider,
   },
   reminderAccent: { width: 4, height: 36, borderRadius: 2 },
-
   recordRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -501,12 +454,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.brandSecondary,
   },
-
   rowPressed: { backgroundColor: colors.surface },
   rowTitle: { color: colors.onSurface, fontSize: 14, fontWeight: "700" },
   rowSub: { color: colors.onSurfaceTertiary, fontSize: 12, marginTop: 2 },
   rowMeta: { color: colors.muted, fontSize: 11, marginTop: 2 },
-
   emptyRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -522,7 +473,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   emptyText: { color: colors.muted, fontSize: 13, flex: 1 },
-
   footerNote: {
     textAlign: "center",
     color: colors.muted,
