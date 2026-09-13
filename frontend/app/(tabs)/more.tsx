@@ -13,6 +13,7 @@ import { profileRepo, useOnboarding } from "@/src/lib/onboarding";
 import type { ExternalLink } from "@/src/lib/types";
 
 const TOOLS = [
+  { title: "Faults & Risks", icon: "alert-outline", route: "/issues" },
   { title: "Delta T Calculator", icon: "chart-bell-curve-cumulative", route: "/calculators/delta-t" },
   { title: "Spray Rate Calculator", icon: "calculator", route: "/calculators/spray-rate" },
   { title: "Tank Mix Calculator", icon: "beaker-outline", route: "/calculators/tank-mix" },
@@ -158,9 +159,6 @@ export default function More() {
           <Pressable
             onPress={async () => {
               if (!userId) return;
-              // Re-open the onboarding wizard so the user can revisit any skipped
-              // step. Marking onboarding_completed_at back to null flips the
-              // PostAuthShell over to <Onboarding/>.
               await profileRepo.resume(userId);
               await reloadOnboarding();
             }}
