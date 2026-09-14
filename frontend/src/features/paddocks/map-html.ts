@@ -1,20 +1,9 @@
 // The MapLibre GL JS HTML template rendered inside a WebView.
-// - Renders all existing paddock polygons from the `initialPaddocks` payload.
+// - Renders existing paddock polygons, farm locations, and open fault/risk pins.
 // - Drawing mode: user taps to add points; polyline preview appears; Undo,
 //   Clear, and Save exposed via React Native via postMessage.
 // - Selection mode: tap a paddock polygon -> posts a `select` message.
 // - GPS blue-dot: React Native forwards `setPosition` messages.
-//
-// Communication protocol (JSON strings):
-//   RN  -> WebView: { type: "setPaddocks", paddocks: [...] } |
-//                    { type: "setMode", mode: "view"|"draw" } |
-//                    { type: "undo" | "clear" | "save" | "cancel" } |
-//                    { type: "setPosition", lat, lon } |
-//                    { type: "focusPaddock", id }
-//   WebView -> RN:  { type: "ready" } | { type: "select", id } |
-//                    { type: "points", count } |
-//                    { type: "save", geojson, areaHa } |
-//                    { type: "log", msg }
 
 export const MAP_HTML = `<!doctype html>
 <html>
@@ -22,6 +11,7 @@ export const MAP_HTML = `<!doctype html>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet" />
   <style>
     html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; touch-action: none; background: #E8ECE9; }
     .pin {
@@ -49,6 +39,20 @@ export const MAP_HTML = `<!doctype html>
       border-top:8px solid #3B6E3B;
       filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25));
     }
+    .issue-pin {
+      width:34px; height:42px; position:relative; cursor:pointer;
+      display:flex; align-items:flex-start; justify-content:center;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,.3));
+    }
+    .issue-pin .drop {
+      width:30px; height:30px; border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg); border:2px solid #fff;
+      display:flex; align-items:center; justify-content:center;
+      box-sizing:border-box;
+    }
+    .issue-pin .drop i {
+      color:#fff; font-size:18px; line-height:1; transform:rotate(45deg);
+    }
   </style>
 </head>
 <body>
@@ -74,8 +78,6 @@ export const MAP_HTML = `<!doctype html>
         },
         layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
       },
-      // Default first-open view: Western Australia. Once paddocks or farm pins
-      // exist, fitToPaddocks() immediately replaces this with the user's data.
       center: [121.5, -25.8],
       zoom: 4.2,
       attributionControl: false,
@@ -84,13 +86,32 @@ export const MAP_HTML = `<!doctype html>
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
     let paddocks = [];
-    let farmPins = [];      // [{ id, name, lat, lon }]
-    let farmMarkers = [];   // parallel maplibre markers
-    let mode = 'view'; // 'view' | 'draw'
-    let drawPoints = []; // [[lng,lat], ...]
+    let farmPins = [];
+    let farmMarkers = [];
+    let issuePins = [];
+    let issueMarkers = [];
+    let mode = 'view';
+    let drawPoints = [];
     let pinMarkers = [];
     let gpsMarker = null;
     let fitted = false;
+
+    const issueMeta = {
+      weed: { color:'#2E8B57', icon:'mdi-sprout' },
+      rock: { color:'#6B7280', icon:'mdi-terrain' },
+      wood: { color:'#8B5E3C', icon:'mdi-tree-outline' },
+      broken: { color:'#D64545', icon:'mdi-link-variant-off' },
+      poi: { color:'#3478D4', icon:'mdi-star-outline' },
+      machinery: { color:'#D99722', icon:'mdi-tractor' },
+      water: { color:'#2D8FC4', icon:'mdi-water-outline' },
+      fence_gate: { color:'#8A6B3F', icon:'mdi-gate' },
+      hazard: { color:'#E0A21B', icon:'mdi-alert-outline' },
+      bog_hole: { color:'#6B7280', icon:'mdi-image-filter-hdr' },
+      washout: { color:'#2D8FC4', icon:'mdi-waves' },
+      safety: { color:'#E0A21B', icon:'mdi-shield-alert-outline' },
+      infrastructure: { color:'#D64545', icon:'mdi-tools' },
+      other: { color:'#3478D4', icon:'mdi-map-marker-outline' }
+    };
 
     function paddockGeoJSON() {
       return {
@@ -122,9 +143,6 @@ export const MAP_HTML = `<!doctype html>
       if (src) src.setData(paddockGeoJSON());
     }
 
-    // Renders one green "farm" bubble marker per weather_locations pin so
-    // operators can see every property on the map even before they've drawn
-    // paddock boundaries.
     function renderFarmPins() {
       farmMarkers.forEach(m => m.remove());
       farmMarkers = farmPins.map(p => {
@@ -143,11 +161,35 @@ export const MAP_HTML = `<!doctype html>
           .addTo(map);
       });
     }
+
+    function renderIssuePins() {
+      issueMarkers.forEach(m => m.remove());
+      issueMarkers = issuePins.map(p => {
+        const meta = issueMeta[p.category] || issueMeta.other;
+        const wrap = document.createElement('div');
+        wrap.className = 'issue-pin';
+        wrap.title = p.title || 'Fault / Risk';
+        const drop = document.createElement('div');
+        drop.className = 'drop';
+        drop.style.background = meta.color;
+        const icon = document.createElement('i');
+        icon.className = 'mdi ' + meta.icon;
+        drop.appendChild(icon);
+        wrap.appendChild(drop);
+        wrap.addEventListener('click', (e) => {
+          e.stopPropagation();
+          post({ type: 'issueSelect', id: p.id });
+        });
+        return new maplibregl.Marker({ element: wrap, anchor: 'bottom' })
+          .setLngLat([p.lon, p.lat])
+          .addTo(map);
+      });
+    }
+
     function renderDrawing() {
       const g = drawingGeoJSON();
       const s1 = map.getSource('draw-fill'); if (s1) s1.setData(g.fill);
       const s2 = map.getSource('draw-outline'); if (s2) s2.setData(g.outline);
-      // pins
       pinMarkers.forEach(m => m.remove());
       pinMarkers = drawPoints.map((pt, idx) => {
         const el = document.createElement('div'); el.className = 'pin';
@@ -156,7 +198,6 @@ export const MAP_HTML = `<!doctype html>
           const c = marker.getLngLat(); drawPoints[idx] = [c.lng, c.lat]; renderDrawing(); postPointsUpdate();
         });
         el.addEventListener('contextmenu', (e) => { e.preventDefault(); drawPoints.splice(idx,1); renderDrawing(); postPointsUpdate(); });
-        // Long press to remove (500ms)
         let pressTimer = null;
         const startPress = () => { pressTimer = setTimeout(() => { drawPoints.splice(idx,1); renderDrawing(); postPointsUpdate(); }, 500); };
         const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
@@ -173,12 +214,6 @@ export const MAP_HTML = `<!doctype html>
       post({ type: 'points', count: drawPoints.length, areaHa });
     }
 
-    function computeArea() {
-      if (drawPoints.length < 3) return 0;
-      const coords = [...drawPoints, drawPoints[0]];
-      return turf.area(turf.polygon([coords])) / 10000;
-    }
-
     function fitToPaddocks() {
       if (fitted) return;
       const g = paddockGeoJSON();
@@ -186,19 +221,20 @@ export const MAP_HTML = `<!doctype html>
       if (g.features.length > 0) {
         bboxSource = g;
       } else if (farmPins.length > 0) {
-        // No paddock polygons yet — fit around the farm pins instead so the
-        // user sees their properties on first open.
         bboxSource = {
           type: 'FeatureCollection',
-          features: farmPins.map(p => ({
-            type: 'Feature', geometry: { type: 'Point', coordinates: [p.lon, p.lat] }, properties: {}
-          }))
+          features: farmPins.map(p => ({ type:'Feature', geometry:{ type:'Point', coordinates:[p.lon,p.lat] }, properties:{} }))
+        };
+      } else if (issuePins.length > 0) {
+        bboxSource = {
+          type: 'FeatureCollection',
+          features: issuePins.map(p => ({ type:'Feature', geometry:{ type:'Point', coordinates:[p.lon,p.lat] }, properties:{} }))
         };
       }
       if (!bboxSource) return;
       try {
         const bbox = turf.bbox(bboxSource);
-        map.fitBounds(bbox, { padding: 60, duration: 0, maxZoom: farmPins.length && !g.features.length ? 12 : 15 });
+        map.fitBounds(bbox, { padding: 60, duration: 0, maxZoom: 15 });
         fitted = true;
       } catch (e) { log(e); }
     }
@@ -235,6 +271,7 @@ export const MAP_HTML = `<!doctype html>
       switch (msg.type) {
         case 'setPaddocks': paddocks = msg.paddocks || []; if (map.loaded()) { renderPaddocks(); fitToPaddocks(); } break;
         case 'setFarmPins': farmPins = msg.pins || []; if (map.loaded()) { renderFarmPins(); fitToPaddocks(); } break;
+        case 'setIssuePins': issuePins = msg.pins || []; if (map.loaded()) { renderIssuePins(); fitToPaddocks(); } break;
         case 'setMode':
           mode = msg.mode;
           if (mode === 'view') { drawPoints = []; renderDrawing(); postPointsUpdate(); }
