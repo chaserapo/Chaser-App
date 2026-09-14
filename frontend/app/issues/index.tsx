@@ -10,6 +10,27 @@ import { listFarmIssues, reopenFarmIssue, resolveFarmIssue, type FarmIssue } fro
 
 const severityColor = (s: string) => s === "critical" ? colors.error : s === "high" ? colors.warning : s === "medium" ? colors.info : colors.success;
 
+const CATEGORY_META: Record<string, { label: string; icon: string; color: string }> = {
+  weed: { label: "Weed", icon: "sprout", color: "#2E8B57" },
+  rock: { label: "Rock", icon: "terrain", color: "#6B7280" },
+  wood: { label: "Wood / Branch", icon: "tree-outline", color: "#8B5E3C" },
+  broken: { label: "Broken / Damaged", icon: "link-variant-off", color: "#D64545" },
+  poi: { label: "Point of Interest", icon: "star-outline", color: "#3478D4" },
+  machinery: { label: "Machinery Problem", icon: "tractor", color: "#D99722" },
+  water: { label: "Water Issue", icon: "water-outline", color: "#2D8FC4" },
+  fence_gate: { label: "Fence / Gate", icon: "gate", color: "#8A6B3F" },
+  hazard: { label: "Hazard", icon: "alert-outline", color: "#E0A21B" },
+  bog_hole: { label: "Bog / Hole", icon: "image-filter-hdr", color: "#6B7280" },
+  washout: { label: "Washout", icon: "waves", color: "#2D8FC4" },
+  safety: { label: "Safety", icon: "shield-alert-outline", color: "#E0A21B" },
+  infrastructure: { label: "Infrastructure", icon: "tools", color: "#D64545" },
+  other: { label: "Other", icon: "map-marker-outline", color: "#3478D4" },
+};
+
+function categoryMeta(category: string) {
+  return CATEGORY_META[category] ?? { label: category.replace(/_/g, " "), icon: "map-marker-outline", color: "#3478D4" };
+}
+
 export default function IssuesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -47,14 +68,19 @@ export default function IssuesScreen() {
 
         {loading ? <Text style={styles.empty}>Loading…</Text> : shown.length === 0 ? (
           <Card><Text style={styles.empty}>{tab === "open" ? "No open faults or risks." : "No resolved issues yet."}</Text></Card>
-        ) : shown.map((issue) => (
+        ) : shown.map((issue) => {
+          const meta = categoryMeta(issue.category);
+          return (
           <Card key={issue.id} style={{ marginBottom: spacing.md }}>
             <View style={styles.rowTop}>
-              <View style={[styles.dot, { backgroundColor: severityColor(issue.severity) }]} />
+              <View style={[styles.pinIcon, { backgroundColor: meta.color }]}>
+                <Icon name={meta.icon as any} size={19} color="#fff" />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.issueTitle}>{issue.title}</Text>
-                <Text style={styles.meta}>{issue.category.replace(/_/g, " ")} · {issue.severity.toUpperCase()}</Text>
+                <Text style={styles.meta}>{meta.label} · {issue.severity.toUpperCase()}</Text>
               </View>
+              <View style={[styles.severityDot, { backgroundColor: severityColor(issue.severity) }]} />
             </View>
             {issue.description ? <Text style={styles.description}>{issue.description}</Text> : null}
             <View style={styles.tags}>
@@ -69,7 +95,7 @@ export default function IssuesScreen() {
               <Text style={[styles.resolveText, { color: tab === "open" ? colors.success : colors.brandPrimary }]}>{tab === "open" ? "Mark resolved" : "Reopen"}</Text>
             </Pressable>
           </Card>
-        ))}
+        )})}
       </ScrollView>
     </View>
   );
@@ -83,9 +109,10 @@ const styles = StyleSheet.create({
   tabTextActive: { color: colors.onSurface },
   empty: { color: colors.muted, textAlign: "center", paddingVertical: spacing.lg },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 10 },
-  dot: { width: 10, height: 10, borderRadius: 99 },
+  pinIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  severityDot: { width: 9, height: 9, borderRadius: 99 },
   issueTitle: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
-  meta: { fontSize: 11, color: colors.muted, marginTop: 2, textTransform: "capitalize" },
+  meta: { fontSize: 11, color: colors.muted, marginTop: 2 },
   description: { color: colors.onSurfaceTertiary, marginTop: spacing.md, lineHeight: 20 },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: spacing.md },
   tag: { fontSize: 11, color: colors.onSurfaceTertiary, backgroundColor: colors.surfaceTertiary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill },
