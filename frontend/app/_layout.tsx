@@ -16,17 +16,12 @@ import { flushOfflineSprayJobs } from "@/src/lib/cloud-repo";
 import { getBackendMode } from "@/src/lib/backend";
 import { useOnboarding } from "@/src/lib/onboarding";
 import DiscoveryScreen, { useDiscoveryGate } from "@/src/features/onboarding/DiscoveryScreen";
-import Onboarding from "./onboarding";
 
 LogBox.ignoreAllLogs(true);
 
 function AuthGate() {
   const { loading, session, business, migration } = useAuth();
 
-  // Offline queue: flush any pending spray-job writes as soon as we have a
-  // business (post sign-in / bootstrap) and whenever the app comes back to
-  // the foreground. This is what lets a job saved during a reception blackspot
-  // reach Supabase when service returns.
   useEffect(() => {
     if (!business) return;
     const attemptFlush = () => {
@@ -37,7 +32,7 @@ function AuthGate() {
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") attemptFlush();
     });
-    const t = setInterval(attemptFlush, 60_000); // periodic retry — cheap, no-op when queue empty
+    const t = setInterval(attemptFlush, 60_000);
     return () => { sub.remove(); clearInterval(t); };
   }, [business]);
 
@@ -55,19 +50,19 @@ function AuthGate() {
   return <PostAuthShell />;
 }
 
-/**
- * Rendered once a signed-in user has an active business. New users first get a
- * tiny acquisition survey, then the Chaser setup wizard. Existing beta users
- * were backfilled as discovery-complete so they are never interrupted by it.
- */
+function DeferredOnboarding() {
+  // Keep the large onboarding dependency tree out of normal startup. This
+  // module is only evaluated for users who actually need the setup wizard.
+  const Onboarding = require("./onboarding").default;
+  return <Onboarding />;
+}
+
 function PostAuthShell() {
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
   const { needsOnboarding, loading, profile } = useOnboarding();
   const discovery = useDiscoveryGate(userId);
 
-  // Wait until we've loaded both profile gates before deciding what to render,
-  // avoiding a flash of tabs or the wrong onboarding page.
   if ((loading && !profile) || discovery.isLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }}>
@@ -77,7 +72,7 @@ function PostAuthShell() {
   }
 
   if (userId && !discovery.data?.completed) return <DiscoveryScreen userId={userId} />;
-  if (needsOnboarding) return <Onboarding />;
+  if (needsOnboarding) return <DeferredOnboarding />;
   return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }} />;
 }
 
@@ -86,8 +81,6 @@ export default function RootLayout() {
   useEffect(() => {
     (async () => {
       try {
-        // Local seed only affects AsyncStorage — safe even if user later signs in and
-        // switches to cloud (seed marker prevents re-seeding, and cloud repo ignores it).
         await seedIfNeeded();
       } catch (e) {
         console.warn("seed error", e);
