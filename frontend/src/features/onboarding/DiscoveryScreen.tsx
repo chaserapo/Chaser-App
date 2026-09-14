@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   group: { gap: 8 },
   tickRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 14, minHeight: 52, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   tickRowActive: { borderColor: colors.brandPrimary, backgroundColor: colors.brandSecondary },
-  tickText: { flex: 1, fontSize: 15, fontWeight: "650", color: colors.onSurfaceTertiary },
+  tickText: { flex: 1, fontSize: 15, fontWeight: "700", color: colors.onSurfaceTertiary },
   tickTextActive: { color: colors.onSurface },
   error: { marginTop: spacing.md, color: colors.error, fontSize: 13, fontWeight: "700" },
   hint: { marginTop: spacing.sm, textAlign: "center", color: colors.muted, fontSize: 12 },
