@@ -12,14 +12,15 @@ import { createFarmIssue, type IssueSeverity } from "@/src/lib/issues";
 import type { Farm, Paddock, Machinery } from "@/src/lib/types";
 
 const CATEGORIES = [
-  ["machinery", "Machinery", "tractor"],
+  ["weed", "Weed", "sprout"],
   ["rock", "Rock", "terrain"],
+  ["wood", "Wood / Branch", "tree-outline"],
+  ["broken", "Broken / Damaged", "link-variant-off"],
+  ["poi", "Point of Interest", "star-outline"],
+  ["machinery", "Machinery Problem", "tractor"],
+  ["water", "Water Issue", "water-outline"],
   ["fence_gate", "Fence / Gate", "gate"],
-  ["bog_hole", "Bog / Hole", "image-filter-hdr"],
-  ["washout", "Washout", "waves"],
-  ["safety", "Safety", "shield-alert-outline"],
-  ["infrastructure", "Infrastructure", "tools"],
-  ["other", "Other", "alert-circle-outline"],
+  ["hazard", "Hazard", "alert-outline"],
 ] as const;
 
 const SEVERITIES: IssueSeverity[] = ["low", "medium", "high", "critical"];
@@ -30,7 +31,7 @@ export default function NewIssueScreen() {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [paddocks, setPaddocks] = useState<Paddock[]>([]);
   const [machines, setMachines] = useState<Machinery[]>([]);
-  const [category, setCategory] = useState("other");
+  const [category, setCategory] = useState("poi");
   const [severity, setSeverity] = useState<IssueSeverity>("medium");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -86,7 +87,7 @@ export default function NewIssueScreen() {
           <Card>
             <View style={styles.grid}>{CATEGORIES.map(([key, label, icon]) => (
               <Pressable key={key} onPress={() => setCategory(key)} style={[styles.category, category === key && styles.categoryActive]}>
-                <Icon name={icon as any} size={20} color={category === key ? colors.onBrandPrimary : colors.brandPrimary} />
+                <Icon name={icon as any} size={22} color={category === key ? colors.onBrandPrimary : colors.brandPrimary} />
                 <Text style={[styles.categoryText, category === key && { color: colors.onBrandPrimary }]}>{label}</Text>
               </Pressable>
             ))}</View>
@@ -144,9 +145,9 @@ function Choice({ label, active, onPress }: { label: string; active: boolean; on
 const styles = StyleSheet.create({
   section: { fontSize: 13, fontWeight: "800", color: colors.muted, marginTop: spacing.lg, marginBottom: spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
-  category: { width: "48%", minHeight: 58, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, alignItems: "center", justifyContent: "center", gap: 4 },
+  category: { width: "48%", minHeight: 62, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 6 },
   categoryActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
-  categoryText: { fontSize: 12, fontWeight: "800", color: colors.onSurface },
+  categoryText: { fontSize: 12, fontWeight: "800", color: colors.onSurface, textAlign: "center" },
   severityRow: { flexDirection: "row", gap: 6 },
   severity: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceSecondary },
   severityActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
