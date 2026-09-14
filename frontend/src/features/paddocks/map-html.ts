@@ -74,8 +74,10 @@ export const MAP_HTML = `<!doctype html>
         },
         layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
       },
-      center: [149.13, -35.28],
-      zoom: 5,
+      // Default first-open view: Western Australia. Once paddocks or farm pins
+      // exist, fitToPaddocks() immediately replaces this with the user's data.
+      center: [121.5, -25.8],
+      zoom: 4.2,
       attributionControl: false,
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
