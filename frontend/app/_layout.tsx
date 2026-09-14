@@ -15,6 +15,7 @@ import { MigrationScreen } from "@/src/features/auth/MigrationScreen";
 import { flushOfflineSprayJobs } from "@/src/lib/cloud-repo";
 import { getBackendMode } from "@/src/lib/backend";
 import { useOnboarding } from "@/src/lib/onboarding";
+import DiscoveryScreen, { useDiscoveryGate } from "@/src/features/onboarding/DiscoveryScreen";
 import Onboarding from "./onboarding";
 
 LogBox.ignoreAllLogs(true);
@@ -55,22 +56,27 @@ function AuthGate() {
 }
 
 /**
- * Rendered once a signed-in user has an active business. Decides between the
- * first-time Onboarding wizard and the full tab stack based on user_profiles.
- * Existing beta users were backfilled with onboarding_completed_at = now(),
- * so they skip the wizard entirely.
+ * Rendered once a signed-in user has an active business. New users first get a
+ * tiny acquisition survey, then the Chaser setup wizard. Existing beta users
+ * were backfilled as discovery-complete so they are never interrupted by it.
  */
 function PostAuthShell() {
+  const { session } = useAuth();
+  const userId = session?.user?.id ?? null;
   const { needsOnboarding, loading, profile } = useOnboarding();
-  // Wait until we've actually loaded a profile (or errored) before deciding —
-  // otherwise a brand-new user could see the tabs flash before the wizard.
-  if (loading && !profile) {
+  const discovery = useDiscoveryGate(userId);
+
+  // Wait until we've loaded both profile gates before deciding what to render,
+  // avoiding a flash of tabs or the wrong onboarding page.
+  if ((loading && !profile) || discovery.isLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color={colors.brandPrimary} />
       </View>
     );
   }
+
+  if (userId && !discovery.data?.completed) return <DiscoveryScreen userId={userId} />;
   if (needsOnboarding) return <Onboarding />;
   return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }} />;
 }
