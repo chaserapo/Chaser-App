@@ -1,7 +1,8 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import { MAP_HTML } from "./map-html";
+import { listFarmIssues } from "@/src/lib/issues";
 
 export type PaddockOnMap = {
   id: string;
@@ -12,6 +13,7 @@ export type PaddockOnMap = {
 };
 
 export type FarmPin = { id: string; name: string; lat: number; lon: number };
+export type IssuePin = { id: string; title: string; category: string; lat: number; lon: number; severity?: string | null };
 
 export type PaddockMapHandle = {
   setMode: (mode: "view" | "draw") => void;
@@ -33,12 +35,10 @@ type Props = {
   style?: any;
 };
 
-// -----------------------------------------------------------------------------
-// Web fallback: iframe with srcDoc pointing at the same MAP_HTML template so the
-// map works in the preview and in Expo Web. Native builds keep using WebView.
-// -----------------------------------------------------------------------------
-const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
-  { paddocks, farmPins, onSelect, onFarmSelect, onPointsUpdate, onSaveGeometry, style }, ref
+type MapProps = Props & { issuePins: IssuePin[] };
+
+const WebMap = forwardRef<PaddockMapHandle, MapProps>(function WebMap(
+  { paddocks, farmPins, issuePins, onSelect, onFarmSelect, onPointsUpdate, onSaveGeometry, style }, ref
 ) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
@@ -46,6 +46,8 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
   pending.current = paddocks;
   const pendingPins = useRef(farmPins ?? []);
   pendingPins.current = farmPins ?? [];
+  const pendingIssues = useRef(issuePins);
+  pendingIssues.current = issuePins;
 
   const send = useCallback((msg: object) => {
     const s = JSON.stringify(msg);
@@ -72,6 +74,7 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
           readyRef.current = true;
           send({ type: "setPaddocks", paddocks: pending.current });
           send({ type: "setFarmPins", pins: pendingPins.current });
+          send({ type: "setIssuePins", pins: pendingIssues.current });
           break;
         case "select": onSelect?.(msg.id); break;
         case "farmSelect": onFarmSelect?.(msg.id); break;
@@ -95,6 +98,12 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
     lastPinsStr.current = pinsStr;
     if (readyRef.current) send({ type: "setFarmPins", pins: farmPins ?? [] });
   }
+  const issuesStr = useMemo(() => JSON.stringify(issuePins), [issuePins]);
+  const lastIssuesStr = useRef(issuesStr);
+  if (lastIssuesStr.current !== issuesStr) {
+    lastIssuesStr.current = issuesStr;
+    if (readyRef.current) send({ type: "setIssuePins", pins: issuePins });
+  }
 
   return (
     <View style={[styles.container, style]}>
@@ -104,11 +113,8 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
   );
 });
 
-// -----------------------------------------------------------------------------
-// Native (iOS/Android): uses react-native-webview.
-// -----------------------------------------------------------------------------
-const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
-  { paddocks, farmPins, onSelect, onFarmSelect, onPointsUpdate, onSaveGeometry, style }, ref
+const NativeMap = forwardRef<PaddockMapHandle, MapProps>(function NativeMap(
+  { paddocks, farmPins, issuePins, onSelect, onFarmSelect, onPointsUpdate, onSaveGeometry, style }, ref
 ) {
   const webviewRef = useRef<WebView>(null);
   const readyRef = useRef(false);
@@ -116,6 +122,8 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
   pendingPaddocks.current = paddocks;
   const pendingPins = useRef<FarmPin[]>(farmPins ?? []);
   pendingPins.current = farmPins ?? [];
+  const pendingIssues = useRef<IssuePin[]>(issuePins);
+  pendingIssues.current = issuePins;
 
   const send = useCallback((msg: object) => {
     const s = JSON.stringify(msg);
@@ -141,6 +149,7 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
           readyRef.current = true;
           send({ type: "setPaddocks", paddocks: pendingPaddocks.current });
           send({ type: "setFarmPins", pins: pendingPins.current });
+          send({ type: "setIssuePins", pins: pendingIssues.current });
           break;
         case "select": onSelect?.(msg.id); break;
         case "farmSelect": onFarmSelect?.(msg.id); break;
@@ -162,6 +171,12 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
     pinsStrRef.current = pinsStr;
     if (readyRef.current) send({ type: "setFarmPins", pins: farmPins ?? [] });
   }
+  const issuesStr = useMemo(() => JSON.stringify(issuePins), [issuePins]);
+  const issuesStrRef = useRef(issuesStr);
+  if (issuesStrRef.current !== issuesStr) {
+    issuesStrRef.current = issuesStr;
+    if (readyRef.current) send({ type: "setIssuePins", pins: issuePins });
+  }
 
   return (
     <View style={[styles.container, style]}>
@@ -182,7 +197,33 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
 });
 
 export const PaddockMap = forwardRef<PaddockMapHandle, Props>(function PaddockMap(props, ref) {
-  return Platform.OS === "web" ? <WebMap {...props} ref={ref} /> : <NativeMap {...props} ref={ref} />;
+  const [issuePins, setIssuePins] = useState<IssuePin[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    listFarmIssues()
+      .then((issues) => {
+        if (!active) return;
+        setIssuePins(
+          issues
+            .filter((i) => !["resolved", "closed"].includes(i.status) && i.latitude != null && i.longitude != null)
+            .map((i) => ({
+              id: i.id,
+              title: i.title,
+              category: i.category,
+              lat: i.latitude as number,
+              lon: i.longitude as number,
+              severity: i.severity,
+            }))
+        );
+      })
+      .catch(() => { if (active) setIssuePins([]); });
+    return () => { active = false; };
+  }, [props.paddocks, props.farmPins]);
+
+  return Platform.OS === "web"
+    ? <WebMap {...props} issuePins={issuePins} ref={ref} />
+    : <NativeMap {...props} issuePins={issuePins} ref={ref} />;
 });
 
 const styles = StyleSheet.create({
