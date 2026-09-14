@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable, Linking } from "react-na
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
@@ -10,6 +11,7 @@ import { LINK_CATEGORIES } from "@/src/lib/links";
 import { useAuth } from "@/src/lib/auth-context";
 import { confirm } from "@/src/lib/confirm";
 import { profileRepo, useOnboarding } from "@/src/lib/onboarding";
+import { supabase } from "@/src/lib/supabase";
 import type { ExternalLink } from "@/src/lib/types";
 
 const TOOLS = [
@@ -26,6 +28,7 @@ const TOOLS = [
 export default function More() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, business, signOut, renameBusiness } = useAuth();
   const { percent, reload: reloadOnboarding, userId } = useOnboarding();
   const [links, setLinks] = useState<ExternalLink[]>([]);
@@ -33,6 +36,8 @@ export default function More() {
   const [newName, setNewName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => { repo.links.list().then(setLinks); }, []));
 
@@ -60,6 +65,28 @@ export default function More() {
       confirmLabel: "Sign out",
       destructive: true,
     }, () => { signOut(); });
+  }
+
+  function confirmResetTestAccount() {
+    if (!business?.id || resetBusy) return;
+    setResetError(null);
+    confirm({
+      title: "Reset beta test account?",
+      message: "This keeps your login and email, but permanently deletes this test business's farms, paddocks, machinery, chemicals, jobs, maintenance, issues, team roster and setup answers. You'll be sent back to the first Chaser setup screen.",
+      confirmLabel: "Reset test data",
+      destructive: true,
+    }, async () => {
+      setResetBusy(true);
+      try {
+        const { error } = await supabase.rpc("reset_beta_onboarding_data", { p_business_id: business.id });
+        if (error) throw error;
+        await queryClient.invalidateQueries();
+      } catch (e: any) {
+        setResetError(e?.message ?? "Couldn't reset this test account.");
+      } finally {
+        setResetBusy(false);
+      }
+    });
   }
 
   return (
@@ -172,7 +199,23 @@ export default function More() {
             ) : null}
             <Icon name="chevron-right" size={22} color={colors.muted} />
           </Pressable>
+          {business?.role === "owner" ? (
+            <Pressable
+              onPress={confirmResetTestAccount}
+              disabled={resetBusy}
+              testID="reset-beta-test-account"
+              style={({ pressed }) => [styles.row, { borderTopWidth: 1, borderTopColor: colors.border }, pressed && { backgroundColor: colors.surface }]}
+            >
+              <Icon name="restart-alert" size={22} color={colors.error} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[styles.rowText, { marginLeft: 0, color: colors.error }]}>Reset beta test account</Text>
+                <Text style={styles.rowSub}>{resetBusy ? "Resetting…" : "Keep this login and start onboarding again from scratch"}</Text>
+              </View>
+              <Icon name="chevron-right" size={22} color={colors.muted} />
+            </Pressable>
+          ) : null}
         </Card>
+        {resetError ? <Text style={styles.resetError}>{resetError}</Text> : null}
 
         <Text style={styles.sectionTitle}>Tools</Text>
         <Card style={{ padding: 0, overflow: "hidden" }}>
@@ -300,6 +343,7 @@ const styles = StyleSheet.create({
   rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   rowText: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.onSurface, marginLeft: 12 },
   rowSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  resetError: { color: colors.error, fontSize: 12, fontWeight: "700", marginTop: spacing.sm },
   manageBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, height: 48 },
   manageBtnText: { color: colors.brandPrimary, fontWeight: "700", fontSize: 15 },
   footer: { textAlign: "center", color: colors.muted, marginTop: spacing.xl, fontSize: 12 },
