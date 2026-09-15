@@ -11,7 +11,8 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://vcbwhlfbmqmwzntpnsjs.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
-        "EXPO_PUBLIC_BACKEND_URL": "https://spray-track-farm-1.preview.emergentagent.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://spray-track-farm-1.preview.emergentagent.com",
+        "EXPO_PUBLIC_SENTRY_DSN": ""
       }
     },
     "preview": {
@@ -26,7 +27,8 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://vcbwhlfbmqmwzntpnsjs.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
-        "EXPO_PUBLIC_BACKEND_URL": "https://spray-track-farm-1.preview.emergentagent.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://spray-track-farm-1.preview.emergentagent.com",
+        "EXPO_PUBLIC_SENTRY_DSN": ""
       }
     },
     "production": {
@@ -41,7 +43,8 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://vcbwhlfbmqmwzntpnsjs.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
-        "EXPO_PUBLIC_BACKEND_URL": "https://spray-track-farm-1.preview.emergentagent.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://spray-track-farm-1.preview.emergentagent.com",
+        "EXPO_PUBLIC_SENTRY_DSN": ""
       }
     }
   },
