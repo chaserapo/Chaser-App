@@ -132,10 +132,10 @@ eas secret:create --scope project --name EXPO_PUBLIC_BACKEND_URL --value 'https:
 ```
 …then delete the `env` block from `eas.json`. EAS Secrets take precedence.
 
-`EXPO_PUBLIC_SENTRY_DSN` is declared the same way but left blank — Sentry is
-disabled until it's set. A Sentry DSN is not secret (it can only submit
-events, not read them), so it's safe to inline in `eas.json` like the
-Supabase keys once you have a project:
+`EXPO_PUBLIC_SENTRY_DSN` is declared the same way and now set to the
+`chaser-vl` Sentry project's DSN. A Sentry DSN is not secret (it can only
+submit events, not read them), so it's safe to inline in `eas.json` like the
+Supabase keys. To rotate it (e.g. a new Sentry project):
 ```bash
 eas secret:create --scope project --name EXPO_PUBLIC_SENTRY_DSN --value 'https://examplePublicKey@o0.ingest.sentry.io/0'
 ```
