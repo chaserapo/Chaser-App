@@ -8,11 +8,13 @@
     "scheme": "chaser",
     "userInterfaceStyle": "automatic",
     "primaryColor": "#0F5132",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "au.com.chaserag.chaser",
-      "buildNumber": "1",
+      "buildNumber": "12",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Chaser uses your location to capture weather at your paddock and record spray-job GPS.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Chaser uses your location to record paddock boundaries and capture weather during a spray job.",
@@ -36,7 +38,17 @@
         "CAMERA",
         "READ_MEDIA_IMAGES",
         "WRITE_EXTERNAL_STORAGE",
-        "READ_EXTERNAL_STORAGE"
+        "READ_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -75,11 +87,18 @@
     "experiments": {
       "typedRoutes": true
     },
+    "owner": "chaserag",
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+        "projectId": "74bd6554-949b-4fd4-8945-2c8cadf61908"
       }
     },
-    "owner": "REPLACE_WITH_EXPO_ACCOUNT_USERNAME"
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/74bd6554-949b-4fd4-8945-2c8cadf61908"
+    }
   }
 }
