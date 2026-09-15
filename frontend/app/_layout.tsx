@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useEffect, useState } from "react";
 
+import { Sentry } from "@/src/lib/sentry";
 import { ErrorBoundary } from "@/src/components/error-boundary";
 import { queryClient } from "@/src/query-client";
 import { seedIfNeeded } from "@/src/lib/seed";
@@ -76,7 +77,7 @@ function PostAuthShell() {
   return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }} />;
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     (async () => {
@@ -108,3 +109,5 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+export default Sentry.wrap(RootLayout);
