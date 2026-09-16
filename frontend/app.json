@@ -89,7 +89,14 @@
       "expo-web-browser",
       "expo-status-bar",
       "@react-native-vector-icons/material-design-icons",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "@sentry/react-native/expo",
+        {
+          "useNativeInit": true,
+          "disableAutoUpload": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
