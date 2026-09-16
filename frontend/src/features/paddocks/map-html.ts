@@ -7,11 +7,16 @@
 //
 // Communication protocol (JSON strings):
 //   RN  -> WebView: { type: "setPaddocks", paddocks: [...] } |
-//                    { type: "setMode", mode: "view"|"draw" } |
+//                    { type: "setFarmPins", pins: [...] } |
+//                    { type: "setIssuePins", pins: [{id,lat,lon,icon,severity}] } |
+//                    { type: "setMode", mode: "view"|"draw"|"pin" } |
 //                    { type: "undo" | "clear" | "save" | "cancel" } |
 //                    { type: "setPosition", lat, lon } |
+//                    { type: "setReportPin", lat, lon } | { type: "clearReportPin" } |
 //                    { type: "focusPaddock", id }
 //   WebView -> RN:  { type: "ready" } | { type: "select", id } |
+//                    { type: "farmSelect", id } | { type: "issueSelect", id } |
+//                    { type: "pinPlaced", lat, lon } |
 //                    { type: "points", count } |
 //                    { type: "save", geojson, areaHa } |
 //                    { type: "log", msg }
@@ -22,6 +27,7 @@ export const MAP_HTML = `<!doctype html>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet" />
   <style>
     html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; touch-action: none; background: #E8ECE9; }
     .pin {
@@ -49,6 +55,20 @@ export const MAP_HTML = `<!doctype html>
       border-top:8px solid #3B6E3B;
       filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25));
     }
+    .issue-pin {
+      width: 30px; height: 30px; border-radius: 999px;
+      display:flex; align-items:center; justify-content:center;
+      border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      cursor: pointer;
+    }
+    .issue-pin .mdi { color:#ffffff; font-size: 16px; }
+    .report-pin {
+      width: 34px; height: 34px; border-radius: 999px 999px 999px 0;
+      background:#DC2626; border: 3px solid #ffffff; transform: rotate(-45deg) translate(6px, 6px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .report-pin .mdi { color:#ffffff; font-size: 16px; transform: rotate(45deg); }
   </style>
 </head>
 <body>
@@ -86,11 +106,16 @@ export const MAP_HTML = `<!doctype html>
     let paddocks = [];
     let farmPins = [];      // [{ id, name, lat, lon }]
     let farmMarkers = [];   // parallel maplibre markers
-    let mode = 'view'; // 'view' | 'draw'
+    let issuePins = [];     // [{ id, lat, lon, icon, severity }]
+    let issueMarkers = [];
+    let reportPin = null;   // [lng, lat] | null — the pin being placed for a new report
+    let reportPinMarker = null;
+    let mode = 'view'; // 'view' | 'draw' | 'pin'
     let drawPoints = []; // [[lng,lat], ...]
     let pinMarkers = [];
     let gpsMarker = null;
     let fitted = false;
+    const severityColor = { low: '#16A34A', medium: '#D97706', high: '#EA580C', critical: '#DC2626' };
 
     function paddockGeoJSON() {
       return {
@@ -143,6 +168,41 @@ export const MAP_HTML = `<!doctype html>
           .addTo(map);
       });
     }
+    // Renders one small colored marker per fault/risk report, using the same
+    // MDI icon name shown for that category in the native app (loaded via
+    // the @mdi/font CDN stylesheet above) so the map stays visually
+    // consistent with the rest of Chaser.
+    function renderIssuePins() {
+      issueMarkers.forEach(m => m.remove());
+      issueMarkers = issuePins.map(p => {
+        const el = document.createElement('div');
+        el.className = 'issue-pin';
+        el.style.background = severityColor[p.severity] || '#6B7280';
+        const icon = document.createElement('i');
+        icon.className = 'mdi mdi-' + (p.icon || 'map-marker');
+        el.appendChild(icon);
+        el.addEventListener('click', () => post({ type: 'issueSelect', id: p.id }));
+        return new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([p.lon, p.lat])
+          .addTo(map);
+      });
+    }
+
+    // The single "drop pin" marker shown while placing/confirming the
+    // location for a new fault/risk report.
+    function renderReportPin() {
+      if (reportPinMarker) { reportPinMarker.remove(); reportPinMarker = null; }
+      if (!reportPin) return;
+      const el = document.createElement('div');
+      el.className = 'report-pin';
+      const icon = document.createElement('i');
+      icon.className = 'mdi mdi-map-marker';
+      el.appendChild(icon);
+      reportPinMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat(reportPin)
+        .addTo(map);
+    }
+
     function renderDrawing() {
       const g = drawingGeoJSON();
       const s1 = map.getSource('draw-fill'); if (s1) s1.setData(g.fill);
@@ -221,6 +281,10 @@ export const MAP_HTML = `<!doctype html>
         if (mode === 'draw') {
           drawPoints.push([e.lngLat.lng, e.lngLat.lat]);
           renderDrawing(); postPointsUpdate();
+        } else if (mode === 'pin') {
+          reportPin = [e.lngLat.lng, e.lngLat.lat];
+          renderReportPin();
+          post({ type: 'pinPlaced', lat: e.lngLat.lat, lon: e.lngLat.lng });
         } else {
           const feats = map.queryRenderedFeatures(e.point, { layers: ['paddocks-fill'] });
           if (feats && feats.length) post({ type: 'select', id: feats[0].properties.id });
@@ -235,6 +299,15 @@ export const MAP_HTML = `<!doctype html>
       switch (msg.type) {
         case 'setPaddocks': paddocks = msg.paddocks || []; if (map.loaded()) { renderPaddocks(); fitToPaddocks(); } break;
         case 'setFarmPins': farmPins = msg.pins || []; if (map.loaded()) { renderFarmPins(); fitToPaddocks(); } break;
+        case 'setIssuePins': issuePins = msg.pins || []; if (map.loaded()) renderIssuePins(); break;
+        case 'setReportPin':
+          if (typeof msg.lon === 'number' && typeof msg.lat === 'number') {
+            reportPin = [msg.lon, msg.lat];
+            renderReportPin();
+            map.easeTo({ center: [msg.lon, msg.lat], zoom: Math.max(map.getZoom(), 15) });
+          }
+          break;
+        case 'clearReportPin': reportPin = null; renderReportPin(); break;
         case 'setMode':
           mode = msg.mode;
           if (mode === 'view') { drawPoints = []; renderDrawing(); postPointsUpdate(); }

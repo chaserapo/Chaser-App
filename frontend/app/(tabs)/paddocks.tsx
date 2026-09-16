@@ -10,9 +10,10 @@ import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { useRealtime } from "@/src/lib/realtime";
 import { useAuth } from "@/src/lib/auth-context";
-import { PaddockMap, PaddockMapHandle, FarmPin } from "@/src/features/paddocks/PaddockMap";
+import { PaddockMap, PaddockMapHandle, FarmPin, IssuePin } from "@/src/features/paddocks/PaddockMap";
 import { supabase } from "@/src/lib/supabase";
-import type { Paddock, PaddockBoundary, Farm } from "@/src/lib/types";
+import { issueCategoryIcon, issueCategoryLabel } from "@/src/lib/issue-categories";
+import type { Paddock, PaddockBoundary, Farm, FarmIssue } from "@/src/lib/types";
 
 type Mode = "view" | "draw";
 type ViewKind = "map" | "list";
@@ -25,10 +26,12 @@ export default function PaddocksTab() {
   const [paddocks, setPaddocks] = useState<Paddock[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [farmPins, setFarmPins] = useState<FarmPin[]>([]);
+  const [issues, setIssues] = useState<FarmIssue[]>([]);
   const [mode, setMode] = useState<Mode>("view");
   const [viewKind, setViewKind] = useState<ViewKind>("map");
   const [collapsedFarmIds, setCollapsedFarmIds] = useState<Record<string, boolean>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [drawInfo, setDrawInfo] = useState<{ count: number; areaHa: number }>({ count: 0, areaHa: 0 });
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
@@ -41,9 +44,10 @@ export default function PaddocksTab() {
   const [driving, setDriving] = useState(false);
 
   const load = useCallback(async () => {
-    const [pList, fList] = await Promise.all([repo.paddocks.active(), repo.farms.active()]);
+    const [pList, fList, iList] = await Promise.all([repo.paddocks.active(), repo.farms.active(), repo.farmIssues.list()]);
     setPaddocks(pList);
     setFarms(fList);
+    setIssues(iList);
     // Load farm pins from weather_locations so operators can see all their
     // properties on the map even before drawing paddock boundaries. Silent
     // fail-safe if the SQL migration hasn't been run yet.
@@ -63,9 +67,17 @@ export default function PaddocksTab() {
           .map((r: any) => ({ id: r.id, lat: r.lat, lon: r.lon, name: r.label || (r.farm_id ? nameByFarm.get(r.farm_id) : "Farm") || "Farm" }))
       );
     } catch { /* fail-safe */ }
-  }, [business?.id]);
+  }, [business]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
-  useRealtime(["paddocks", "farms"], load, [load]);
+  useRealtime(["paddocks", "farms", "farm_issues"], load, [load]);
+
+  const issuePins: IssuePin[] = useMemo(
+    () => issues
+      .filter((i) => i.latitude != null && i.longitude != null && !["resolved", "closed"].includes(i.status))
+      .map((i) => ({ id: i.id, lat: i.latitude as number, lon: i.longitude as number, icon: issueCategoryIcon(i.category), severity: i.severity })),
+    [issues],
+  );
+  const selectedIssue = selectedIssueId ? issues.find((i) => i.id === selectedIssueId) : null;
 
   // Group paddocks by farm — memoised so the list view is snappy on big properties.
   const grouped = useMemo(() => {
@@ -318,7 +330,9 @@ export default function PaddocksTab() {
             id: p.id, name: p.name, area_ha: p.area_ha, crop: p.crop, boundary_geojson: p.boundary ?? null,
           }))}
           farmPins={farmPins}
-          onSelect={(id) => { if (mode === "view") { setSelectedId(id); mapRef.current?.focusPaddock(id); } }}
+          issuePins={issuePins}
+          onSelect={(id) => { if (mode === "view") { setSelectedIssueId(null); setSelectedId(id); mapRef.current?.focusPaddock(id); } }}
+          onIssueSelect={(id) => { if (mode === "view") { setSelectedId(null); setSelectedIssueId(id); } }}
           onPointsUpdate={(count, areaHa) => setDrawInfo({ count, areaHa })}
           onSaveGeometry={persistPaddock}
         />
@@ -394,6 +408,26 @@ export default function PaddocksTab() {
                   <Button title="New Job" variant="outline" icon="plus" onPress={() => router.push({ pathname: "/records/new", params: { paddockId: selectedPaddock.id } })} testID="summary-new-job-btn" />
                 </View>
               </View>
+            </Card>
+          </View>
+        ) : null}
+
+        {/* Selected fault/risk pin summary */}
+        {mode === "view" && selectedIssue ? (
+          <View style={[styles.summary, { paddingBottom: insets.bottom + 12 }]} testID="issue-summary">
+            <Card>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={styles.summaryIcon}><Icon name={issueCategoryIcon(selectedIssue.category) as any} size={22} color={colors.brandPrimary} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.summaryName} numberOfLines={1}>{selectedIssue.title}</Text>
+                  <Text style={styles.summaryMeta} numberOfLines={1}>{issueCategoryLabel(selectedIssue.category)} · {selectedIssue.severity.toUpperCase()}</Text>
+                </View>
+                <Pressable onPress={() => setSelectedIssueId(null)} hitSlop={8} testID="close-issue-summary-btn">
+                  <Icon name="close" size={20} color={colors.muted} />
+                </Pressable>
+              </View>
+              <View style={{ height: spacing.sm }} />
+              <Button title="View All Faults & Risks" icon="chevron-right" onPress={() => router.push("/issues")} testID="summary-view-issues-btn" />
             </Card>
           </View>
         ) : null}

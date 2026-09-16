@@ -5,9 +5,11 @@
 import { supabase } from "./supabase";
 import { getActiveBusinessId } from "./backend";
 import { offlineQueue } from "./offline-queue";
+import { issuesOfflineQueue } from "./issues-offline-queue";
 import type {
   Business, Farm, Paddock, Chemical, ChemicalBatch, Machinery, Maintenance,
   MaintenanceCompletion, SprayJob, SprayJobProduct, ExternalLink, Operator, StockMovement,
+  FarmIssue,
 } from "./types";
 
 function bid(): string {
@@ -150,6 +152,36 @@ function completionFromDb(row: any): MaintenanceCompletion {
     notes: row.notes ?? undefined,
     created_at: row.created_at,
   };
+}
+
+// ---- Farm issues (fault/risk reports) ----
+async function listFarmIssuesJoined(): Promise<FarmIssue[]> {
+  const { data, error } = await supabase
+    .from("farm_issues")
+    .select("*, farms(name), paddocks(name), machinery(name)")
+    .eq("business_id", bid())
+    .is("deleted_at", null)
+    .order("reported_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as FarmIssue[];
+}
+
+async function saveFarmIssue(issue: FarmIssue) {
+  const businessId = bid();
+  const issueWithBiz: FarmIssue = { ...issue, business_id: businessId };
+  try {
+    await issuesOfflineQueue.mirror(businessId, issueWithBiz);
+  } catch (e) {
+    console.warn("issue offline mirror failed", e);
+  }
+  try {
+    const { farms, paddocks, machinery, ...row } = issueWithBiz;
+    await upsertRow("farm_issues", row as any);
+    await issuesOfflineQueue.markSynced(businessId, issueWithBiz.id);
+  } catch (e) {
+    await issuesOfflineQueue.markFailed(businessId, issueWithBiz.id, e);
+    console.warn("farm issue cloud save failed — kept in offline queue", e);
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -307,6 +339,27 @@ export const cloudRepo = {
     save: (o: Operator) => upsertRow("operators", o),
     remove: (id: string) => softDelete("operators", id),
   },
+  farmIssues: {
+    list: async () => {
+      try { return await listFarmIssuesJoined(); }
+      catch (e) {
+        console.warn("farmIssues.list cloud fail, using local shadow", e);
+        return await issuesOfflineQueue.listLocal(bid());
+      }
+    },
+    save: saveFarmIssue,
+    remove: (id: string) => softDelete("farm_issues", id),
+    get: async (id: string) => {
+      try {
+        const rows = await listRows<FarmIssue>("farm_issues", { extraEq: [["id", id]] });
+        if (rows[0]) return rows[0];
+      } catch (e) {
+        console.warn("farmIssues.get cloud fail, using shadow", e);
+      }
+      const local = await issuesOfflineQueue.listLocal(bid());
+      return local.find((i) => i.id === id) ?? null;
+    },
+  },
   links: {
     list: () => listRows<ExternalLink>("external_links"),
     save: (l: ExternalLink) => upsertRow("external_links", l),
@@ -346,6 +399,28 @@ export async function flushOfflineSprayJobs(): Promise<{ attempted: number; sync
       if (!(await offlineQueue.isPending(business_id, job.id))) synced += 1;
     } catch (e) {
       console.warn("flushOfflineSprayJobs retry failed", e);
+    }
+  }
+  return { attempted: pending.length, synced };
+}
+
+/**
+ * Retry any farm_issues (fault/risk reports) that failed to reach Supabase.
+ * Safe to call on app focus / after sign-in. No-op when nothing pending.
+ */
+export async function flushOfflineIssues(): Promise<{ attempted: number; synced: number }> {
+  const businessId = getActiveBusinessId();
+  if (!businessId) return { attempted: 0, synced: 0 };
+  const pending = await issuesOfflineQueue.listPending();
+  let synced = 0;
+  for (const { business_id, issue } of pending) {
+    if (business_id !== businessId) continue;
+    try {
+      await saveFarmIssue(issue);
+      const stillPending = (await issuesOfflineQueue.listPending()).some((p) => p.issue.id === issue.id);
+      if (!stillPending) synced += 1;
+    } catch (e) {
+      console.warn("flushOfflineIssues retry failed", e);
     }
   }
   return { attempted: pending.length, synced };

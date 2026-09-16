@@ -13,7 +13,7 @@ import { colors } from "@/src/theme";
 import { AuthProvider, useAuth } from "@/src/lib/auth-context";
 import { AuthScreen } from "@/src/features/auth/AuthScreen";
 import { MigrationScreen } from "@/src/features/auth/MigrationScreen";
-import { flushOfflineSprayJobs } from "@/src/lib/cloud-repo";
+import { flushOfflineSprayJobs, flushOfflineIssues } from "@/src/lib/cloud-repo";
 import { getBackendMode } from "@/src/lib/backend";
 import { useOnboarding } from "@/src/lib/onboarding";
 import DiscoveryScreen, { useDiscoveryGate } from "@/src/features/onboarding/DiscoveryScreen";
@@ -28,6 +28,7 @@ function AuthGate() {
     const attemptFlush = () => {
       if (getBackendMode() !== "cloud") return;
       flushOfflineSprayJobs().catch((e) => console.warn("flush error", e));
+      flushOfflineIssues().catch((e) => console.warn("issue flush error", e));
     };
     attemptFlush();
     const sub = AppState.addEventListener("change", (state) => {
