@@ -14,6 +14,7 @@ import type {
   ExternalLink,
   Operator,
   StockMovement,
+  FarmIssue,
 } from "./types";
 
 const KEYS = {
@@ -27,6 +28,7 @@ const KEYS = {
   maintenance: "as.maintenance",
   maintenance_completions: "as.maintenance_completions",
   spray_jobs: "as.spray_jobs",
+  farm_issues: "as.farm_issues",
   links: "as.links",
   operators: "as.operators",
   seeded: "as.seeded_v5",
@@ -190,6 +192,21 @@ export const localRepo = {
       await writeList(KEYS.spray_jobs, list);
     },
     get: async (id: string) => (await readList<SprayJob>(KEYS.spray_jobs)).find((j) => j.id === id) ?? null,
+  },
+  farmIssues: {
+    list: () => readList<FarmIssue>(KEYS.farm_issues),
+    save: async (i: FarmIssue) => {
+      const list = await readList<FarmIssue>(KEYS.farm_issues);
+      const idx = list.findIndex((x) => x.id === i.id);
+      if (idx >= 0) list[idx] = i;
+      else list.push(i);
+      await writeList(KEYS.farm_issues, list);
+    },
+    remove: async (id: string) => {
+      const list = (await readList<FarmIssue>(KEYS.farm_issues)).filter((x) => x.id !== id);
+      await writeList(KEYS.farm_issues, list);
+    },
+    get: async (id: string) => (await readList<FarmIssue>(KEYS.farm_issues)).find((i) => i.id === id) ?? null,
   },
   async isSeeded(): Promise<boolean> {
     return (await AsyncStorage.getItem(KEYS.seeded)) === "1";

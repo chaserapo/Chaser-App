@@ -19,8 +19,8 @@
         "NSLocationWhenInUseUsageDescription": "Chaser uses your location to capture weather at your paddock and record spray-job GPS.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Chaser uses your location to record paddock boundaries and capture weather during a spray job.",
         "NSLocationAlwaysUsageDescription": "Chaser uses your location to record paddock boundaries and capture weather during a spray job.",
-        "NSCameraUsageDescription": "Chaser uses the camera to attach photos to spray records and machinery documents.",
-        "NSPhotoLibraryUsageDescription": "Chaser lets you attach photos from your library to spray records and machinery documents.",
+        "NSCameraUsageDescription": "Chaser uses the camera to attach photos to spray records, machinery documents and fault reports.",
+        "NSPhotoLibraryUsageDescription": "Chaser lets you attach photos from your library to spray records, machinery documents and fault reports.",
         "NSPhotoLibraryAddUsageDescription": "Chaser saves generated spray-record images to your photo library on request.",
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -74,6 +74,13 @@
           "locationAlwaysAndWhenInUsePermission": "Chaser uses your location to record paddock boundaries and capture weather during a spray job.",
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Chaser lets you attach photos from your library to spray records, machinery documents and fault reports.",
+          "cameraPermission": "Chaser uses the camera to attach photos to spray records, machinery documents and fault reports."
         }
       ],
       "expo-font",

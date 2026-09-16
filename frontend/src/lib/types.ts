@@ -266,6 +266,34 @@ export type SprayJob = {
   created_at: string;
 };
 
+export type IssueSeverity = "low" | "medium" | "high" | "critical";
+export type IssueStatus = "open" | "assigned" | "in_progress" | "resolved" | "closed";
+
+export type FarmIssue = {
+  id: ID;
+  business_id: ID;
+  farm_id?: ID | null;
+  paddock_id?: ID | null;
+  machinery_id?: ID | null;
+  category: string;
+  subcategory?: string | null;
+  title: string;
+  description?: string | null;
+  severity: IssueSeverity;
+  status: IssueStatus;
+  reported_at: string;
+  resolved_at?: string | null;
+  resolution_notes?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  location_accuracy_m?: number | null;
+  location_note?: string | null;
+  photo_url?: string | null;
+  farms?: { name: string } | null;
+  paddocks?: { name: string } | null;
+  machinery?: { name: string } | null;
+};
+
 export type ExternalLink = {
   id: ID;
   business_id: ID;

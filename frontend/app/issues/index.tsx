@@ -1,12 +1,15 @@
 import { useCallback, useMemo, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, Pressable } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Pressable, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
 import { Button, Card } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
-import { listFarmIssues, reopenFarmIssue, resolveFarmIssue, type FarmIssue } from "@/src/lib/issues";
+import { repo } from "@/src/lib/storage";
+import { reopenFarmIssue, resolveFarmIssue } from "@/src/lib/issues";
+import { issueCategoryIcon, issueCategoryLabel } from "@/src/lib/issue-categories";
+import type { FarmIssue } from "@/src/lib/types";
 
 const severityColor = (s: string) => s === "critical" ? colors.error : s === "high" ? colors.warning : s === "medium" ? colors.info : colors.success;
 
@@ -18,7 +21,7 @@ export default function IssuesScreen() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    try { setIssues(await listFarmIssues()); }
+    try { setIssues(await repo.farmIssues.list()); }
     finally { setLoading(false); }
   }, []);
 
@@ -27,8 +30,8 @@ export default function IssuesScreen() {
   const shown = useMemo(() => issues.filter((i) => tab === "resolved" ? ["resolved", "closed"].includes(i.status) : !["resolved", "closed"].includes(i.status)), [issues, tab]);
 
   async function toggle(issue: FarmIssue) {
-    if (["resolved", "closed"].includes(issue.status)) await reopenFarmIssue(issue.id);
-    else await resolveFarmIssue(issue.id);
+    if (["resolved", "closed"].includes(issue.status)) await reopenFarmIssue(issue);
+    else await resolveFarmIssue(issue);
     await load();
   }
 
@@ -50,13 +53,16 @@ export default function IssuesScreen() {
         ) : shown.map((issue) => (
           <Card key={issue.id} style={{ marginBottom: spacing.md }}>
             <View style={styles.rowTop}>
-              <View style={[styles.dot, { backgroundColor: severityColor(issue.severity) }]} />
+              <View style={[styles.categoryIcon, { backgroundColor: severityColor(issue.severity) }]}>
+                <Icon name={issueCategoryIcon(issue.category) as any} size={18} color="#fff" />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.issueTitle}>{issue.title}</Text>
-                <Text style={styles.meta}>{issue.category.replace(/_/g, " ")} · {issue.severity.toUpperCase()}</Text>
+                <Text style={styles.meta}>{issueCategoryLabel(issue.category)} · {issue.severity.toUpperCase()}</Text>
               </View>
             </View>
             {issue.description ? <Text style={styles.description}>{issue.description}</Text> : null}
+            {issue.photo_url ? <Image source={{ uri: issue.photo_url }} style={styles.photo} /> : null}
             <View style={styles.tags}>
               {issue.farms?.name ? <Text style={styles.tag}>Farm: {issue.farms.name}</Text> : null}
               {issue.paddocks?.name ? <Text style={styles.tag}>Paddock: {issue.paddocks.name}</Text> : null}
@@ -83,7 +89,8 @@ const styles = StyleSheet.create({
   tabTextActive: { color: colors.onSurface },
   empty: { color: colors.muted, textAlign: "center", paddingVertical: spacing.lg },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 10 },
-  dot: { width: 10, height: 10, borderRadius: 99 },
+  categoryIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  photo: { width: "100%", height: 160, borderRadius: radius.md, marginTop: spacing.md },
   issueTitle: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
   meta: { fontSize: 11, color: colors.muted, marginTop: 2, textTransform: "capitalize" },
   description: { color: colors.onSurfaceTertiary, marginTop: spacing.md, lineHeight: 20 },
