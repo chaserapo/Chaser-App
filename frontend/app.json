@@ -90,6 +90,7 @@
       "expo-status-bar",
       "@react-native-vector-icons/material-design-icons",
       "expo-sharing",
+      "expo-notifications",
       [
         "@sentry/react-native/expo",
         {
