@@ -8,11 +8,14 @@ import { Button, Card, Chip } from "@/src/components/ui";
 import { colors, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { exportJobsCsv } from "@/src/lib/csv";
+import { exportJobsPdf } from "@/src/lib/pdf-report";
+import { useAuth } from "@/src/lib/auth-context";
 import type { SprayJob, Farm, Paddock } from "@/src/lib/types";
 
 export default function Records() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { business } = useAuth();
   const [jobs, setJobs] = useState<SprayJob[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [paddocks, setPaddocks] = useState<Paddock[]>([]);
@@ -51,6 +54,9 @@ export default function Records() {
         </View>
         <Pressable onPress={async () => { const done = await repo.sprayJobs.completed(); await exportJobsCsv(done); }} style={styles.exportBtn} testID="export-csv-btn">
           <Icon name="download-outline" size={18} color={colors.onSurface} />
+        </Pressable>
+        <Pressable onPress={() => exportJobsPdf(filtered, business?.name ?? "Chaser")} style={styles.exportBtn} testID="export-pdf-btn">
+          <Icon name="file-pdf-box" size={18} color={colors.onSurface} />
         </Pressable>
         <Pressable onPress={() => router.push("/records/new")} style={styles.newBtn} testID="new-record-btn">
           <Icon name="plus" size={20} color={colors.onBrandPrimary} />

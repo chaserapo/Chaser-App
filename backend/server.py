@@ -55,6 +55,7 @@ async def get_status_checks():
 # Feature routes
 from routes.invitations import router as invitations_router  # noqa: E402
 from routes.weather_cron import weather_cron_loop, _cron_tick  # noqa: E402
+from routes.alerts_cron import alerts_cron_loop, _cron_tick as _alerts_cron_tick  # noqa: E402
 api_router.include_router(invitations_router)
 
 # On-demand refresh endpoint — safe to call ad-hoc from admin tools or a cron
@@ -64,6 +65,16 @@ api_router.include_router(invitations_router)
 async def weather_refresh_all():
     try:
         await _cron_tick()
+        return {"status": "ok"}
+    except Exception as e:  # pragma: no cover
+        return {"status": "error", "message": str(e)}
+
+# On-demand alerts sweep — same idempotent-tick shape as weather/refresh-all,
+# useful for verifying the push pipeline without waiting for the interval.
+@api_router.post("/alerts/check-now")
+async def alerts_check_now():
+    try:
+        await _alerts_cron_tick()
         return {"status": "ok"}
     except Exception as e:  # pragma: no cover
         return {"status": "error", "message": str(e)}
@@ -106,3 +117,10 @@ async def _start_weather_cron():
     # is configured so local dev/preview works without it.
     import asyncio
     asyncio.create_task(weather_cron_loop())
+
+@app.on_event("startup")
+async def _start_alerts_cron():
+    # Background overdue-maintenance / open-fault push notifier. No-op unless
+    # SUPABASE_SERVICE_ROLE_KEY is configured so local dev/preview works without it.
+    import asyncio
+    asyncio.create_task(alerts_cron_loop())

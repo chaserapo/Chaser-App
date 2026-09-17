@@ -15,6 +15,7 @@ import { AuthScreen } from "@/src/features/auth/AuthScreen";
 import { MigrationScreen } from "@/src/features/auth/MigrationScreen";
 import { flushOfflineSprayJobs, flushOfflineIssues } from "@/src/lib/cloud-repo";
 import { getBackendMode } from "@/src/lib/backend";
+import { registerPushToken, useNotificationRouting } from "@/src/lib/push-tokens";
 import { useOnboarding } from "@/src/lib/onboarding";
 import DiscoveryScreen, { useDiscoveryGate } from "@/src/features/onboarding/DiscoveryScreen";
 
@@ -37,6 +38,11 @@ function AuthGate() {
     const t = setInterval(attemptFlush, 60_000);
     return () => { sub.remove(); clearInterval(t); };
   }, [business]);
+
+  useEffect(() => {
+    if (!business || !session?.user) return;
+    registerPushToken(session.user.id, business.id);
+  }, [business, session]);
 
   if (loading) {
     return (
@@ -64,6 +70,7 @@ function PostAuthShell() {
   const userId = session?.user?.id ?? null;
   const { needsOnboarding, loading, profile } = useOnboarding();
   const discovery = useDiscoveryGate(userId);
+  useNotificationRouting();
 
   if ((loading && !profile) || discovery.isLoading) {
     return (
