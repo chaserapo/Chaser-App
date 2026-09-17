@@ -47,6 +47,7 @@ export default function NewSprayJob() {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
   const [showMissing, setShowMissing] = useState<Record<string, boolean>>({});
+  const [lastJob, setLastJob] = useState<SprayJob | null>(null);
 
   const [f, setF] = useState({
     farm_id: "", farm_name: "", paddock_id: "", paddock_name: "",
@@ -64,10 +65,12 @@ export default function NewSprayJob() {
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [fa, pa, ma, ch, op] = await Promise.all([
-        repo.farms.active(), repo.paddocks.active(), repo.machinery.list(), repo.chemicals.active(), repo.operators.active(),
+      const [fa, pa, ma, ch, op, done] = await Promise.all([
+        repo.farms.active(), repo.paddocks.active(), repo.machinery.list(), repo.chemicals.active(), repo.operators.active(), repo.sprayJobs.completed(),
       ]);
       setFarms(fa); setPaddocks(pa); setMachs(ma); setChems(ch); setOperators(op);
+      const sortedDone = [...done].sort((a, b) => b.created_at.localeCompare(a.created_at));
+      setLastJob(sortedDone[0] ?? null);
       // Default operator to current user, only if not already set / no draft loaded
       setF((s) => {
         if (s.operator_id) return s;
@@ -167,6 +170,26 @@ export default function NewSprayJob() {
       speed_kmh: m.default_speed_kmh != null ? m.default_speed_kmh.toString() : s.speed_kmh,
       water_rate: m.default_water_rate_lha != null ? m.default_water_rate_lha.toString() : s.water_rate,
     }));
+  }
+
+  function repeatLastJob() {
+    if (!lastJob) return;
+    setF((s) => ({
+      ...s,
+      farm_id: lastJob.farm_id ?? "", farm_name: lastJob.farm_name ?? "",
+      paddock_id: "", paddock_name: "", crop: "", variety: "", area_ha: "",
+      target: lastJob.target ?? "",
+      operator_id: lastJob.operator_id ?? s.operator_id, operator_name: lastJob.operator ?? s.operator_name,
+      machinery_id: lastJob.machinery_id ?? "", machinery_name: lastJob.machinery_name ?? "",
+      water_rate: lastJob.water_rate != null ? lastJob.water_rate.toString() : s.water_rate,
+      speed_kmh: lastJob.speed_kmh != null ? lastJob.speed_kmh.toString() : s.speed_kmh,
+      boom_width_m: lastJob.boom_width_m != null ? lastJob.boom_width_m.toString() : s.boom_width_m,
+      nozzle_type: lastJob.nozzle_type ?? s.nozzle_type,
+      nozzle_spacing_m: lastJob.nozzle_spacing_m != null ? (lastJob.nozzle_spacing_m * 1000).toString() : s.nozzle_spacing_m,
+      pressure: lastJob.pressure != null ? lastJob.pressure.toString() : s.pressure,
+    }));
+    setProducts(lastJob.products.map((p) => ({ ...p, id: uuid(), rateStr: p.rate.toString() })));
+    setShowMissing({});
   }
 
   function addProduct(c: Chemical) {
@@ -325,6 +348,17 @@ export default function NewSprayJob() {
               <Text style={styles.errorBannerText}>Fill in the {missingCount} required field{missingCount === 1 ? "" : "s"} highlighted below.</Text>
             </View>
           )}
+
+          {!params.draft && !params.plannedId && lastJob ? (
+            <Card style={{ backgroundColor: colors.brandSecondary, borderColor: colors.brandPrimary, marginBottom: spacing.md }} testID="repeat-last-job-card">
+              <Text style={styles.repeatTitle}>Spraying the same mix again?</Text>
+              <Text style={styles.repeatSub}>
+                Copy farm, operator, machine, setup and tank mix from your last job{lastJob.paddock_name ? ` (${lastJob.paddock_name})` : ""} — just pick the new paddock.
+              </Text>
+              <View style={{ height: spacing.sm }} />
+              <Button title="Repeat Last Job" icon="content-copy" variant="outline" onPress={repeatLastJob} testID="repeat-last-job-btn" />
+            </Card>
+          ) : null}
 
           <Text style={styles.section}>Location</Text>
           <Card style={showMissing.farm_id || showMissing.paddock_id ? styles.errorCard : undefined}>
@@ -668,6 +702,8 @@ const styles = StyleSheet.create({
   errorBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.error, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.md },
   errorBannerText: { color: colors.onError, fontWeight: "700", fontSize: 13, flex: 1 },
   errorCard: { borderColor: colors.error, borderWidth: 1.5 },
+  repeatTitle: { fontSize: 15, fontWeight: "800", color: colors.onBrandSecondary },
+  repeatSub: { fontSize: 12, color: colors.onBrandSecondary, opacity: 0.85, marginTop: 4, lineHeight: 17 },
   overrideHint: { fontSize: 11, color: colors.muted, fontStyle: "italic", marginTop: -4, marginBottom: 4, lineHeight: 15 },
   addProductBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.brandSecondary, borderWidth: 1, borderColor: colors.brandPrimary, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 16, marginBottom: spacing.md },
   addProductText: { color: colors.onBrandSecondary, fontWeight: "700", fontSize: 14, flex: 1 },
