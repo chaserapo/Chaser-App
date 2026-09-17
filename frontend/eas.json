@@ -53,7 +53,10 @@
       "ios": {
         "appleId": "Jake.comley@hotmail.com",
         "ascAppId": "6810748503",
-        "appleTeamId": "875K47HU2X"
+        "appleTeamId": "875K47HU2X",
+        "ascApiKeyPath": "./AuthKey_X8X5Z2CSJ6.p8",
+        "ascApiKeyId": "X8X5Z2CSJ6",
+        "ascApiKeyIssuerId": "8895692d-e85e-474a-a5f3-e10e8b467fe4"
       },
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json",
