@@ -8,8 +8,12 @@ import { Button, Card, Input, StatusBadge } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo, maintenanceStatus } from "@/src/lib/storage";
 import { confirm } from "@/src/lib/confirm";
+import { resolveFarmIssue, reopenFarmIssue } from "@/src/lib/issues";
+import { issueCategoryIcon, issueCategoryLabel } from "@/src/lib/issue-categories";
 import { MACHINE_TYPES } from "@/src/lib/types";
-import type { Machinery, Maintenance, MaintenanceCompletion, MachineType } from "@/src/lib/types";
+import type { Machinery, Maintenance, MaintenanceCompletion, MachineType, FarmIssue } from "@/src/lib/types";
+
+const OPEN_ISSUE_STATUSES = ["open", "assigned", "in_progress"];
 
 export default function MachineDetail() {
   const insets = useSafeAreaInsets();
@@ -18,6 +22,7 @@ export default function MachineDetail() {
   const [m, setM] = useState<Machinery | null>(null);
   const [maints, setMaints] = useState<Maintenance[]>([]);
   const [completions, setCompletions] = useState<MaintenanceCompletion[]>([]);
+  const [issues, setIssues] = useState<FarmIssue[]>([]);
   const [editing, setEditing] = useState(false);
   const [ef, setEf] = useState({
     name: "", machine_type: "Tractor" as MachineType,
@@ -50,17 +55,26 @@ export default function MachineDetail() {
   useFocusEffect(useCallback(() => {
     if (!id) return;
     (async () => {
-      const [mach, mm, comps] = await Promise.all([
+      const [mach, mm, comps, allIssues] = await Promise.all([
         repo.machinery.get(id),
         repo.maintenance.forMachine(id),
         repo.maintenanceCompletions.forMachine(id),
+        repo.farmIssues.list(),
       ]);
       setM(mach);
       if (mach) loadFields(mach);
       setMaints(mm.sort((a, b) => (a.next_service_hours ?? Infinity) - (b.next_service_hours ?? Infinity)));
       setCompletions(comps);
+      setIssues(allIssues.filter((i) => i.machinery_id === id).sort((a, b) => b.reported_at.localeCompare(a.reported_at)));
     })();
   }, [id]));
+
+  async function toggleIssue(issue: FarmIssue) {
+    if (OPEN_ISSUE_STATUSES.includes(issue.status)) await resolveFarmIssue(issue);
+    else await reopenFarmIssue(issue);
+    const all = await repo.farmIssues.list();
+    setIssues(all.filter((i) => i.machinery_id === id).sort((a, b) => b.reported_at.localeCompare(a.reported_at)));
+  }
 
   async function saveEdit() {
     if (!m || !ef.name.trim()) return;
@@ -117,6 +131,8 @@ export default function MachineDetail() {
   );
 
   const dueCount = maints.filter((mn) => maintenanceStatus(m.current_hours, mn.next_service_hours) !== "good").length;
+  const openIssues = issues.filter((i) => OPEN_ISSUE_STATUSES.includes(i.status));
+  const resolvedIssuesCount = issues.length - openIssues.length;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
@@ -238,6 +254,41 @@ export default function MachineDetail() {
                 Live telematics sync (John Deere Operations Center · JDLink · CNH FieldOps) is on the roadmap. Edit the machine to link a platform ID today so history is ready when we switch it on.
               </Text>
             </Card>
+
+            <View style={styles.sectionRow}>
+              <Text style={styles.sectionTitle}>Faults & Risks</Text>
+              <Pressable onPress={() => router.push({ pathname: "/issues/new", params: { machineryId: m.id } })} testID="add-issue-btn" hitSlop={8}>
+                <Text style={styles.link}>+ Report</Text>
+              </Pressable>
+            </View>
+            {openIssues.length === 0 ? (
+              <Card>
+                <Text style={styles.empty}>
+                  No open faults or risks for this machine.{resolvedIssuesCount > 0 ? ` ${resolvedIssuesCount} resolved.` : ""}
+                </Text>
+              </Card>
+            ) : (
+              openIssues.map((issue) => (
+                <Card key={issue.id} style={{ marginBottom: spacing.sm }} testID={`machine-issue-${issue.id}`}>
+                  <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                    <View style={styles.historyIcon}><Icon name={issueCategoryIcon(issue.category) as any} size={20} color={colors.error} /></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.mnTitle}>{issue.title}</Text>
+                      <Text style={styles.mnMeta}>{issueCategoryLabel(issue.category)} · {issue.severity.toUpperCase()} · {issue.reported_at.slice(0, 10)}</Text>
+                      {issue.description ? <Text style={styles.historyLine}>{issue.description}</Text> : null}
+                      {issue.location_note ? <Text style={styles.historyLine}>Where: {issue.location_note}</Text> : null}
+                    </View>
+                  </View>
+                  <Pressable onPress={() => toggleIssue(issue)} style={styles.resolveBtn} testID={`resolve-machine-issue-${issue.id}`}>
+                    <Icon name="check-circle-outline" size={16} color={colors.success} />
+                    <Text style={styles.resolveBtnText}>Mark resolved</Text>
+                  </Pressable>
+                </Card>
+              ))
+            )}
+            {resolvedIssuesCount > 0 && openIssues.length > 0 ? (
+              <Text style={[styles.subCount, { marginBottom: spacing.sm }]}>{resolvedIssuesCount} resolved — see Faults & Risks for full history.</Text>
+            ) : null}
 
             <View style={styles.sectionRow}>
               <Text style={styles.sectionTitle}>Maintenance Schedule</Text>
@@ -381,4 +432,6 @@ const styles = StyleSheet.create({
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceSecondary },
   historyIcon: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center", marginRight: 12 },
   historyLine: { fontSize: 13, color: colors.onSurface, marginTop: 3 },
+  resolveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, minHeight: 36 },
+  resolveBtnText: { color: colors.success, fontWeight: "800", fontSize: 13 },
 });

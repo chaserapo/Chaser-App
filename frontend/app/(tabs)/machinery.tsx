@@ -15,7 +15,10 @@ type EnrichedMachine = Machinery & {
   dueCount: number;
   overdueCount: number;
   totalMaint: number;
+  openFaults: number;
 };
+
+const OPEN_ISSUE_STATUSES = ["open", "assigned", "in_progress"];
 
 export default function MachineryTab() {
   const insets = useSafeAreaInsets();
@@ -23,11 +26,12 @@ export default function MachineryTab() {
   const [list, setList] = useState<EnrichedMachine[]>([]);
 
   const load = useCallback(async () => {
-    const [m, ms] = await Promise.all([repo.machinery.list(), repo.maintenance.list()]);
+    const [m, ms, issues] = await Promise.all([repo.machinery.list(), repo.maintenance.list(), repo.farmIssues.list()]);
     const enriched: EnrichedMachine[] = m
       .filter((x) => !x.archived_at)
       .map((x) => {
         const machMaints = ms.filter((mm) => mm.machinery_id === x.id);
+        const openFaults = issues.filter((i) => i.machinery_id === x.id && OPEN_ISSUE_STATUSES.includes(i.status)).length;
         let next: number | undefined;
         let dueCount = 0;
         let overdueCount = 0;
@@ -40,9 +44,10 @@ export default function MachineryTab() {
           if (status === "overdue") overdueCount += 1;
         });
         const overallStatus: MaintenanceStatus = overdueCount > 0 ? "overdue" : dueCount > 0 ? "due_soon" : "good";
-        return { ...x, status: overallStatus, nextService: next, dueCount, overdueCount, totalMaint: machMaints.length };
+        return { ...x, status: overallStatus, nextService: next, dueCount, overdueCount, totalMaint: machMaints.length, openFaults };
       });
     enriched.sort((a, b) => {
+      if ((a.openFaults > 0) !== (b.openFaults > 0)) return a.openFaults > 0 ? -1 : 1;
       const rank = { overdue: 0, due_soon: 1, good: 2 } as const;
       if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
       return a.name.localeCompare(b.name);
@@ -51,11 +56,12 @@ export default function MachineryTab() {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
-  useRealtime(["machinery", "maintenance_schedules", "maintenance_completions"], load, [load]);
+  useRealtime(["machinery", "maintenance_schedules", "maintenance_completions", "farm_issues"], load, [load]);
 
   const totalMachines = list.length;
   const totalDueSoon = list.reduce((s, m) => s + m.dueCount, 0);
   const totalOverdue = list.reduce((s, m) => s + m.overdueCount, 0);
+  const totalOpenFaults = list.reduce((s, m) => s + m.openFaults, 0);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
@@ -80,6 +86,7 @@ export default function MachineryTab() {
               <StatTile label="Machines" value={totalMachines} tone="brand" icon="tractor-variant" testID="stat-total" />
               <StatTile label="Due Soon" value={totalDueSoon} tone={totalDueSoon > 0 ? "warn" : "muted"} icon="clock-alert-outline" testID="stat-due" />
               <StatTile label="Overdue" value={totalOverdue} tone={totalOverdue > 0 ? "danger" : "muted"} icon="alert-octagon-outline" testID="stat-overdue" />
+              <StatTile label="Faults" value={totalOpenFaults} tone={totalOpenFaults > 0 ? "danger" : "muted"} icon="alert-circle-outline" testID="stat-faults" />
             </View>
           ) : null
         }
@@ -136,6 +143,14 @@ export default function MachineryTab() {
                         <Text style={styles.metricText}>no schedule</Text>
                       </View>
                     ) : null}
+                    {item.openFaults > 0 ? (
+                      <View style={styles.metric}>
+                        <Icon name="alert-circle" size={12} color={colors.error} />
+                        <Text style={[styles.metricText, { color: colors.error, fontWeight: "700" }]}>
+                          {item.openFaults} open fault{item.openFaults === 1 ? "" : "s"}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
                 <StatusBadge status={item.status} testID={`machine-status-${item.id}`} />
@@ -189,8 +204,8 @@ const styles = StyleSheet.create({
   sub: { fontSize: 13, color: colors.muted, marginTop: 2 },
   newBtn: { flexDirection: "row", alignItems: "center", backgroundColor: colors.brandPrimary, paddingHorizontal: 14, height: 40, borderRadius: 999 },
   newBtnText: { color: colors.onBrandPrimary, fontWeight: "700", marginLeft: 6 },
-  statsRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
-  tile: { flex: 1, paddingVertical: spacing.md, paddingHorizontal: spacing.sm, borderRadius: radius.lg, alignItems: "flex-start" },
+  statsRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.md },
+  tile: { flexGrow: 1, flexBasis: "47%", paddingVertical: spacing.md, paddingHorizontal: spacing.sm, borderRadius: radius.lg, alignItems: "flex-start" },
   tileValue: { fontSize: 22, fontWeight: "800", marginTop: 4 },
   tileLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 },
   iconBox: { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center", marginRight: 14 },
