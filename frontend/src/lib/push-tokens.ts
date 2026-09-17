@@ -5,15 +5,22 @@ import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { supabase } from "./supabase";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+try {
+  // Guarded: this runs at module-import time, before any component mounts.
+  // A binary built before expo-notifications was added has no native module
+  // for this to call into — this must not be allowed to crash app startup.
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+} catch (e) {
+  console.warn("setNotificationHandler failed (native module unavailable?)", e);
+}
 
 export type ChaserNotificationData = {
   type: "overdue_maintenance" | "open_fault";
@@ -55,12 +62,17 @@ export async function registerPushToken(userId: string, businessId: string): Pro
 export function useNotificationRouting() {
   const router = useRouter();
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as ChaserNotificationData | undefined;
-      if (data?.machineryId) {
-        router.push({ pathname: "/machinery/[id]", params: { id: data.machineryId } });
-      }
-    });
-    return () => sub.remove();
+    try {
+      const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data as ChaserNotificationData | undefined;
+        if (data?.machineryId) {
+          router.push({ pathname: "/machinery/[id]", params: { id: data.machineryId } });
+        }
+      });
+      return () => sub.remove();
+    } catch (e) {
+      console.warn("notification response listener failed (native module unavailable?)", e);
+      return undefined;
+    }
   }, [router]);
 }
