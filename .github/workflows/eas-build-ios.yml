@@ -1,0 +1,31 @@
+name: EAS Build (iOS Production)
+
+# Manual trigger only — click "Run workflow" on this workflow's page in the
+# GitHub Actions tab. Never runs automatically on push, so it can't consume
+# a build unexpectedly.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build on EAS
+        run: eas build --platform ios --profile production --non-interactive --no-wait
