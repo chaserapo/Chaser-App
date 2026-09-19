@@ -6,23 +6,37 @@ import Icon from "@react-native-vector-icons/material-design-icons";
 import { Button, Card } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { listTeamMembers, type TeamMember } from "@/src/lib/team";
+import { listTasks, type Task } from "@/src/lib/tasks";
 
 export default function TeamTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    try { setMembers(await listTeamMembers(true)); }
-    finally { setLoading(false); }
+    try {
+      const [m, t] = await Promise.all([listTeamMembers(true), listTasks()]);
+      setMembers(m);
+      setTasks(t);
+    } finally { setLoading(false); }
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const shown = useMemo(() => members.filter((m) => showInactive || !m.archived_at), [members, showInactive]);
   const activeCount = members.filter((m) => !m.archived_at).length;
+  const openTaskCount = tasks.filter((t) => t.status !== "done").length;
+  const openTasksByMember = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of tasks) {
+      if (t.status === "done" || !t.assigned_to) continue;
+      map.set(t.assigned_to, (map.get(t.assigned_to) ?? 0) + 1);
+    }
+    return map;
+  }, [tasks]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
@@ -36,6 +50,17 @@ export default function TeamTab() {
 
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}>
         <Button title="Add Team Member" icon="account-plus-outline" onPress={() => router.push("/team/new")} testID="add-team-member-btn" />
+        <View style={{ height: spacing.sm }} />
+        <Pressable onPress={() => router.push("/tasks")} testID="team-tasks-entry">
+          <Card style={styles.tasksCard}>
+            <View style={styles.tasksIcon}><Icon name="clipboard-check-outline" size={22} color={colors.brandPrimary} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.tasksTitle}>Tasks</Text>
+              <Text style={styles.meta}>{openTaskCount} open · assign work or leave it open for anyone</Text>
+            </View>
+            <Icon name="chevron-right" size={22} color={colors.muted} />
+          </Card>
+        </Pressable>
 
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>Team members</Text>
@@ -61,6 +86,7 @@ export default function TeamTab() {
                   {m.chemical_accreditation ? <Text style={styles.tag}>Chemical accredited</Text> : null}
                   {(m.machinery_competencies?.length ?? 0) > 0 ? <Text style={styles.tag}>{m.machinery_competencies!.length} machinery skills</Text> : null}
                   {m.availability ? <Text style={styles.tag}>{m.availability}</Text> : null}
+                  {(openTasksByMember.get(m.id) ?? 0) > 0 ? <Text style={styles.tag}>{openTasksByMember.get(m.id)} open task{openTasksByMember.get(m.id) === 1 ? "" : "s"}</Text> : null}
                 </View>
               </View>
               <Icon name="chevron-right" size={22} color={colors.muted} />
@@ -82,6 +108,9 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: "800", color: colors.onSurface },
   link: { color: colors.brandPrimary, fontWeight: "700", fontSize: 13 },
   empty: { color: colors.muted, textAlign: "center", paddingVertical: spacing.lg },
+  tasksCard: { marginBottom: spacing.md, flexDirection: "row", alignItems: "center", gap: 12 },
+  tasksIcon: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center" },
+  tasksTitle: { fontSize: 15, fontWeight: "800", color: colors.onSurface },
   memberCard: { marginBottom: spacing.sm, flexDirection: "row", alignItems: "center", gap: 12 },
   inactiveCard: { opacity: 0.65 },
   avatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center" },

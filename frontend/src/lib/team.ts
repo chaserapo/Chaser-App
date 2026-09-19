@@ -22,10 +22,29 @@ export type TeamMember = {
   emergency_contact_relationship?: string | null;
   availability?: string | null;
   notes?: string | null;
+  start_date?: string | null;
   is_default_user?: boolean;
   archived_at?: string | null;
   created_at?: string;
 };
+
+/** "On the team since March 2024 · 1 yr 4 mo" style tenure line from a start_date. */
+export function formatTenure(startDate?: string | null): string | null {
+  if (!startDate) return null;
+  const start = new Date(startDate);
+  if (isNaN(start.getTime())) return null;
+  const now = new Date();
+  let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  if (now.getDate() < start.getDate()) months -= 1;
+  months = Math.max(0, months);
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} yr${years === 1 ? "" : "s"}`);
+  if (remMonths > 0 || years === 0) parts.push(`${remMonths} mo${remMonths === 1 ? "" : "s"}`);
+  const since = start.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  return `Since ${since} · ${parts.join(" ")}`;
+}
 
 function bid() {
   const id = getActiveBusinessId();
