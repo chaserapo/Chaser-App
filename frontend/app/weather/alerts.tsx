@@ -103,7 +103,7 @@ export default function AlertsScreen() {
           <View style={styles.notice}>
             <Icon name="information-outline" size={18} color={colors.warning} />
             <Text style={styles.noticeText}>
-              Alert configuration is available now. Delivery via push notifications will be enabled after Chaser's push-notification build — you'll start receiving these alerts on your device automatically once that's wired up.
+              These preferences are saved now, but delivery isn&apos;t wired up yet — turning one on won&apos;t send you anything until that&apos;s built. (This is separate from maintenance/fault push notifications, which do work today.)
             </Text>
           </View>
         </Card>
