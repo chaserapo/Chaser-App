@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { v4 as uuid } from "uuid";
@@ -37,6 +37,8 @@ export default function PaddocksTab() {
   const [name, setName] = useState("");
   const [crop, setCrop] = useState("");
   const [gpsOn, setGpsOn] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [searching, setSearching] = useState(false);
   const mapRef = useRef<PaddockMapHandle>(null);
   const gpsWatch = useRef<Location.LocationSubscription | null>(null);
   const driveWatch = useRef<Location.LocationSubscription | null>(null);
@@ -165,6 +167,29 @@ export default function PaddocksTab() {
       { accuracy: Location.Accuracy.Balanced, timeInterval: 3000, distanceInterval: 5 },
       (loc) => mapRef.current?.setPosition(loc.coords.latitude, loc.coords.longitude, false),
     );
+  }
+
+  async function searchAddress() {
+    const q = searchText.trim();
+    if (!q) return;
+    setSearching(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
+        { headers: { "Accept-Language": "en" } },
+      );
+      const results = await res.json();
+      const first = Array.isArray(results) ? results[0] : null;
+      if (first) {
+        mapRef.current?.flyTo(parseFloat(first.lat), parseFloat(first.lon), 15);
+      } else {
+        alert("No results found for that search.");
+      }
+    } catch {
+      alert("Couldn't search right now — check your connection.");
+    } finally {
+      setSearching(false);
+    }
   }
 
   function startDraw() {
@@ -342,6 +367,32 @@ export default function PaddocksTab() {
           <Icon name={gpsOn ? "crosshairs-gps" : "crosshairs"} size={20} color={gpsOn ? colors.onBrandPrimary : colors.brandPrimary} />
         </Pressable>
 
+        {/* Address search - sits between the GPS button (left) and the
+            map's own zoom control (right, added inside map-html.ts) */}
+        {mode === "view" ? (
+          <View style={styles.searchRow} testID="address-search-row">
+            <Icon name="magnify" size={18} color={colors.muted} />
+            <TextInput
+              value={searchText}
+              onChangeText={setSearchText}
+              onSubmitEditing={searchAddress}
+              placeholder="Search address or place"
+              placeholderTextColor={colors.muted}
+              style={styles.searchInput}
+              returnKeyType="search"
+              autoCorrect={false}
+              testID="address-search-input"
+            />
+            {searching ? (
+              <ActivityIndicator size="small" color={colors.brandPrimary} />
+            ) : searchText ? (
+              <Pressable onPress={() => setSearchText("")} hitSlop={8} testID="address-search-clear">
+                <Icon name="close-circle" size={18} color={colors.muted} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
         {/* Draw controls overlay */}
         {mode === "draw" ? (
           <View style={[styles.drawOverlay, { paddingBottom: insets.bottom + 12 }]} testID="draw-overlay">
@@ -460,8 +511,17 @@ const styles = StyleSheet.create({
   sub: { color: colors.muted, fontSize: 13, marginTop: 2 },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.brandPrimary, paddingHorizontal: 14, height: 40, borderRadius: 999 },
   addBtnText: { color: colors.onBrandPrimary, fontWeight: "700" },
-  gpsBtn: { position: "absolute", right: 12, top: 12, width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 6, elevation: 4, borderWidth: 1, borderColor: colors.border },
+  // Left side, on purpose: MapLibre's own zoom (+/-) control sits top-right,
+  // so a second button there would sit on top of it and hide it.
+  gpsBtn: { position: "absolute", left: 12, top: 12, width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 6, elevation: 4, borderWidth: 1, borderColor: colors.border },
   gpsBtnOn: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
+  searchRow: {
+    position: "absolute", top: 12, left: 64, right: 56, height: 44,
+    flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12,
+    backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
+    shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 6, elevation: 4,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: colors.onSurface, padding: 0 },
   drawOverlay: { position: "absolute", left: 12, right: 12, bottom: 0 },
   drawMeta: { fontSize: 13, color: colors.onSurface, fontWeight: "600", marginTop: spacing.sm },
   drawHint: { fontSize: 12, color: colors.muted, marginTop: 2, fontStyle: "italic" },
