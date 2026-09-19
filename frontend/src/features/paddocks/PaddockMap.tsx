@@ -37,6 +37,7 @@ type Props = {
   onPinPlaced?: (lat: number, lon: number) => void;
   onPointsUpdate?: (count: number, areaHa: number) => void;
   onSaveGeometry?: (geojson: { type: "Polygon"; coordinates: number[][][] }, areaHa: number) => void;
+  onReady?: () => void;
   style?: any;
 };
 
@@ -45,7 +46,7 @@ type Props = {
 // map works in the preview and in Expo Web. Native builds keep using WebView.
 // -----------------------------------------------------------------------------
 const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
-  { paddocks, farmPins, issuePins, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, style }, ref
+  { paddocks, farmPins, issuePins, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady, style }, ref
 ) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
@@ -85,6 +86,7 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
           send({ type: "setPaddocks", paddocks: pending.current });
           send({ type: "setFarmPins", pins: pendingPins.current });
           send({ type: "setIssuePins", pins: pendingIssuePins.current });
+          onReady?.();
           break;
         case "select": onSelect?.(msg.id); break;
         case "farmSelect": onFarmSelect?.(msg.id); break;
@@ -96,7 +98,7 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
     }
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [send, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry]);
+  }, [send, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady]);
 
   const paddocksStr = useMemo(() => JSON.stringify(paddocks), [paddocks]);
   const lastStr = useRef(paddocksStr);
@@ -128,7 +130,7 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
 // Native (iOS/Android): uses react-native-webview.
 // -----------------------------------------------------------------------------
 const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
-  { paddocks, farmPins, issuePins, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, style }, ref
+  { paddocks, farmPins, issuePins, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady, style }, ref
 ) {
   const webviewRef = useRef<WebView>(null);
   const readyRef = useRef(false);
@@ -167,6 +169,7 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
           send({ type: "setPaddocks", paddocks: pendingPaddocks.current });
           send({ type: "setFarmPins", pins: pendingPins.current });
           send({ type: "setIssuePins", pins: pendingIssuePins.current });
+          onReady?.();
           break;
         case "select": onSelect?.(msg.id); break;
         case "farmSelect": onFarmSelect?.(msg.id); break;
@@ -176,7 +179,7 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
         case "save": if (msg.geojson) onSaveGeometry?.(msg.geojson, msg.areaHa ?? 0); break;
       }
     } catch { /* ignore */ }
-  }, [onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, send]);
+  }, [onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady, send]);
 
   const paddocksStr = useMemo(() => JSON.stringify(paddocks), [paddocks]);
   const paddocksStrRef = useRef(paddocksStr);
