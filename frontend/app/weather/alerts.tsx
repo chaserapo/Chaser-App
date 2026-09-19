@@ -101,9 +101,9 @@ export default function AlertsScreen() {
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xxl }}>
         <Card>
           <View style={styles.notice}>
-            <Icon name="information-outline" size={18} color={colors.warning} />
+            <Icon name="information-outline" size={18} color={colors.brandPrimary} />
             <Text style={styles.noticeText}>
-              These preferences are saved now, but delivery isn&apos;t wired up yet — turning one on won&apos;t send you anything until that&apos;s built. (This is separate from maintenance/fault push notifications, which do work today.)
+              Turn any of these on and Chaser checks the forecast in the background and sends you a push notification the first time the condition is met. Make sure notifications are allowed for Chaser in your phone&apos;s settings.
             </Text>
           </View>
         </Card>

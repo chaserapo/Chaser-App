@@ -17,56 +17,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
 
+from routes.weather_fetch import MODELS, fetch_model
+
 logger = logging.getLogger("chaser.weather")
-
-MODELS: List[str] = ["ecmwf_ifs04", "ecmwf_aifs025", "bom_access_global", "gfs_seamless"]
-
-HOURLY_VARS = ",".join([
-    "temperature_2m",
-    "apparent_temperature",
-    "precipitation",
-    "precipitation_probability",
-    "rain",
-    "showers",
-    "snowfall",
-    "wind_speed_10m",
-    "wind_gusts_10m",
-    "wind_direction_10m",
-    "relative_humidity_2m",
-    "dew_point_2m",
-    "cloud_cover",
-    "surface_pressure",
-    "soil_temperature_0cm",
-    "soil_moisture_0_to_1cm",
-    "et0_fao_evapotranspiration",
-])
-
-VAR_MAP = {
-    "temperature_2m": "temperature_c",
-    "apparent_temperature": "apparent_temp_c",
-    "precipitation": "precip_mm",
-    "precipitation_probability": "precip_prob",
-    "rain": "rain_mm",
-    "showers": "showers_mm",
-    "snowfall": "snowfall_cm",
-    "wind_speed_10m": "wind_speed_kmh",
-    "wind_gusts_10m": "wind_gust_kmh",
-    "wind_direction_10m": "wind_dir_deg",
-    "relative_humidity_2m": "humidity_pct",
-    "dew_point_2m": "dew_point_c",
-    "cloud_cover": "cloud_cover_pct",
-    "surface_pressure": "pressure_hpa",
-    "soil_temperature_0cm": "soil_temp_c",
-    "soil_moisture_0_to_1cm": "soil_moisture",
-    "et0_fao_evapotranspiration": "et0_mm",
-}
 
 
 def _cron_hours() -> int:
@@ -112,38 +71,6 @@ async def _sb_post(client: httpx.AsyncClient, conf: Dict[str, str], path: str, b
     return r.json()
 
 
-async def _fetch_model(client: httpx.AsyncClient, model: str, lat: float, lon: float, days: int = 7) -> List[Dict[str, Any]]:
-    url = (
-        f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-        f"&hourly={HOURLY_VARS}&wind_speed_unit=kmh&timezone=auto"
-        f"&forecast_days={days}&models={model}"
-    )
-    r = await client.get(url, timeout=25)
-    r.raise_for_status()
-    j = r.json()
-    times: List[str] = (j.get("hourly") or {}).get("time") or []
-    now = datetime.now(timezone.utc)
-    rows: List[Dict[str, Any]] = []
-    hourly = j.get("hourly") or {}
-    for i, iso in enumerate(times):
-        try:
-            valid = datetime.fromisoformat(iso.replace("Z", "+00:00"))
-        except Exception:
-            continue
-        horizon = int((valid - now).total_seconds() // 3600)
-        row: Dict[str, Any] = {
-            "model": model,
-            "valid_time": valid.isoformat(),
-            "horizon_hours": horizon,
-        }
-        for om_key, chaser_key in VAR_MAP.items():
-            arr = hourly.get(om_key)
-            if isinstance(arr, list) and i < len(arr) and arr[i] is not None:
-                row[chaser_key] = arr[i]
-        rows.append(row)
-    return rows
-
-
 async def _fetch_and_store_for_location(client: httpx.AsyncClient, conf: Dict[str, str], loc: Dict[str, Any]) -> None:
     lat = float(loc["lat"])
     lon = float(loc["lon"])
@@ -152,15 +79,15 @@ async def _fetch_and_store_for_location(client: httpx.AsyncClient, conf: Dict[st
 
     # Fetch every model in parallel; skip any that fail so a single model
     # outage doesn't lose the whole run.
-    tasks = [_fetch_model(client, m, lat, lon) for m in MODELS]
+    tasks = [fetch_model(client, m, lat, lon) for m in MODELS]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     by_model: Dict[str, List[Dict[str, Any]]] = {}
     for m, r in zip(MODELS, results):
         if isinstance(r, Exception):
             logger.warning("weather model %s failed for %s: %s", m, location_id, r)
             continue
-        if r:
-            by_model[m] = r
+        if r and r.get("rows"):
+            by_model[m] = r["rows"]
     if not by_model:
         logger.warning("weather cron: no models returned for %s", location_id)
         return

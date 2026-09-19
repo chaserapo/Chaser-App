@@ -23,8 +23,10 @@ try {
 }
 
 export type ChaserNotificationData = {
-  type: "overdue_maintenance" | "open_fault";
+  type: "overdue_maintenance" | "open_fault" | "spray_window" | "frost" | "wind_max" | "rain_change" | "rain_after_spray";
   machineryId?: string;
+  farmId?: string;
+  jobId?: string;
 };
 
 const projectId = Constants.expoConfig?.extra?.eas?.projectId;
@@ -67,6 +69,10 @@ export function useNotificationRouting() {
         const data = response.notification.request.content.data as ChaserNotificationData | undefined;
         if (data?.machineryId) {
           router.push({ pathname: "/machinery/[id]", params: { id: data.machineryId } });
+        } else if (data?.type === "rain_after_spray" && data.jobId) {
+          router.push({ pathname: "/records/[id]", params: { id: data.jobId } });
+        } else if (data?.type && ["spray_window", "frost", "wind_max", "rain_change"].includes(data.type)) {
+          router.push("/(tabs)/weather");
         }
       });
       return () => sub.remove();
