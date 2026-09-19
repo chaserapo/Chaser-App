@@ -48,6 +48,9 @@ export default function Records() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
       <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn} testID="records-back-btn" hitSlop={8}>
+          <Icon name="chevron-left" size={26} color={colors.onSurface} />
+        </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Spray Records</Text>
           <Text style={styles.sub}>{filtered.length} record{filtered.length === 1 ? "" : "s"}</Text>
@@ -113,6 +116,7 @@ export default function Records() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md, gap: spacing.sm },
+  backBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center", marginRight: -4 },
   title: { fontSize: 26, fontWeight: "800", color: colors.onSurface },
   sub: { fontSize: 13, color: colors.muted, marginTop: 2 },
   newBtn: { flexDirection: "row", alignItems: "center", backgroundColor: colors.brandPrimary, paddingHorizontal: 14, height: 40, borderRadius: 999 },
