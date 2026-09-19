@@ -7,7 +7,7 @@ import { Button, Card, StatusBadge } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo, maintenanceStatus } from "@/src/lib/storage";
 import { useRealtime } from "@/src/lib/realtime";
-import type { Machinery, MaintenanceStatus } from "@/src/lib/types";
+import type { Machinery, MaintenanceStatus, IssueSeverity } from "@/src/lib/types";
 
 type EnrichedMachine = Machinery & {
   status: MaintenanceStatus;
@@ -16,9 +16,11 @@ type EnrichedMachine = Machinery & {
   overdueCount: number;
   totalMaint: number;
   openFaults: number;
+  topFaultSeverity: IssueSeverity | null;
 };
 
 const OPEN_ISSUE_STATUSES = ["open", "assigned", "in_progress"];
+const SEVERITY_RANK: Record<IssueSeverity, number> = { low: 0, medium: 1, high: 2, critical: 3 };
 
 export default function MachineryTab() {
   const insets = useSafeAreaInsets();
@@ -31,7 +33,12 @@ export default function MachineryTab() {
       .filter((x) => !x.archived_at)
       .map((x) => {
         const machMaints = ms.filter((mm) => mm.machinery_id === x.id);
-        const openFaults = issues.filter((i) => i.machinery_id === x.id && OPEN_ISSUE_STATUSES.includes(i.status)).length;
+        const openIssues = issues.filter((i) => i.machinery_id === x.id && OPEN_ISSUE_STATUSES.includes(i.status));
+        const openFaults = openIssues.length;
+        const topFaultSeverity = openIssues.reduce<IssueSeverity | null>((top, i) => {
+          if (!top || SEVERITY_RANK[i.severity] > SEVERITY_RANK[top]) return i.severity;
+          return top;
+        }, null);
         let next: number | undefined;
         let dueCount = 0;
         let overdueCount = 0;
@@ -44,10 +51,15 @@ export default function MachineryTab() {
           if (status === "overdue") overdueCount += 1;
         });
         const overallStatus: MaintenanceStatus = overdueCount > 0 ? "overdue" : dueCount > 0 ? "due_soon" : "good";
-        return { ...x, status: overallStatus, nextService: next, dueCount, overdueCount, totalMaint: machMaints.length, openFaults };
+        return { ...x, status: overallStatus, nextService: next, dueCount, overdueCount, totalMaint: machMaints.length, openFaults, topFaultSeverity };
       });
     enriched.sort((a, b) => {
       if ((a.openFaults > 0) !== (b.openFaults > 0)) return a.openFaults > 0 ? -1 : 1;
+      if (a.openFaults > 0 && b.openFaults > 0) {
+        const aRank = a.topFaultSeverity ? SEVERITY_RANK[a.topFaultSeverity] : -1;
+        const bRank = b.topFaultSeverity ? SEVERITY_RANK[b.topFaultSeverity] : -1;
+        if (aRank !== bRank) return bRank - aRank;
+      }
       const rank = { overdue: 0, due_soon: 1, good: 2 } as const;
       if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
       return a.name.localeCompare(b.name);
@@ -145,8 +157,9 @@ export default function MachineryTab() {
                     ) : null}
                     {item.openFaults > 0 ? (
                       <View style={styles.metric}>
-                        <Icon name="alert-circle" size={12} color={colors.error} />
-                        <Text style={[styles.metricText, { color: colors.error, fontWeight: "700" }]}>
+                        <Icon name={faultSeverityIcon(item.topFaultSeverity) as any} size={12} color={faultSeverityColor(item.topFaultSeverity)} />
+                        <Text style={[styles.metricText, { color: faultSeverityColor(item.topFaultSeverity), fontWeight: "700" }]}>
+                          {item.topFaultSeverity === "critical" ? "CRITICAL · " : ""}
                           {item.openFaults} open fault{item.openFaults === 1 ? "" : "s"}
                         </Text>
                       </View>
@@ -180,6 +193,19 @@ function iconForType(t?: string): string {
     default:
       return "tractor-variant";
   }
+}
+
+function faultSeverityColor(severity: IssueSeverity | null): string {
+  switch (severity) {
+    case "critical": return "#DC2626";
+    case "high": return "#EA580C";
+    case "medium": return colors.warning;
+    default: return colors.error;
+  }
+}
+
+function faultSeverityIcon(severity: IssueSeverity | null): string {
+  return severity === "critical" || severity === "high" ? "alert-octagon" : "alert-circle";
 }
 
 function StatTile({ label, value, tone, icon, testID }: { label: string; value: number; tone: "brand" | "warn" | "danger" | "muted"; icon: string; testID?: string }) {
