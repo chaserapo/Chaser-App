@@ -10,7 +10,7 @@ import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { PaddockMap, PaddockMapHandle } from "@/src/features/paddocks/PaddockMap";
-import { geocodeAddress } from "@/src/lib/geocode";
+import { geocodeAddress } from "@/src/lib/geocoding";
 import type { Paddock, PaddockBoundary, Farm } from "@/src/lib/types";
 
 export default function NewPaddock() {

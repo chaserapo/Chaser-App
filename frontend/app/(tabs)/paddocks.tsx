@@ -13,7 +13,7 @@ import { useAuth } from "@/src/lib/auth-context";
 import { PaddockMap, PaddockMapHandle, FarmPin, IssuePin } from "@/src/features/paddocks/PaddockMap";
 import { supabase } from "@/src/lib/supabase";
 import { issueCategoryIcon, issueCategoryLabel } from "@/src/lib/issue-categories";
-import { geocodeAddress } from "@/src/lib/geocode";
+import { geocodeAddress } from "@/src/lib/geocoding";
 import type { Paddock, PaddockBoundary, Farm, FarmIssue } from "@/src/lib/types";
 
 type Mode = "view" | "draw";

@@ -9,6 +9,8 @@ import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { CHEMICAL_CATEGORIES, ChemicalCategory, RATE_UNITS, RateUnit } from "@/src/lib/types";
 import type { Chemical } from "@/src/lib/types";
+import { ApvmaSearch } from "@/src/features/chemicals/ApvmaSearch";
+import { mapApvmaCategory, type ApvmaProduct } from "@/src/lib/apvma";
 
 export default function NewChemical() {
   const insets = useSafeAreaInsets();
@@ -51,6 +53,18 @@ export default function NewChemical() {
     router.replace({ pathname: "/chemicals/[id]", params: { id: c.id } });
   }
 
+  function applyApvmaProduct(p: ApvmaProduct) {
+    setF({
+      ...f,
+      product_name: p.productName,
+      manufacturer: p.holder || f.manufacturer,
+      apvma_number: p.pcode || f.apvma_number,
+      formulation: p.formulation || f.formulation,
+    });
+    const mapped = mapApvmaCategory(p.category);
+    if (mapped) setType(mapped);
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
       <ScreenHeader title="Add Chemical" back />
@@ -58,6 +72,7 @@ export default function NewChemical() {
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }} keyboardShouldPersistTaps="handled">
 
           <Card>
+            <ApvmaSearch onSelect={applyApvmaProduct} />
             <Input label="Product name*" value={f.product_name} onChangeText={(v) => setF({ ...f, product_name: v })} testID="input-product-name" />
 
             <Text style={styles.label}>Product type*</Text>
