@@ -6,7 +6,6 @@ import { reloadAppAsync } from "expo";
 import { Component, type ErrorInfo, type PropsWithChildren, useState } from "react";
 import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 
-import { Sentry } from "@/src/lib/sentry";
 import { makeStyles } from "@/src/theme";
 
 type ErrorBoundaryState = { error: Error | null };
@@ -20,7 +19,6 @@ export class ErrorBoundary extends Component<PropsWithChildren, ErrorBoundarySta
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error("[ErrorBoundary] render crash:", error, info.componentStack ?? "");
-    Sentry.captureException(error, { contexts: { react: { componentStack: info.componentStack ?? "" } } });
   }
 
   resetError = (): void => {
