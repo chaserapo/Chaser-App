@@ -7,7 +7,7 @@ import { ScreenHeader } from "@/src/components/header";
 import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
-import { CHEMICAL_CATEGORIES, ChemicalCategory, RATE_UNITS, RateUnit } from "@/src/lib/types";
+import { CHEMICAL_CATEGORIES, ChemicalCategory, PACK_SIZE_PRESETS, RATE_UNITS, RateUnit } from "@/src/lib/types";
 import type { Chemical } from "@/src/lib/types";
 import { ApvmaSearch } from "@/src/features/chemicals/ApvmaSearch";
 import { mapApvmaCategory, type ApvmaProduct } from "@/src/lib/apvma";
@@ -114,8 +114,16 @@ export default function NewChemical() {
           <Text style={styles.section}>Inventory</Text>
           <Card>
             <Input label="Pack size" value={f.pack_size} onChangeText={(v) => setF({ ...f, pack_size: v })} placeholder="e.g. 20 L" testID="input-pack" />
+            <Text style={styles.label}>Or pick a common size</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: spacing.md }}>
+              {PACK_SIZE_PRESETS.map((size) => (
+                <Pressable key={size} onPress={() => setF({ ...f, pack_size: size, stock_unit: f.stock_unit.trim() ? f.stock_unit : size })} style={[styles.unitChip, f.pack_size === size && styles.unitChipActive]} testID={`pack-size-${size}`}>
+                  <Text style={[styles.unitText, f.pack_size === size && { color: colors.onBrandPrimary }]}>{size}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
             <View style={{ flexDirection: "row", gap: 8 }}>
-              <View style={{ flex: 1 }}><Input label="Stock quantity" value={f.stock_qty} onChangeText={(v) => setF({ ...f, stock_qty: v })} keyboardType="decimal-pad" testID="input-stock-qty" /></View>
+              <View style={{ flex: 1 }}><Input label="Stock quantity" value={f.stock_qty} onChangeText={(v) => setF({ ...f, stock_qty: v })} keyboardType="decimal-pad" placeholder="e.g. 4" testID="input-stock-qty" /></View>
               <View style={{ flex: 1 }}><Input label="Stock unit" value={f.stock_unit} onChangeText={(v) => setF({ ...f, stock_unit: v })} placeholder="packs, L, kg" testID="input-stock-unit" /></View>
             </View>
             <Input label="Storage location" value={f.storage_location} onChangeText={(v) => setF({ ...f, storage_location: v })} placeholder="e.g. Chem shed A" testID="input-storage" />

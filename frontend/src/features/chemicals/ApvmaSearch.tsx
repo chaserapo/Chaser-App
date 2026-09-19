@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Text, TextInput, Pressable, ActivityIndicator, StyleSheet } from "react-native";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { colors, radius, spacing } from "@/src/theme";
@@ -15,6 +15,10 @@ export function ApvmaSearch({ onSelect }: { onSelect: (p: ApvmaProduct) => void 
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [addedName, setAddedName] = useState<string | null>(null);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (addedTimer.current) clearTimeout(addedTimer.current); }, []);
 
   async function runSearch() {
     const q = query.trim();
@@ -30,6 +34,18 @@ export function ApvmaSearch({ onSelect }: { onSelect: (p: ApvmaProduct) => void 
     } finally {
       setSearching(false);
     }
+  }
+
+  function pick(p: ApvmaProduct) {
+    onSelect(p);
+    // Collapse the results and show a brief confirmation - tapping a result
+    // otherwise gives no feedback that anything happened.
+    setResults([]);
+    setSearched(false);
+    setQuery("");
+    setAddedName(p.productName);
+    if (addedTimer.current) clearTimeout(addedTimer.current);
+    addedTimer.current = setTimeout(() => setAddedName(null), 2500);
   }
 
   return (
@@ -59,6 +75,12 @@ export function ApvmaSearch({ onSelect }: { onSelect: (p: ApvmaProduct) => void 
       </View>
       <Text style={styles.hint}>Or skip this and just type the product details below yourself.</Text>
 
+      {addedName ? (
+        <View style={styles.addedRow} testID="apvma-added-confirm">
+          <Icon name="check-circle" size={16} color={colors.success} />
+          <Text style={styles.addedText}>{addedName} added — check the fields below.</Text>
+        </View>
+      ) : null}
       {searched && !searching && failed ? (
         <Text style={styles.empty}>Couldn&apos;t reach the registry right now — no problem, type the details below.</Text>
       ) : null}
@@ -66,7 +88,7 @@ export function ApvmaSearch({ onSelect }: { onSelect: (p: ApvmaProduct) => void 
         <Text style={styles.empty}>No matches. Try a different spelling, or type the details below.</Text>
       ) : null}
       {results.map((p) => (
-        <Pressable key={p.pcode} onPress={() => onSelect(p)} style={styles.resultRow} testID={`apvma-result-${p.pcode}`}>
+        <Pressable key={p.pcode} onPress={() => pick(p)} style={styles.resultRow} testID={`apvma-result-${p.pcode}`}>
           <View style={{ flex: 1 }}>
             <Text style={styles.resultName}>{p.productName}</Text>
             <Text style={styles.resultMeta}>{[p.holder, p.category].filter(Boolean).join(" · ")} · APVMA {p.pcode}</Text>
@@ -89,6 +111,8 @@ const styles = StyleSheet.create({
   searchBtn: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" },
   searchBtnDisabled: { opacity: 0.5 },
   hint: { fontSize: 11, color: colors.muted, fontStyle: "italic", marginTop: 6 },
+  addedRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.sm },
+  addedText: { fontSize: 12, color: colors.success, fontWeight: "700" },
   empty: { fontSize: 12, color: colors.muted, marginTop: spacing.sm, fontStyle: "italic" },
   resultRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4 },
   resultName: { fontSize: 13, fontWeight: "700", color: colors.onSurface },
