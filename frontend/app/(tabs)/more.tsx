@@ -131,25 +131,26 @@ export default function More() {
 
             <Text style={styles.sectionTitle}>Team</Text>
             <Card style={{ padding: 0, overflow: "hidden" }}>
-              <Pressable onPress={() => router.push("/team")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-team-btn">
+              <Pressable onPress={() => router.push("/(tabs)/team")} style={({ pressed }) => [styles.row, styles.rowBorder, pressed && { backgroundColor: colors.surface }]} testID="open-team-roster-btn">
                 <Icon name="account-group-outline" size={22} color={colors.brandPrimary} />
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={[styles.rowText, { marginLeft: 0 }]}>Team Members</Text>
+                  <Text style={[styles.rowText, { marginLeft: 0 }]}>Team Roster</Text>
+                  <Text style={styles.rowSub}>People, skills, tasks & work history</Text>
+                </View>
+                <Icon name="chevron-right" size={22} color={colors.muted} />
+              </Pressable>
+              <Pressable onPress={() => router.push("/team")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-team-btn">
+                <Icon name="shield-account-outline" size={22} color={colors.brandPrimary} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.rowText, { marginLeft: 0 }]}>Manage Access</Text>
                   <Text style={styles.rowSub}>
                     {business?.role === "owner"
-                      ? "Invite and manage the people on your farm"
-                      : "View who's on this farm"}
+                      ? "Invite people and manage who can log into Chaser"
+                      : "See who has access to Chaser"}
                   </Text>
                 </View>
                 <Icon name="chevron-right" size={22} color={colors.muted} />
               </Pressable>
-              {business?.role === "owner" ? (
-                <Pressable onPress={() => router.push("/team")} style={({ pressed }) => [styles.row, styles.rowBorder, { borderBottomWidth: 0, borderTopWidth: 1, borderTopColor: colors.border }, pressed && { backgroundColor: colors.surface }]} testID="invite-team-btn">
-                  <Icon name="email-plus-outline" size={22} color={colors.brandPrimary} />
-                  <Text style={styles.rowText}>Invite team member</Text>
-                  <Icon name="chevron-right" size={22} color={colors.muted} />
-                </Pressable>
-              ) : null}
             </Card>
           </>
         ) : null}
