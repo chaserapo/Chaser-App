@@ -13,7 +13,7 @@
 //                    { type: "undo" | "clear" | "save" | "cancel" } |
 //                    { type: "setPosition", lat, lon } |
 //                    { type: "setReportPin", lat, lon } | { type: "clearReportPin" } |
-//                    { type: "focusPaddock", id }
+//                    { type: "focusPaddock", id } | { type: "flyTo", lat, lon, zoom }
 //   WebView -> RN:  { type: "ready" } | { type: "select", id } |
 //                    { type: "farmSelect", id } | { type: "issueSelect", id } |
 //                    { type: "pinPlaced", lat, lon } |
@@ -342,6 +342,11 @@ export const MAP_HTML = `<!doctype html>
           }
           break;
         }
+        case 'flyTo':
+          if (typeof msg.lon === 'number' && typeof msg.lat === 'number') {
+            map.easeTo({ center: [msg.lon, msg.lat], zoom: msg.zoom || 14 });
+          }
+          break;
       }
     }
 

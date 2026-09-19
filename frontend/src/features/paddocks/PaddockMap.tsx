@@ -22,6 +22,7 @@ export type PaddockMapHandle = {
   addPoint: (lat: number, lon: number) => void;
   setPosition: (lat: number, lon: number, recenter?: boolean) => void;
   focusPaddock: (id: string) => void;
+  flyTo: (lat: number, lon: number, zoom?: number) => void;
   setReportPin: (lat: number, lon: number) => void;
   clearReportPin: () => void;
 };
@@ -68,6 +69,7 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
     addPoint: (lat, lon) => send({ type: "addPoint", lat, lon }),
     setPosition: (lat, lon, recenter) => send({ type: "setPosition", lat, lon, recenter }),
     focusPaddock: (id) => send({ type: "focusPaddock", id }),
+    flyTo: (lat, lon, zoom) => send({ type: "flyTo", lat, lon, zoom }),
     setReportPin: (lat, lon) => send({ type: "setReportPin", lat, lon }),
     clearReportPin: () => send({ type: "clearReportPin" }),
   }), [send]);
@@ -151,6 +153,7 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
     addPoint: (lat, lon) => send({ type: "addPoint", lat, lon }),
     setPosition: (lat, lon, recenter) => send({ type: "setPosition", lat, lon, recenter }),
     focusPaddock: (id) => send({ type: "focusPaddock", id }),
+    flyTo: (lat, lon, zoom) => send({ type: "flyTo", lat, lon, zoom }),
     setReportPin: (lat, lon) => send({ type: "setReportPin", lat, lon }),
     clearReportPin: () => send({ type: "clearReportPin" }),
   }), [send]);
