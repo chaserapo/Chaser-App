@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "au.com.chaserag.chaser",
-      "buildNumber": "21",
+      "buildNumber": "22",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Chaser uses your location to capture weather at your paddock and record spray-job GPS.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Chaser uses your location to record paddock boundaries and capture weather during a spray job.",
