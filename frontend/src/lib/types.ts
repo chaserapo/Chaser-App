@@ -199,6 +199,10 @@ export type Maintenance = {
 export type RateUnit = "L/ha" | "mL/ha" | "kg/ha" | "g/ha" | "mL/100 L" | "L/100 L" | "%v/v" | "Custom";
 export const RATE_UNITS: RateUnit[] = ["L/ha", "mL/ha", "kg/ha", "g/ha", "mL/100 L", "L/100 L", "%v/v", "Custom"];
 
+// Common ag-chem pack sizes, offered as quick-select chips when recording
+// stock so a farmer isn't typing "20 L" by hand every time.
+export const PACK_SIZE_PRESETS: string[] = ["1 L", "5 L", "10 L", "15 L", "20 L", "110 L", "200 L", "1000 L", "500 g", "1 kg", "5 kg", "10 kg", "20 kg", "25 kg"];
+
 export type SprayJobProduct = {
   id: ID;
   chemical_id: ID;
