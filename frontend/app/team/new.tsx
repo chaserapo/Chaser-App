@@ -1,34 +1,53 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, Pressable, KeyboardAvoidingView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { v4 as uuid } from "uuid";
 import { ScreenHeader } from "@/src/components/header";
 import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { getActiveBusinessId } from "@/src/lib/backend";
-import { saveTeamMember, type EmploymentType } from "@/src/lib/team";
+import { getTeamMember, saveTeamMember, type EmploymentType } from "@/src/lib/team";
 
 const EMPLOYMENT: EmploymentType[] = ["employee", "contractor", "casual"];
 
 export default function NewTeamMember() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { memberId } = useLocalSearchParams<{ memberId?: string }>();
+  const isEdit = !!memberId;
   const [employment, setEmployment] = useState<EmploymentType>("employee");
   const [saving, setSaving] = useState(false);
   const [f, setF] = useState({
-    name: "", phone: "", role: "", licences: "", chemical: "", machinery: "",
+    name: "", phone: "", role: "", start_date: "", licences: "", chemical: "", machinery: "",
     emergency_name: "", emergency_phone: "", emergency_relationship: "", availability: "Available", notes: "",
   });
+
+  useFocusEffect(useCallback(() => {
+    if (!memberId) return;
+    getTeamMember(memberId).then((m) => {
+      if (!m) return;
+      setF({
+        name: m.name, phone: m.phone ?? "", role: m.role ?? "", start_date: m.start_date ?? "",
+        licences: (m.licences_qualifications ?? []).join(", "), chemical: m.chemical_accreditation ?? "",
+        machinery: (m.machinery_competencies ?? []).join(", "),
+        emergency_name: m.emergency_contact_name ?? "", emergency_phone: m.emergency_contact_phone ?? "",
+        emergency_relationship: m.emergency_contact_relationship ?? "", availability: m.availability ?? "", notes: m.notes ?? "",
+      });
+      if (m.employment_type) setEmployment(m.employment_type);
+    });
+  }, [memberId]));
 
   async function save() {
     const businessId = getActiveBusinessId();
     if (!businessId || !f.name.trim()) return;
     setSaving(true);
     try {
+      const existing = memberId ? await getTeamMember(memberId) : null;
       await saveTeamMember({
-        id: uuid(), business_id: businessId, name: f.name.trim(), phone: f.phone || null,
+        id: memberId ?? uuid(), business_id: businessId, name: f.name.trim(), phone: f.phone || null,
         role: f.role || null, employment_type: employment,
+        start_date: f.start_date || null,
         licences_qualifications: f.licences.split(",").map((x) => x.trim()).filter(Boolean),
         chemical_accreditation: f.chemical || null,
         machinery_competencies: f.machinery.split(",").map((x) => x.trim()).filter(Boolean),
@@ -37,7 +56,8 @@ export default function NewTeamMember() {
         emergency_contact_relationship: f.emergency_relationship || null,
         availability: f.availability || null,
         notes: f.notes || null,
-        created_at: new Date().toISOString(),
+        archived_at: existing?.archived_at,
+        created_at: existing?.created_at ?? new Date().toISOString(),
       });
       router.back();
     } finally { setSaving(false); }
@@ -45,13 +65,14 @@ export default function NewTeamMember() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
-      <ScreenHeader title="Add Team Member" back />
+      <ScreenHeader title={isEdit ? "Edit Team Member" : "Add Team Member"} back />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }} keyboardShouldPersistTaps="handled">
           <Card>
             <Input label="Team member name*" value={f.name} onChangeText={(v) => setF({ ...f, name: v })} testID="team-name" />
             <Input label="Phone" value={f.phone} onChangeText={(v) => setF({ ...f, phone: v })} keyboardType="phone-pad" testID="team-phone" />
             <Input label="Role" value={f.role} onChangeText={(v) => setF({ ...f, role: v })} placeholder="e.g. Farm hand, Manager, Spray operator" testID="team-role" />
+            <Input label="Start date" value={f.start_date} onChangeText={(v) => setF({ ...f, start_date: v })} placeholder="YYYY-MM-DD (optional)" testID="team-start-date" />
 
             <Text style={styles.label}>Employment type</Text>
             <View style={styles.chips}>{EMPLOYMENT.map((x) => <Pressable key={x} onPress={() => setEmployment(x)} style={[styles.chip, employment === x && styles.chipOn]}><Text style={[styles.chipText, employment === x && styles.chipTextOn]}>{x[0].toUpperCase() + x.slice(1)}</Text></Pressable>)}</View>
@@ -75,7 +96,7 @@ export default function NewTeamMember() {
           </Card>
 
           <View style={{ height: spacing.md }} />
-          <Button title="Save Team Member" icon="content-save-outline" onPress={save} loading={saving} disabled={saving || !f.name.trim()} testID="save-team-member" />
+          <Button title={isEdit ? "Save Changes" : "Save Team Member"} icon="content-save-outline" onPress={save} loading={saving} disabled={saving || !f.name.trim()} testID="save-team-member" />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

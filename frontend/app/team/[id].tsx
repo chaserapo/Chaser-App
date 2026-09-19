@@ -1,23 +1,26 @@
 import { useCallback, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
 import { Card } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
-import { getTeamActivity, getTeamMember, setTeamMemberActive, type TeamActivity, type TeamMember } from "@/src/lib/team";
+import { getTeamActivity, getTeamMember, setTeamMemberActive, formatTenure, type TeamActivity, type TeamMember } from "@/src/lib/team";
+import { listTasksForMember, setTaskStatus, type Task } from "@/src/lib/tasks";
 
 export default function TeamMemberDetail() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [member, setMember] = useState<TeamMember | null>(null);
   const [activity, setActivity] = useState<TeamActivity>({ assignedJobs: [], recentJobs: [], incidents: [], prestarts: [] });
+  const [tasks, setTasks] = useState<Task[]>([]);
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [m, a] = await Promise.all([getTeamMember(id), getTeamActivity(id)]);
-    setMember(m); setActivity(a);
+    const [m, a, t] = await Promise.all([getTeamMember(id), getTeamActivity(id), listTasksForMember(id)]);
+    setMember(m); setActivity(a); setTasks(t);
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -35,7 +38,15 @@ export default function TeamMemberDetail() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
-      <ScreenHeader title={member.name} back />
+      <ScreenHeader
+        title={member.name}
+        back
+        right={
+          <Pressable onPress={() => router.push({ pathname: "/team/new", params: { memberId: member.id } })} testID="edit-team-member-btn">
+            <Icon name="pencil" size={22} color={colors.brandPrimary} />
+          </Pressable>
+        }
+      />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}>
         <Card>
           <View style={styles.profileTop}>
@@ -46,6 +57,7 @@ export default function TeamMemberDetail() {
               <View style={[styles.status, member.archived_at ? styles.statusOff : styles.statusOn]}><Text style={styles.statusText}>{member.archived_at ? "INACTIVE" : "ACTIVE"}</Text></View>
             </View>
           </View>
+          {formatTenure(member.start_date) ? <Field label="On the team" value={formatTenure(member.start_date)} /> : null}
           <Field label="Phone" value={member.phone} />
           <Field label="Availability" value={member.availability} />
           <Field label="Chemical accreditation" value={member.chemical_accreditation} />
@@ -61,6 +73,25 @@ export default function TeamMemberDetail() {
             <Field label="Relationship" value={member.emergency_contact_relationship} />
           </Card>
         </> : null}
+
+        <View style={styles.sectionRow}>
+          <Text style={styles.section}>Assigned tasks</Text>
+          <Pressable onPress={() => router.push({ pathname: "/tasks/new", params: { memberId: member.id } })} hitSlop={8} testID="assign-task-btn">
+            <Text style={styles.link}>+ Assign task</Text>
+          </Pressable>
+        </View>
+        {tasks.length === 0 ? <Card><Text style={styles.empty}>No open tasks assigned.</Text></Card> : tasks.map((t) => (
+          <Card key={t.id} style={styles.itemCard} testID={`member-task-${t.id}`}>
+            <View style={styles.iconRow}>
+              <Pressable onPress={async () => { await setTaskStatus(t.id, t.status === "in_progress" ? "done" : "in_progress"); await load(); }} testID={`member-task-toggle-${t.id}`}>
+                <Icon name={t.status === "in_progress" ? "progress-clock" : "circle-outline"} size={20} color={t.status === "in_progress" ? colors.warning : colors.muted} />
+              </Pressable>
+              <Text style={styles.itemTitle}>{t.title}</Text>
+            </View>
+            {t.due_date ? <Text style={styles.itemMeta}>Due {t.due_date}</Text> : null}
+            {t.description ? <Text style={styles.itemLine}>{t.description}</Text> : null}
+          </Card>
+        ))}
 
         <Text style={styles.section}>Assigned jobs</Text>
         {activity.assignedJobs.length === 0 ? <Card><Text style={styles.empty}>No assigned or active jobs.</Text></Card> : activity.assignedJobs.map((j) => (
@@ -120,6 +151,8 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 10, fontWeight: "800", color: colors.muted, textTransform: "uppercase" },
   fieldValue: { fontSize: 14, color: colors.onSurface, marginTop: 3 },
   section: { fontSize: 13, fontWeight: "800", color: colors.muted, marginTop: spacing.lg, marginBottom: spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 },
+  sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  link: { color: colors.brandPrimary, fontWeight: "700", fontSize: 13 },
   empty: { color: colors.muted, textAlign: "center", paddingVertical: spacing.md },
   itemCard: { marginBottom: spacing.sm },
   itemTitle: { fontSize: 14, fontWeight: "800", color: colors.onSurface },
