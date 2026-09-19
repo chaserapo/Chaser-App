@@ -24,6 +24,7 @@ export default function MachineDetail() {
   const [completions, setCompletions] = useState<MaintenanceCompletion[]>([]);
   const [issues, setIssues] = useState<FarmIssue[]>([]);
   const [editing, setEditing] = useState(false);
+  const [fenceJets, setFenceJets] = useState<0 | 1 | 2>(0);
   const [ef, setEf] = useState({
     name: "", machine_type: "Tractor" as MachineType,
     make: "", model: "", year: "", serial_number: "", registration: "",
@@ -51,6 +52,18 @@ export default function MachineDetail() {
     external_platform: mm.external_platform ?? "",
     external_machine_id: mm.external_machine_id ?? "",
   });
+
+  // Auto-fill "# of nozzles" from boom width ÷ nozzle spacing, plus however
+  // many fence jets are ticked - those sit at the boom ends outside the
+  // regular spacing pattern. Still a plain editable field afterwards. Fence
+  // jet count itself isn't stored - it's just a helper for this calculation.
+  function recomputeNozzleCount(boomStr: string, spacingStr: string, fj: 0 | 1 | 2) {
+    const boomM = parseFloat(boomStr);
+    const spacingMm = parseFloat(spacingStr);
+    if (!boomM || !spacingMm) return;
+    const mainCount = Math.round(boomM / (spacingMm / 1000));
+    setEf((prev) => ({ ...prev, nozzle_positions: String(mainCount + fj) }));
+  }
 
   useFocusEffect(useCallback(() => {
     if (!id) return;
@@ -138,7 +151,7 @@ export default function MachineDetail() {
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
       <ScreenHeader title={m.name} back right={
         !editing ? (
-          <Pressable onPress={() => setEditing(true)} testID="edit-machine-btn"><Icon name="pencil" size={22} color={colors.brandPrimary} /></Pressable>
+          <Pressable onPress={() => { setFenceJets(0); setEditing(true); }} testID="edit-machine-btn"><Icon name="pencil" size={22} color={colors.brandPrimary} /></Pressable>
         ) : null
       } />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }} keyboardShouldPersistTaps="handled">
@@ -174,12 +187,23 @@ export default function MachineDetail() {
                 <Card>
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     <View style={{ flex: 1 }}><Input label="Tank capacity" value={ef.tank_capacity_l} onChangeText={(v) => setEf({ ...ef, tank_capacity_l: v })} keyboardType="decimal-pad" suffix="L" testID="edit-tank" /></View>
-                    <View style={{ flex: 1 }}><Input label="Boom width" value={ef.boom_width_m} onChangeText={(v) => setEf({ ...ef, boom_width_m: v })} keyboardType="decimal-pad" suffix="m" testID="edit-boom" /></View>
+                    <View style={{ flex: 1 }}><Input label="Boom width" value={ef.boom_width_m} onChangeText={(v) => { setEf({ ...ef, boom_width_m: v }); recomputeNozzleCount(v, ef.nozzle_spacing_m, fenceJets); }} keyboardType="decimal-pad" suffix="m" testID="edit-boom" /></View>
                   </View>
                   <View style={{ flexDirection: "row", gap: 8 }}>
-                    <View style={{ flex: 1 }}><Input label="Nozzle spacing" value={ef.nozzle_spacing_m} onChangeText={(v) => setEf({ ...ef, nozzle_spacing_m: v })} keyboardType="decimal-pad" suffix="mm" testID="edit-spacing" /></View>
-                    <View style={{ flex: 1 }}><Input label="Nozzle positions" value={ef.nozzle_positions} onChangeText={(v) => setEf({ ...ef, nozzle_positions: v })} keyboardType="numeric" testID="edit-positions" /></View>
+                    <View style={{ flex: 1 }}><Input label="Nozzle spacing" value={ef.nozzle_spacing_m} onChangeText={(v) => { setEf({ ...ef, nozzle_spacing_m: v }); recomputeNozzleCount(ef.boom_width_m, v, fenceJets); }} keyboardType="decimal-pad" suffix="mm" testID="edit-spacing" /></View>
+                    <View style={{ flex: 1 }}><Input label="# of nozzles" value={ef.nozzle_positions} onChangeText={(v) => setEf({ ...ef, nozzle_positions: v })} keyboardType="numeric" testID="edit-positions" /></View>
                   </View>
+                  <Text style={styles.editLabel}>Fence jet nozzles</Text>
+                  <View style={{ flexDirection: "row", gap: 8, marginBottom: spacing.sm }}>
+                    {([0, 1, 2] as const).map((n) => (
+                      <Pressable key={n} onPress={() => { setFenceJets(n); recomputeNozzleCount(ef.boom_width_m, ef.nozzle_spacing_m, n); }} style={[styles.typeChip, { flex: 1 }, fenceJets === n && styles.typeChipActive]} testID={`edit-fence-jets-${n}`}>
+                        <Text style={[styles.typeChipText, fenceJets === n && { color: colors.onBrandPrimary }]}>{n}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Text style={styles.helperText}>
+                    Fence jets sit at the boom ends spraying outward, outside the regular nozzle spacing. &quot;# of nozzles&quot; auto-fills from boom width ÷ spacing + fence jets — edit it directly if it doesn&apos;t match your setup.
+                  </Text>
                   <Input label="Default nozzle" value={ef.default_nozzle} onChangeText={(v) => setEf({ ...ef, default_nozzle: v })} testID="edit-def-nozzle" />
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     <View style={{ flex: 1 }}><Input label="Default speed" value={ef.default_speed_kmh} onChangeText={(v) => setEf({ ...ef, default_speed_kmh: v })} keyboardType="decimal-pad" suffix="km/h" testID="edit-def-speed" /></View>
@@ -201,7 +225,7 @@ export default function MachineDetail() {
             <View style={{ height: spacing.md }} />
             <Button title="Save Changes" icon="content-save-outline" onPress={saveEdit} disabled={!ef.name.trim()} testID="save-machine-edit-btn" />
             <View style={{ height: spacing.sm }} />
-            <Button title="Cancel" variant="outline" onPress={() => { setEditing(false); loadFields(m); }} testID="cancel-machine-edit-btn" />
+            <Button title="Cancel" variant="outline" onPress={() => { setEditing(false); setFenceJets(0); loadFields(m); }} testID="cancel-machine-edit-btn" />
             <View style={{ height: spacing.md }} />
             <Button title="Delete Machine" variant="danger" icon="trash-can-outline" onPress={confirmDelete} testID="delete-machine-btn" />
           </>
@@ -235,7 +259,7 @@ export default function MachineDetail() {
                   <Field label="Tank capacity" value={m.tank_capacity_l != null ? `${m.tank_capacity_l} L` : undefined} />
                   <Field label="Boom width" value={m.boom_width_m != null ? `${m.boom_width_m} m` : undefined} />
                   <Field label="Nozzle spacing" value={m.nozzle_spacing_m != null ? `${Math.round(m.nozzle_spacing_m * 1000)} mm` : undefined} />
-                  <Field label="Nozzle positions" value={m.nozzle_positions} />
+                  <Field label="# of nozzles" value={m.nozzle_positions} />
                   <Field label="Default nozzle" value={m.default_nozzle} />
                   <Field label="Default speed" value={m.default_speed_kmh != null ? `${m.default_speed_kmh} km/h` : undefined} />
                   <Field label="Default water rate" value={m.default_water_rate_lha != null ? `${m.default_water_rate_lha} L/ha` : undefined} />

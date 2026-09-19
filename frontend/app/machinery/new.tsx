@@ -39,6 +39,7 @@ export default function NewMachine() {
   const [pwm, setPwm] = useState(false);
   const [spotWidth, setSpotWidth] = useState("0.5");
   const [treatedPct, setTreatedPct] = useState("10");
+  const [fenceJets, setFenceJets] = useState<0 | 1 | 2>(0);
   const [bodyType, setBodyType] = useState<NozzleBodyType>("single");
   const [bodyNozzles, setBodyNozzles] = useState<string[]>(["", "", "", "", ""]);
   const [defaultPosition, setDefaultPosition] = useState(1);
@@ -54,6 +55,17 @@ export default function NewMachine() {
 
   const isSprayer = type === "Self-propelled sprayer" || type === "Tow-behind sprayer";
   const bodyCount = BODY_TYPES.find((x) => x.key === bodyType)?.count ?? 1;
+
+  // Auto-fill "# of nozzles" from boom width ÷ nozzle spacing, plus however
+  // many fence jets are ticked - those sit at the boom ends outside the
+  // regular spacing pattern. Still a plain editable field afterwards.
+  function recomputeNozzleCount(boomStr: string, spacingStr: string, fj: 0 | 1 | 2) {
+    const boomM = parseFloat(boomStr);
+    const spacingMm = parseFloat(spacingStr);
+    if (!boomM || !spacingMm) return;
+    const mainCount = Math.round(boomM / (spacingMm / 1000));
+    setF((prev) => ({ ...prev, nozzle_positions: String(mainCount + fj) }));
+  }
   const activeNozzleId = bodyNozzles[Math.max(0, defaultPosition - 1)] || "";
   const activeNozzle = NOZZLES.find((n) => n.id === activeNozzleId) ?? null;
 
@@ -155,8 +167,11 @@ export default function NewMachine() {
           {isSprayer ? <>
             <Text style={styles.section}>Sprayer setup</Text>
             <Card>
-              <View style={styles.twoCol}><View style={{ flex: 1 }}><Input label="Tank capacity" value={f.tank_capacity_l} onChangeText={(v) => setF({ ...f, tank_capacity_l: v })} keyboardType="decimal-pad" suffix="L" /></View><View style={{ flex: 1 }}><Input label="Boom width" value={f.boom_width_m} onChangeText={(v) => setF({ ...f, boom_width_m: v })} keyboardType="decimal-pad" suffix="m" /></View></View>
-              <View style={styles.twoCol}><View style={{ flex: 1 }}><Input label="Nozzle spacing" value={f.nozzle_spacing_m} onChangeText={(v) => setF({ ...f, nozzle_spacing_m: v })} keyboardType="decimal-pad" suffix="mm" /></View><View style={{ flex: 1 }}><Input label="Nozzle positions across boom" value={f.nozzle_positions} onChangeText={(v) => setF({ ...f, nozzle_positions: v })} keyboardType="numeric" /></View></View>
+              <View style={styles.twoCol}><View style={{ flex: 1 }}><Input label="Tank capacity" value={f.tank_capacity_l} onChangeText={(v) => setF({ ...f, tank_capacity_l: v })} keyboardType="decimal-pad" suffix="L" /></View><View style={{ flex: 1 }}><Input label="Boom width" value={f.boom_width_m} onChangeText={(v) => { setF({ ...f, boom_width_m: v }); recomputeNozzleCount(v, f.nozzle_spacing_m, fenceJets); }} keyboardType="decimal-pad" suffix="m" /></View></View>
+              <View style={styles.twoCol}><View style={{ flex: 1 }}><Input label="Nozzle spacing" value={f.nozzle_spacing_m} onChangeText={(v) => { setF({ ...f, nozzle_spacing_m: v }); recomputeNozzleCount(f.boom_width_m, v, fenceJets); }} keyboardType="decimal-pad" suffix="mm" /></View><View style={{ flex: 1 }}><Input label="# of nozzles" value={f.nozzle_positions} onChangeText={(v) => setF({ ...f, nozzle_positions: v })} keyboardType="numeric" /></View></View>
+              <Text style={styles.label}>Fence jet nozzles</Text>
+              <View style={styles.twoColThree}>{([0, 1, 2] as const).map((n) => <Pressable key={n} onPress={() => { setFenceJets(n); recomputeNozzleCount(f.boom_width_m, f.nozzle_spacing_m, n); }} style={[styles.chip, styles.thirdChip, fenceJets === n && styles.chipActive]} testID={`fence-jets-${n}`}><Text style={[styles.chipText, fenceJets === n && styles.chipTextActive]}>{n}</Text></Pressable>)}</View>
+              <Text style={styles.hint}>Fence jets sit at the boom ends spraying outward, outside the regular nozzle spacing. "# of nozzles" auto-fills from boom width ÷ spacing + fence jets - edit it directly if it doesn't match your setup.</Text>
               <View style={styles.twoCol}><View style={{ flex: 1 }}><Input label="Typical speed" value={f.default_speed_kmh} onChangeText={(v) => setF({ ...f, default_speed_kmh: v })} keyboardType="decimal-pad" suffix="km/h" /></View><View style={{ flex: 1 }}><Input label="Typical water rate" value={f.default_water_rate_lha} onChangeText={(v) => setF({ ...f, default_water_rate_lha: v })} keyboardType="decimal-pad" suffix="L/ha" /></View></View>
             </Card>
 
@@ -210,6 +225,8 @@ const styles = StyleSheet.create({
   label: { fontSize: 12, color: colors.muted, marginBottom: 6, marginTop: 8, fontWeight: "700" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
   twoCol: { flexDirection: "row", gap: 8 },
+  twoColThree: { flexDirection: "row", gap: 8, marginBottom: spacing.sm },
+  thirdChip: { flex: 1 },
   chip: { paddingHorizontal: 12, minHeight: 36, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, alignItems: "center", justifyContent: "center" },
   chipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
   chipText: { fontSize: 12, fontWeight: "700", color: colors.onSurfaceTertiary }, chipTextActive: { color: colors.onBrandPrimary },
