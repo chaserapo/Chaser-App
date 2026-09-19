@@ -13,6 +13,7 @@ import { useAuth } from "@/src/lib/auth-context";
 import { PaddockMap, PaddockMapHandle, FarmPin, IssuePin } from "@/src/features/paddocks/PaddockMap";
 import { supabase } from "@/src/lib/supabase";
 import { issueCategoryIcon, issueCategoryLabel } from "@/src/lib/issue-categories";
+import { geocodeAddress } from "@/src/lib/geocode";
 import type { Paddock, PaddockBoundary, Farm, FarmIssue } from "@/src/lib/types";
 
 type Mode = "view" | "draw";
@@ -36,6 +37,7 @@ export default function PaddocksTab() {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [crop, setCrop] = useState("");
+  const [drawFarmId, setDrawFarmId] = useState<string | null>(null);
   const [gpsOn, setGpsOn] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [searching, setSearching] = useState(false);
@@ -174,14 +176,9 @@ export default function PaddocksTab() {
     if (!q) return;
     setSearching(true);
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
-        { headers: { "Accept-Language": "en" } },
-      );
-      const results = await res.json();
-      const first = Array.isArray(results) ? results[0] : null;
-      if (first) {
-        mapRef.current?.flyTo(parseFloat(first.lat), parseFloat(first.lon), 15);
+      const loc = await geocodeAddress(q);
+      if (loc) {
+        mapRef.current?.flyTo(loc.lat, loc.lon, 15);
       } else {
         alert("No results found for that search.");
       }
@@ -194,7 +191,7 @@ export default function PaddocksTab() {
 
   function startDraw() {
     if (!canEdit) return;
-    setSelectedId(null); setName(""); setCrop("");
+    setSelectedId(null); setName(""); setCrop(""); setDrawFarmId(null);
     setMode("draw"); mapRef.current?.setMode("draw");
     mapRef.current?.clear();
   }
@@ -216,7 +213,7 @@ export default function PaddocksTab() {
       const p: Paddock = {
         id: uuid(),
         business_id: business.id,
-        farm_id: null,
+        farm_id: drawFarmId,
         name: name.trim(),
         area_ha: Math.round(areaHa * 100) / 100,
         crop: crop.trim() || undefined,
@@ -399,6 +396,30 @@ export default function PaddocksTab() {
             <Card style={{ marginBottom: 8 }}>
               <Input label="Paddock name*" value={name} onChangeText={setName} placeholder="e.g. North 40" testID="draw-name" />
               <Input label="Crop (optional)" value={crop} onChangeText={setCrop} placeholder="e.g. Wheat" testID="draw-crop" />
+              {farms.length > 0 ? (
+                <>
+                  <Text style={styles.drawFieldLabel}>Farm</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.farmChipRow}>
+                    <Pressable
+                      onPress={() => setDrawFarmId(null)}
+                      style={[styles.farmChip, drawFarmId === null && styles.farmChipActive]}
+                      testID="draw-farm-unassigned"
+                    >
+                      <Text style={[styles.farmChipText, drawFarmId === null && styles.farmChipTextActive]}>Unassigned</Text>
+                    </Pressable>
+                    {farms.map((fm) => (
+                      <Pressable
+                        key={fm.id}
+                        onPress={() => setDrawFarmId(fm.id)}
+                        style={[styles.farmChip, drawFarmId === fm.id && styles.farmChipActive]}
+                        testID={`draw-farm-${fm.id}`}
+                      >
+                        <Text style={[styles.farmChipText, drawFarmId === fm.id && styles.farmChipTextActive]}>{fm.name}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </>
+              ) : null}
               <Text style={styles.drawMeta}>
                 {drawInfo.count === 0
                   ? "Tap the map to add corner points, or hit Drive to record while driving the boundary."
@@ -522,6 +543,12 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 6, elevation: 4,
   },
   searchInput: { flex: 1, fontSize: 14, color: colors.onSurface, padding: 0 },
+  drawFieldLabel: { fontSize: 13, fontWeight: "700", color: colors.onSurfaceTertiary, marginBottom: 6, marginTop: 4 },
+  farmChipRow: { gap: 8, paddingBottom: 4 },
+  farmChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary },
+  farmChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
+  farmChipText: { color: colors.onSurfaceTertiary, fontSize: 12, fontWeight: "700" },
+  farmChipTextActive: { color: colors.onBrandPrimary },
   drawOverlay: { position: "absolute", left: 12, right: 12, bottom: 0 },
   drawMeta: { fontSize: 13, color: colors.onSurface, fontWeight: "600", marginTop: spacing.sm },
   drawHint: { fontSize: 12, color: colors.muted, marginTop: 2, fontStyle: "italic" },
