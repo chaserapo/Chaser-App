@@ -292,7 +292,7 @@ export default function MachineDetail() {
 
             <View style={styles.sectionRow}>
               <Text style={styles.sectionTitle}>Maintenance Schedule</Text>
-              <Pressable onPress={() => router.push({ pathname: "/machinery/maintenance-new", params: { machineId: m.id } })} testID="add-maint-btn" hitSlop={8}>
+              <Pressable onPress={() => router.push({ pathname: "/machinery/service-new", params: { machineId: m.id } })} testID="add-maint-btn" hitSlop={8}>
                 <Text style={styles.link}>+ Add</Text>
               </Pressable>
             </View>
