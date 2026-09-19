@@ -149,15 +149,19 @@ const MAP: Record<string, keyof HourlyVars> = {
 };
 
 // ─── Fetcher ───────────────────────────────────────────────────────────────
-async function fetchOne(model: ModelId, lat: number, lon: number, horizonH: number): Promise<ModelHour[]> {
-  const days = Math.max(1, Math.ceil(horizonH / 24));
+// Each model's request pulls a full week of hourly data across 17 variables -
+// a sizeable payload. On a weak mobile connection, four of these fired in
+// parallel can easily have some finish well after the others; a short
+// timeout turns "slow" into "silently missing" for whichever models lose the
+// race. Give it real room, and retry once before giving up entirely.
+async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: number, timeoutMs: number): Promise<ModelHour[]> {
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     `&hourly=${HOURLY_VARS}` +
     `&wind_speed_unit=kmh&timezone=auto&forecast_days=${days}` +
     `&models=${model}`;
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), 12_000);
+  const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) throw new Error(`open-meteo ${model} ${res.status}`);
@@ -183,6 +187,18 @@ async function fetchOne(model: ModelId, lat: number, lon: number, horizonH: numb
     return hours;
   } finally {
     clearTimeout(t);
+  }
+}
+
+async function fetchOne(model: ModelId, lat: number, lon: number, horizonH: number): Promise<ModelHour[]> {
+  const days = Math.max(1, Math.ceil(horizonH / 24));
+  try {
+    return await fetchOnceRaw(model, lat, lon, days, 25_000);
+  } catch {
+    // One retry - a single slow/dropped request on mobile shouldn't cost a
+    // model out of the consensus for the next 45 minutes (the stale-refetch
+    // window).
+    return await fetchOnceRaw(model, lat, lon, days, 25_000);
   }
 }
 
