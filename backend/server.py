@@ -54,10 +54,12 @@ async def get_status_checks():
 
 # Feature routes
 from routes.invitations import router as invitations_router  # noqa: E402
+from routes.account import router as account_router  # noqa: E402
 from routes.weather_cron import weather_cron_loop, _cron_tick  # noqa: E402
 from routes.alerts_cron import alerts_cron_loop, _cron_tick as _alerts_cron_tick  # noqa: E402
 from routes.weather_alerts_cron import weather_alerts_cron_loop, _cron_tick as _weather_alerts_cron_tick  # noqa: E402
 api_router.include_router(invitations_router)
+api_router.include_router(account_router)
 
 # On-demand refresh endpoint — safe to call ad-hoc from admin tools or a cron
 # runner. Idempotent; each call creates one new forecast run per active

@@ -26,13 +26,15 @@ const TOOLS = [
 export default function More() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, business, signOut, renameBusiness } = useAuth();
+  const { user, business, signOut, renameBusiness, deleteAccount } = useAuth();
   const { percent, reload: reloadOnboarding, userId } = useOnboarding();
   const [links, setLinks] = useState<ExternalLink[]>([]);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => { repo.links.list().then(setLinks); }, []));
 
@@ -60,6 +62,25 @@ export default function More() {
       confirmLabel: "Sign out",
       destructive: true,
     }, () => { signOut(); });
+  }
+
+  function confirmDeleteAccount() {
+    confirm({
+      title: "Delete your account?",
+      message: "This permanently deletes your Chaser login. This can't be undone. Your farm's data isn't touched unless you're the sole owner with no team.",
+      confirmLabel: "Delete account",
+      destructive: true,
+    }, async () => {
+      setDeleteError(null);
+      setDeletingAccount(true);
+      try {
+        await deleteAccount();
+      } catch (e: any) {
+        setDeleteError(e?.message ?? "Something went wrong.");
+      } finally {
+        setDeletingAccount(false);
+      }
+    });
   }
 
   return (
@@ -127,6 +148,10 @@ export default function More() {
                 <Icon name="logout-variant" size={18} color={colors.error} />
                 <Text style={styles.signOutText}>Sign out</Text>
               </Pressable>
+              <Pressable onPress={confirmDeleteAccount} disabled={deletingAccount} style={{ alignItems: "center", marginTop: spacing.md }} testID="delete-account-btn">
+                <Text style={styles.deleteAccountText}>{deletingAccount ? "Deleting…" : "Delete my account"}</Text>
+              </Pressable>
+              {deleteError ? <Text style={{ color: colors.error, fontSize: 12, marginTop: spacing.sm, textAlign: "center" }}>{deleteError}</Text> : null}
             </Card>
 
             <Text style={styles.sectionTitle}>Team</Text>
@@ -313,4 +338,5 @@ const styles = StyleSheet.create({
   cloudBadgeText: { fontSize: 11, fontWeight: "700", color: colors.brandPrimary },
   signOutBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, height: 44, backgroundColor: colors.surface },
   signOutText: { color: colors.error, fontWeight: "700", fontSize: 14 },
+  deleteAccountText: { color: colors.muted, fontWeight: "600", fontSize: 12, textDecorationLine: "underline" },
 });
