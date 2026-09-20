@@ -1,0 +1,40 @@
+name: EAS Build (Android)
+
+# Manual trigger only — click "Run workflow" on this workflow's page in the
+# GitHub Actions tab. Never runs automatically on push, so it can't consume
+# a build unexpectedly.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile — 'preview' produces a directly-installable APK, 'production' produces the .aab bundle Google Play requires"
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - production
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install eas-cli
+        run: npm install --global eas-cli
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build on EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas build --platform android --profile ${{ inputs.profile }} --non-interactive --no-wait
