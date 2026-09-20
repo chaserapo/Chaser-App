@@ -262,7 +262,7 @@ export default function ActiveJob() {
                         <View style={{ flex: 1, paddingRight: 8 }}>
                           <Text style={{ fontSize: 13, fontWeight: "700", color: colors.onSurface }} numberOfLines={1}>{p.chemical_name}</Text>
                           {p.note ? <Text style={{ fontSize: 11, color: colors.muted, fontStyle: "italic" }}>{p.note}</Text> : (
-                            <Text style={{ fontSize: 11, color: colors.muted }}>{p.before.toFixed(2)} → {p.after.toFixed(2)} packs ({p.packs_used?.toFixed(2)} used)</Text>
+                            <Text style={{ fontSize: 11, color: colors.muted }}>{p.before.toFixed(2)} → {p.after.toFixed(2)} {p.unit_label} ({p.packs_used?.toFixed(2)} used)</Text>
                           )}
                         </View>
                         {p.warning ? <View style={{ backgroundColor: colors.error, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}><Text style={{ color: colors.onError, fontSize: 10, fontWeight: "800" }}>UNDER 0</Text></View> : null}

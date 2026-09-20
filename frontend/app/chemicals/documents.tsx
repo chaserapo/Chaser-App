@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { View, Text, FlatList, StyleSheet, Pressable, Linking } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { View, Text, TextInput, FlatList, StyleSheet, Pressable, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
@@ -12,17 +12,49 @@ import type { Chemical } from "@/src/lib/types";
 export default function Documents() {
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<Chemical[]>([]);
+  const [query, setQuery] = useState("");
 
   useFocusEffect(useCallback(() => { repo.chemicals.active().then((l) => setItems(l.sort((a, b) => a.product_name.localeCompare(b.product_name)))); }, []));
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((c) =>
+      c.product_name.toLowerCase().includes(q) ||
+      c.active_ingredient?.toLowerCase().includes(q) ||
+      c.formulation?.toLowerCase().includes(q) ||
+      c.manufacturer?.toLowerCase().includes(q) ||
+      c.apvma_number?.toLowerCase().includes(q)
+    );
+  }, [items, query]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
       <ScreenHeader title="Labels & SDS" back />
+      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+        <View style={styles.searchWrap}>
+          <Icon name="magnify" size={20} color={colors.muted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by name, active ingredient, formulation…"
+            placeholderTextColor={colors.muted}
+            style={styles.searchInput}
+            autoCapitalize="none"
+            testID="docs-search-input"
+          />
+          {query ? (
+            <Pressable onPress={() => setQuery("")} hitSlop={8} testID="docs-search-clear">
+              <Icon name="close-circle" size={18} color={colors.muted} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
       <FlatList
-        data={items}
+        data={filtered}
         keyExtractor={(c) => c.id}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}
-        ListEmptyComponent={<Card><Text style={styles.empty}>No chemicals in your register.</Text></Card>}
+        ListEmptyComponent={<Card><Text style={styles.empty}>{query ? "No matching products." : "No chemicals in your register."}</Text></Card>}
         renderItem={({ item }) => (
           <Card style={{ marginBottom: spacing.md }} testID={`docs-row-${item.id}`}>
             <Text style={styles.name}>{item.product_name}</Text>
@@ -57,6 +89,8 @@ export default function Documents() {
 }
 
 const styles = StyleSheet.create({
+  searchWrap: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, height: 48 },
+  searchInput: { flex: 1, fontSize: 15, color: colors.onSurface },
   name: { fontSize: 16, fontWeight: "700", color: colors.onSurface },
   ai: { fontSize: 12, color: colors.muted, marginTop: 2 },
   btnRow: { flexDirection: "row", gap: 8, marginTop: spacing.md },

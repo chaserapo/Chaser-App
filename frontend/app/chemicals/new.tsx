@@ -21,7 +21,7 @@ export default function NewChemical() {
     product_name: "", active_ingredient: "", formulation: "",
     apvma_number: "", chemical_group: "", manufacturer: "",
     pack_size: "", default_rate: "",
-    stock_qty: "", stock_unit: "", storage_location: "",
+    stock_qty: "", stock_unit: "", low_stock_threshold: "", storage_location: "",
     label_url: "", sds_url: "", notes: "",
   });
 
@@ -43,6 +43,7 @@ export default function NewChemical() {
       default_unit: f.default_rate ? rateUnit : undefined,
       stock_qty: f.stock_qty ? parseFloat(f.stock_qty) : undefined,
       stock_unit: f.stock_unit.trim() || undefined,
+      low_stock_threshold: f.low_stock_threshold ? parseFloat(f.low_stock_threshold) : undefined,
       storage_location: f.storage_location.trim() || undefined,
       label_url: f.label_url.trim() || undefined,
       sds_url: f.sds_url.trim() || undefined,
@@ -126,6 +127,7 @@ export default function NewChemical() {
               <View style={{ flex: 1 }}><Input label="Stock quantity" value={f.stock_qty} onChangeText={(v) => setF({ ...f, stock_qty: v })} keyboardType="decimal-pad" placeholder="e.g. 4" testID="input-stock-qty" /></View>
               <View style={{ flex: 1 }}><Input label="Stock unit" value={f.stock_unit} onChangeText={(v) => setF({ ...f, stock_unit: v })} placeholder="packs, L, kg" testID="input-stock-unit" /></View>
             </View>
+            <Input label="Low stock warning (optional)" value={f.low_stock_threshold} onChangeText={(v) => setF({ ...f, low_stock_threshold: v })} keyboardType="decimal-pad" placeholder="Leave blank to use your default" testID="input-low-stock" />
             <Input label="Storage location" value={f.storage_location} onChangeText={(v) => setF({ ...f, storage_location: v })} placeholder="e.g. Chem shed A" testID="input-storage" />
           </Card>
 
