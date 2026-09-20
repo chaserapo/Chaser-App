@@ -137,7 +137,7 @@ export default function TeamScreen() {
               {invites.map((inv) => (
                 <Card key={inv.id} style={{ marginBottom: spacing.sm }} testID={`invite-row-${inv.id}`}>
                   <View style={styles.row}>
-                    <View style={[styles.avatar, { backgroundColor: "#FEF3C7" }]}><Icon name="email-clock-outline" size={22} color={colors.warning} /></View>
+                    <View style={[styles.avatar, { backgroundColor: "#FEF3C7" }]}><Icon name="email-sync-outline" size={22} color={colors.warning} /></View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.name} numberOfLines={1}>{inv.email}</Text>
                       <Text style={styles.meta}>Invited {new Date(inv.invited_at).toLocaleDateString()} · {inv.role}</Text>

@@ -22,7 +22,8 @@ type Table =
   | "spray_job_products"
   | "farms"
   | "paddocks"
-  | "farm_issues";
+  | "farm_issues"
+  | "operators";
 
 /**
  * Subscribe to realtime changes on one or more tables filtered to the active

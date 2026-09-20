@@ -63,10 +63,6 @@ export default function RecordDetail() {
     try { await Share.share({ message: summary }); } catch {}
   }
 
-  const Field = ({ label, value }: { label: string; value?: string | number }) => (
-    <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><Text style={styles.fieldValue}>{value ?? "—"}</Text></View>
-  );
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
       <ScreenHeader title="Spray Record" back />
@@ -211,6 +207,12 @@ export default function RecordDetail() {
         </Text>
       </ScrollView>
     </View>
+  );
+}
+
+function Field({ label, value }: { label: string; value?: string | number }) {
+  return (
+    <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><Text style={styles.fieldValue}>{value ?? "—"}</Text></View>
   );
 }
 

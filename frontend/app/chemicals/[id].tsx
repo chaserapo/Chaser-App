@@ -118,10 +118,6 @@ export default function ChemicalDetail() {
 
   if (!c) return <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}><ScreenHeader title="Chemical" back /></View>;
 
-  const Field = ({ label, value }: { label: string; value?: string | number }) => (
-    <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><Text style={styles.fieldValue}>{value ?? "—"}</Text></View>
-  );
-
   if (editing) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
@@ -319,6 +315,12 @@ export default function ChemicalDetail() {
         <Button title="Delete Product" icon="trash-can-outline" variant="danger" onPress={confirmDelete} testID="delete-chem-btn" />
       </ScrollView>
     </View>
+  );
+}
+
+function Field({ label, value }: { label: string; value?: string | number }) {
+  return (
+    <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><Text style={styles.fieldValue}>{value ?? "—"}</Text></View>
   );
 }
 

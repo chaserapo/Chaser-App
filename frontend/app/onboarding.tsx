@@ -48,8 +48,8 @@ export default function Onboarding() {
   const userId = session?.user?.id ?? null;
   const step: OnboardingStep = ONBOARDING_STEPS[stepIdx];
 
-  const next = useCallback(() => setStepIdx((s) => Math.min(6, (s + 1) as StepIndex)), []);
-  const back = useCallback(() => setStepIdx((s) => Math.max(0, (s - 1) as StepIndex)), []);
+  const next = useCallback(() => setStepIdx((s) => Math.min(6, s + 1) as StepIndex), []);
+  const back = useCallback(() => setStepIdx((s) => Math.max(0, s - 1) as StepIndex), []);
 
   async function markCurrent(kind: "done" | "skipped") {
     if (!userId || step === "finish") return;

@@ -375,7 +375,7 @@ function LocationSelector({ farms, paddocks, target, onChange }: { farms: Farm[]
 function HeroStat({ icon, value, label }: { icon: string; value: string; label: string }) {
   return (
     <View style={styles.heroStat}>
-      <Icon name={icon} size={20} color={colors.onBrandPrimary} />
+      <Icon name={icon as any} size={20} color={colors.onBrandPrimary} />
       <Text style={styles.heroStatValue}>{value}</Text>
       <Text style={styles.heroStatLabel}>{label}</Text>
     </View>
@@ -411,7 +411,7 @@ function OpTile({ title, value, icon, tone }: { title: string; value: string; ic
   const fg = tone === "good" ? colors.brandPrimary : tone === "warn" ? "#92400E" : "#991B1B";
   return (
     <View style={[styles.opTile, { backgroundColor: bg, borderColor: fg }]}>
-      <Icon name={icon} size={20} color={fg} />
+      <Icon name={icon as any} size={20} color={fg} />
       <Text style={[styles.opTileTitle, { color: fg }]}>{title}</Text>
       <Text style={[styles.opTileValue, { color: fg }]}>{value}</Text>
     </View>

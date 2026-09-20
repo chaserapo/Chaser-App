@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import * as FileSystem from "expo-file-system";
+import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import type { SprayJob } from "./types";
 
@@ -66,13 +66,13 @@ export async function exportJobsCsv(jobs: SprayJob[]): Promise<{ ok: boolean; me
   }
 
   try {
-    const uri = `${FileSystem.cacheDirectory}${filename}`;
-    await FileSystem.writeAsStringAsync(uri, csv, { encoding: FileSystem.EncodingType.UTF8 });
+    const file = new File(Paths.cache, filename);
+    file.write(csv);
     if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, { mimeType: "text/csv", dialogTitle: "Export Spray Records" });
+      await Sharing.shareAsync(file.uri, { mimeType: "text/csv", dialogTitle: "Export Spray Records" });
       return { ok: true };
     }
-    return { ok: true, message: `Saved to ${uri}` };
+    return { ok: true, message: `Saved to ${file.uri}` };
   } catch (e: any) {
     return { ok: false, message: e?.message ?? "Export failed" };
   }

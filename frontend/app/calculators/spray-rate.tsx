@@ -27,8 +27,8 @@ export default function SprayRateCalc() {
   useEffect(() => {
     (async () => {
       try {
-        const all = await repo.machinery.active();
-        setSprayers(all.filter((m: Machinery) => m.machine_type === "Self-propelled sprayer" || m.machine_type === "Tow-behind sprayer"));
+        const all = await repo.machinery.list();
+        setSprayers(all.filter((m: Machinery) => !m.archived_at && (m.machine_type === "Self-propelled sprayer" || m.machine_type === "Tow-behind sprayer")));
       } catch { /* ignore */ }
     })();
   }, []);

@@ -32,7 +32,7 @@ export default function NozzleGuide() {
   const [goal, setGoal] = useState<ApplicationGoal>("systemic");
   const [rate, setRate] = useState("80");
   const [speed, setSpeed] = useState("18");
-  const [spacing, setSpacing] = useState("0.5");
+  const [spacing_, setSpacing] = useState("0.5");
   const [spotWidth, setSpotWidth] = useState("0.5");
   const [treatedPct, setTreatedPct] = useState("10");
   const [pwm, setPwm] = useState(false);
@@ -42,7 +42,7 @@ export default function NozzleGuide() {
 
   const targetRate = Math.max(0, parseFloat(rate) || 0);
   const travelSpeed = Math.max(0, parseFloat(speed) || 0);
-  const effectiveWidth = mode === "spot" ? Math.max(0, parseFloat(spotWidth) || 0) : Math.max(0, parseFloat(spacing) || 0);
+  const effectiveWidth = mode === "spot" ? Math.max(0, parseFloat(spotWidth) || 0) : Math.max(0, parseFloat(spacing_) || 0);
   const treatedFraction = Math.min(1, Math.max(0, (parseFloat(treatedPct) || 0) / 100));
   const required = useMemo(() => nozzleFlowLpm(targetRate, travelSpeed, effectiveWidth), [targetRate, travelSpeed, effectiveWidth]);
   const recommended = useMemo(() => recommendNozzles(required, goal, pwm, mode === "spot", 5), [required, goal, pwm, mode]);
@@ -72,7 +72,7 @@ export default function NozzleGuide() {
           <Card>
             <Input label={mode === "spot" ? "Water rate on sprayed area" : "Application rate"} value={rate} onChangeText={setRate} keyboardType="decimal-pad" suffix="L/ha" />
             <Input label="Speed" value={speed} onChangeText={setSpeed} keyboardType="decimal-pad" suffix="km/h" />
-            {mode === "broadcast" ? <Input label="Nozzle spacing" value={spacing} onChangeText={setSpacing} keyboardType="decimal-pad" suffix="m" /> : <>
+            {mode === "broadcast" ? <Input label="Nozzle spacing" value={spacing_} onChangeText={setSpacing} keyboardType="decimal-pad" suffix="m" /> : <>
               <Input label="Sprayed width per fired nozzle" value={spotWidth} onChangeText={setSpotWidth} keyboardType="decimal-pad" suffix="m" />
               <Input label="Estimated paddock area treated" value={treatedPct} onChangeText={setTreatedPct} keyboardType="decimal-pad" suffix="%" />
               <Text style={styles.hint}>Spot nozzle flow is sized from the L/ha delivered to the area actually sprayed and the sprayed width of one firing nozzle. The treated percentage changes average paddock use, not nozzle flow while ON.</Text>
