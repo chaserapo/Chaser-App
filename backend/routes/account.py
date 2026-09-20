@@ -27,8 +27,11 @@ from fastapi import APIRouter, Header, HTTPException
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_PUBLISHABLE_KEY = os.environ["SUPABASE_PUBLISHABLE_KEY"]
+# Read lazily (os.getenv, not os.environ[...]): server.py imports this module
+# to build its routes, so a KeyError here would take down the entire app -
+# every route and every background cron - over one missing setting.
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
 
 
 def _service_role_key() -> str:
@@ -39,6 +42,8 @@ def _service_role_key() -> str:
 
 
 async def _get_caller(authorization: str) -> dict:
+    if not SUPABASE_URL or not SUPABASE_PUBLISHABLE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase is not configured on this server")
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get(
             f"{SUPABASE_URL}/auth/v1/user",
