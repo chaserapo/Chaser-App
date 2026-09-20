@@ -52,6 +52,7 @@ export type Chemical = {
   pack_size?: string;
   stock_qty?: number;
   stock_unit?: string;
+  low_stock_threshold?: number;
   storage_location?: string;
   label_url?: string;
   sds_url?: string;

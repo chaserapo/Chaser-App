@@ -101,7 +101,9 @@ export default function TankMixCalc() {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 8 }}>
                   {chemicals.map((c) => (
                     <Pressable key={c.id} onPress={() => pickChemical(r.id, c)} style={styles.pickChip}>
-                      <Text style={styles.pickChipText} numberOfLines={1}>{c.product_name}</Text>
+                      <Text style={styles.pickChipText} numberOfLines={1}>
+                        {c.product_name}{c.stock_qty != null ? ` · ${c.stock_qty} ${c.stock_unit ?? ""}`.trimEnd() : ""}
+                      </Text>
                     </Pressable>
                   ))}
                 </ScrollView>
@@ -126,6 +128,15 @@ export default function TankMixCalc() {
               <Text style={styles.amount}>
                 Amount for tank: <Text style={{ fontWeight: "800" }}>{fmt(results.products[idx]?.amount ?? 0)} {results.products[idx]?.amount_unit}</Text>
               </Text>
+              {(() => {
+                const selected = r.chemical_id ? chemicals.find((c) => c.id === r.chemical_id) : undefined;
+                if (!selected || selected.stock_qty == null) return null;
+                return (
+                  <Text style={styles.stockLine} testID={`stock-line-${idx}`}>
+                    Available stock: {selected.stock_qty} {selected.stock_unit ?? ""}
+                  </Text>
+                );
+              })()}
             </Card>
           ))}
 
@@ -158,6 +169,7 @@ const styles = StyleSheet.create({
   unitChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
   unitChipText: { fontSize: 12, fontWeight: "700", color: colors.onSurfaceTertiary },
   amount: { marginTop: 6, fontSize: 14, color: colors.onSurface },
+  stockLine: { marginTop: 2, fontSize: 12, color: colors.muted },
   resultTitle: { fontSize: 15, fontWeight: "800", color: colors.onBrandSecondary, marginBottom: spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 },
   resRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8 },
   rowLabel: { fontSize: 14, color: colors.onBrandSecondary, fontWeight: "600" },

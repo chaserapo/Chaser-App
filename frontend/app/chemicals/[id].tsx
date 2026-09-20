@@ -9,6 +9,7 @@ import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { CHEMICAL_CATEGORIES, ChemicalCategory, RATE_UNITS, RateUnit } from "@/src/lib/types";
 import type { Chemical } from "@/src/lib/types";
+import { confirm } from "@/src/lib/confirm";
 
 export default function ChemicalDetail() {
   const insets = useSafeAreaInsets();
@@ -24,7 +25,7 @@ export default function ChemicalDetail() {
     product_name: "", active_ingredient: "", formulation: "",
     apvma_number: "", chemical_group: "", manufacturer: "",
     pack_size: "", default_rate: "",
-    stock_qty: "", stock_unit: "", storage_location: "",
+    stock_qty: "", stock_unit: "", low_stock_threshold: "", storage_location: "",
     label_url: "", sds_url: "", notes: "",
   });
 
@@ -42,6 +43,7 @@ export default function ChemicalDetail() {
       default_rate: chem.default_rate != null ? chem.default_rate.toString() : "",
       stock_qty: chem.stock_qty != null ? chem.stock_qty.toString() : "",
       stock_unit: chem.stock_unit ?? "",
+      low_stock_threshold: chem.low_stock_threshold != null ? chem.low_stock_threshold.toString() : "",
       storage_location: chem.storage_location ?? "",
       label_url: chem.label_url ?? "",
       sds_url: chem.sds_url ?? "",
@@ -78,6 +80,7 @@ export default function ChemicalDetail() {
       default_unit: f.default_rate ? rateUnit : undefined,
       stock_qty: f.stock_qty ? parseFloat(f.stock_qty) : undefined,
       stock_unit: f.stock_unit.trim() || undefined,
+      low_stock_threshold: f.low_stock_threshold ? parseFloat(f.low_stock_threshold) : undefined,
       storage_location: f.storage_location.trim() || undefined,
       label_url: f.label_url.trim() || undefined,
       sds_url: f.sds_url.trim() || undefined,
@@ -98,6 +101,19 @@ export default function ChemicalDetail() {
     const next = { ...c, archived_at: undefined };
     await repo.chemicals.save(next);
     setC(next);
+  }
+
+  function confirmDelete() {
+    if (!c) return;
+    confirm({
+      title: "Delete this product?",
+      message: `${c.product_name} will be removed from your Chemical Register, including its stock history. Archive it instead if you might need it again.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    }, async () => {
+      await repo.chemicals.remove(c.id);
+      router.back();
+    });
   }
 
   if (!c) return <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}><ScreenHeader title="Chemical" back /></View>;
@@ -153,6 +169,7 @@ export default function ChemicalDetail() {
                 <View style={{ flex: 1 }}><Input label="Stock quantity" value={f.stock_qty} onChangeText={(v) => setF({ ...f, stock_qty: v })} keyboardType="decimal-pad" testID="edit-stock-qty" /></View>
                 <View style={{ flex: 1 }}><Input label="Stock unit" value={f.stock_unit} onChangeText={(v) => setF({ ...f, stock_unit: v })} testID="edit-stock-unit" /></View>
               </View>
+              <Input label="Low stock warning (optional)" value={f.low_stock_threshold} onChangeText={(v) => setF({ ...f, low_stock_threshold: v })} keyboardType="decimal-pad" placeholder="Leave blank to use your default" testID="edit-low-stock" />
               <Input label="Storage location" value={f.storage_location} onChangeText={(v) => setF({ ...f, storage_location: v })} testID="edit-storage" />
             </Card>
 
@@ -206,6 +223,7 @@ export default function ChemicalDetail() {
         <Card>
           <Field label="Pack size" value={c.pack_size} />
           <Field label="Current stock" value={c.stock_qty != null ? `${c.stock_qty} ${c.stock_unit ?? c.pack_size ?? ""}` : undefined} />
+          <Field label="Low stock warning" value={c.low_stock_threshold != null ? `${c.low_stock_threshold} ${c.stock_unit ?? ""}`.trim() : "Using your default"} />
           <Field label="Storage location" value={c.storage_location} />
         </Card>
 
@@ -295,8 +313,10 @@ export default function ChemicalDetail() {
         {c.archived_at ? (
           <Button title="Unarchive Product" icon="archive-arrow-up-outline" onPress={unarchive} testID="unarchive-chem-btn" />
         ) : (
-          <Button title="Archive Product" icon="archive-outline" variant="danger" onPress={archive} testID="archive-chem-btn" />
+          <Button title="Archive Product" icon="archive-outline" variant="secondary" onPress={archive} testID="archive-chem-btn" />
         )}
+        <View style={{ height: spacing.sm }} />
+        <Button title="Delete Product" icon="trash-can-outline" variant="danger" onPress={confirmDelete} testID="delete-chem-btn" />
       </ScrollView>
     </View>
   );

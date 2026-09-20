@@ -680,6 +680,9 @@ export default function NewSprayJob() {
                     {item.apvma_number ? `APVMA ${item.apvma_number}` : ""}
                     {item.default_rate ? `${item.apvma_number ? " · " : ""}Default ${item.default_rate} ${item.default_unit}` : ""}
                   </Text>
+                  <Text style={[styles.pickerMeta, item.stock_qty != null && item.stock_qty <= 0 && { color: colors.error, fontWeight: "700" }]}>
+                    {item.stock_qty != null ? `In stock: ${item.stock_qty} ${item.stock_unit ?? ""}`.trimEnd() : "No stock recorded"}
+                  </Text>
                 </View>
                 <Icon name="plus-circle" size={22} color={colors.brandPrimary} />
               </Pressable>
