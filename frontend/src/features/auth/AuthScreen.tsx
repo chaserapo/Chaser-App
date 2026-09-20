@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable, ActivityIndicator, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
@@ -12,6 +13,7 @@ type Mode = "signin" | "signup";
 
 export function AuthScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
@@ -111,6 +113,19 @@ export function AuthScreen() {
               ? "By signing in, you agree to keep your farm data safe. Your existing local data stays on this device as a backup."
               : "We'll create your cloud workspace and safely upload the data already on this device."}
           </Text>
+          {mode === "signup" ? (
+            <Text style={styles.footer}>
+              By creating an account you agree to Chaser&apos;s{" "}
+              <Text style={styles.footerLink} onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "terms" } })} testID="signup-terms-link">
+                Terms
+              </Text>
+              {" "}and{" "}
+              <Text style={styles.footerLink} onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "privacy" } })} testID="signup-privacy-link">
+                Privacy Policy
+              </Text>
+              .
+            </Text>
+          ) : null}
           {busy ? (
             <View style={{ marginTop: spacing.md, alignItems: "center" }}>
               <ActivityIndicator color={colors.brandPrimary} />
@@ -135,5 +150,6 @@ const styles = StyleSheet.create({
   errorBox: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.sm, backgroundColor: "#FEE2E2", padding: 10, borderRadius: radius.md },
   errorText: { color: colors.error, fontWeight: "600", fontSize: 13, flex: 1 },
   footer: { marginTop: spacing.lg, color: colors.muted, fontSize: 12, textAlign: "center", lineHeight: 17 },
+  footerLink: { color: colors.brandPrimary, fontWeight: "700" },
   eyeBtn: { position: "absolute", right: 12, top: 34, padding: 4 },
 });

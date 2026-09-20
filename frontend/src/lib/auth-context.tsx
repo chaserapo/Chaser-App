@@ -25,6 +25,7 @@ type Ctx = {
   retryMigration: () => Promise<void>;
   clearMigrationSuccess: () => void;
   renameBusiness: (newName: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
 };
 
 const AuthCtx = createContext<Ctx | null>(null);
@@ -233,6 +234,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (migration.kind === "success") setMigration({ kind: "idle" });
   }, [migration]);
 
+  // Permanently deletes the signed-in user's login (App Store Guideline
+  // 5.1.1(v) requires this to be reachable from inside the app, not just by
+  // emailing support). The backend blocks it if this user owns a business
+  // that still has other team members.
+  const deleteAccount = useCallback(async () => {
+    const jwt = session?.access_token;
+    if (!jwt) throw new Error("Not signed in");
+    const base = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
+    const r = await fetch(`${base}/api/account`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => null);
+      throw new Error(body?.detail ?? `Account deletion failed (${r.status})`);
+    }
+    await supabase.auth.signOut();
+  }, [session]);
+
   const renameBusiness = useCallback(async (newName: string) => {
     const name = newName.trim();
     if (!business) throw new Error("No active business");
@@ -249,8 +269,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user: session?.user ?? null,
     business,
     migration,
-    signIn, signUp, signOut, retryMigration, clearMigrationSuccess, renameBusiness,
-  }), [loading, session, business, migration, signIn, signUp, signOut, retryMigration, clearMigrationSuccess, renameBusiness]);
+    signIn, signUp, signOut, retryMigration, clearMigrationSuccess, renameBusiness, deleteAccount,
+  }), [loading, session, business, migration, signIn, signUp, signOut, retryMigration, clearMigrationSuccess, renameBusiness, deleteAccount]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
