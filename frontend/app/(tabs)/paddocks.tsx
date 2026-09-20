@@ -46,6 +46,15 @@ export default function PaddocksTab() {
   const driveWatch = useRef<Location.LocationSubscription | null>(null);
   const lastDrivePoint = useRef<{ lat: number; lon: number; ts: number } | null>(null);
   const [driving, setDriving] = useState(false);
+  // The map (a WebView) unmounts whenever the List view is showing, since
+  // that's a different branch of the render tree. Starting a draw from List
+  // remounts a fresh map instance, and the setMode("draw") call inside
+  // startDraw() fires before that new instance's ref exists - it's a no-op
+  // on the stale/null ref. Track the intended mode in a ref so the map's own
+  // onReady callback (fired once the new instance is actually live) can
+  // re-apply it instead of relying on that racy synchronous call.
+  const modeRef = useRef(mode);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
 
   const load = useCallback(async () => {
     const [pList, fList, iList] = await Promise.all([repo.paddocks.active(), repo.farms.active(), repo.farmIssues.list()]);
@@ -357,6 +366,7 @@ export default function PaddocksTab() {
           onIssueSelect={(id) => { if (mode === "view") { setSelectedId(null); setSelectedIssueId(id); } }}
           onPointsUpdate={(count, areaHa) => setDrawInfo({ count, areaHa })}
           onSaveGeometry={persistPaddock}
+          onReady={() => { if (modeRef.current === "draw") mapRef.current?.setMode("draw"); }}
         />
 
         {/* GPS toggle */}
