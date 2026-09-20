@@ -21,6 +21,8 @@ type Ctx = {
   migration: MigrationState;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, businessName: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  confirmPasswordReset: (email: string, code: string, newPassword: string) => Promise<void>;
   signOut: () => Promise<void>;
   retryMigration: () => Promise<void>;
   clearMigrationSuccess: () => void;
@@ -218,6 +220,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Two-step, in-app password reset — no magic-link redirect to handle,
+  // since the app has no web presence for one to land on. Supabase's
+  // recovery email needs to carry the OTP code, not just the default link
+  // (see More -> Settings, or the sign-in screen's "Forgot password" flow).
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+    if (error) throw error;
+  }, []);
+
+  const confirmPasswordReset = useCallback(async (email: string, code: string, newPassword: string) => {
+    const { error: verifyError } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: "recovery" });
+    if (verifyError) throw verifyError;
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (updateError) throw updateError;
+  }, []);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);
@@ -269,8 +287,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user: session?.user ?? null,
     business,
     migration,
-    signIn, signUp, signOut, retryMigration, clearMigrationSuccess, renameBusiness, deleteAccount,
-  }), [loading, session, business, migration, signIn, signUp, signOut, retryMigration, clearMigrationSuccess, renameBusiness, deleteAccount]);
+    signIn, signUp, requestPasswordReset, confirmPasswordReset, signOut, retryMigration, clearMigrationSuccess, renameBusiness, deleteAccount,
+  }), [loading, session, business, migration, signIn, signUp, requestPasswordReset, confirmPasswordReset, signOut, retryMigration, clearMigrationSuccess, renameBusiness, deleteAccount]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
