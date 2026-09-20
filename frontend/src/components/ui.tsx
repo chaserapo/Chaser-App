@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable, StyleSheet, ViewStyle, TextStyle } from "react-native";
+import { View, Text, Pressable, StyleSheet, ViewStyle, TextStyle, StyleProp, KeyboardTypeOptions } from "react-native";
 import * as Haptics from "expo-haptics";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { colors, radius, spacing } from "../theme";
@@ -61,7 +61,7 @@ export function Button({
   );
 }
 
-export function Card({ children, style, onPress, testID }: { children: React.ReactNode; style?: ViewStyle; onPress?: () => void; testID?: string }) {
+export function Card({ children, style, onPress, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; testID?: string }) {
   const content = <View style={[styles.card, style]}>{children}</View>;
   if (onPress) {
     return (
@@ -112,7 +112,7 @@ export function Input({
   label?: string;
   value: string;
   onChangeText: (t: string) => void;
-  keyboardType?: "default" | "numeric" | "decimal-pad";
+  keyboardType?: KeyboardTypeOptions;
   placeholder?: string;
   suffix?: string;
   testID?: string;

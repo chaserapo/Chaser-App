@@ -27,10 +27,6 @@ export default function TeamMemberDetail() {
 
   if (!member) return <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}><ScreenHeader title="Team Member" back /></View>;
 
-  const Field = ({ label, value }: { label: string; value?: string | null }) => value ? (
-    <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><Text style={styles.fieldValue}>{value}</Text></View>
-  ) : null;
-
   async function toggleActive() {
     await setTeamMemberActive(member!.id, Boolean(member!.archived_at));
     await load();
@@ -136,6 +132,12 @@ export default function TeamMemberDetail() {
       </ScrollView>
     </View>
   );
+}
+
+function Field({ label, value }: { label: string; value?: string | null }) {
+  return value ? (
+    <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><Text style={styles.fieldValue}>{value}</Text></View>
+  ) : null;
 }
 
 const styles = StyleSheet.create({

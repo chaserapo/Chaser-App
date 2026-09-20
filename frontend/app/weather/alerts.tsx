@@ -113,7 +113,7 @@ export default function AlertsScreen() {
           const enabled = existing?.enabled ?? false;
           return (
             <View key={k.kind} style={styles.alertRow} testID={`alert-${k.kind}`}>
-              <Icon name={k.icon} size={22} color={enabled ? colors.brandPrimary : colors.muted} />
+              <Icon name={k.icon as any} size={22} color={enabled ? colors.brandPrimary : colors.muted} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.alertLabel}>{k.label}</Text>
                 <Text style={styles.alertSub}>{k.sub}</Text>

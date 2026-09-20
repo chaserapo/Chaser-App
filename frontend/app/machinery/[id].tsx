@@ -136,12 +136,6 @@ export default function MachineDetail() {
     return <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}><ScreenHeader title="Machine" back /></View>;
   }
 
-  const Field = ({ label, value }: { label: string; value?: string | number }) => (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <Text style={styles.fieldValue}>{value ?? "—"}</Text>
-    </View>
-  );
 
   const dueCount = maints.filter((mn) => maintenanceStatus(m.current_hours, mn.next_service_hours) !== "good").length;
   const openIssues = issues.filter((i) => OPEN_ISSUE_STATUSES.includes(i.status));
@@ -421,6 +415,15 @@ export default function MachineDetail() {
           </>
         )}
       </ScrollView>
+    </View>
+  );
+}
+
+function Field({ label, value }: { label: string; value?: string | number }) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={styles.fieldValue}>{value ?? "—"}</Text>
     </View>
   );
 }

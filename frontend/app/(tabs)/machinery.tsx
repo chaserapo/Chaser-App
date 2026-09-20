@@ -115,7 +115,7 @@ export default function MachineryTab() {
             <Card style={{ marginBottom: spacing.md }} onPress={() => router.push({ pathname: "/machinery/[id]", params: { id: item.id } })} testID={`machine-card-${item.id}`}>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <View style={styles.iconBox}>
-                  <Icon name={iconForType(item.machine_type)} size={26} color={colors.brandPrimary} />
+                  <Icon name={iconForType(item.machine_type) as any} size={26} color={colors.brandPrimary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
