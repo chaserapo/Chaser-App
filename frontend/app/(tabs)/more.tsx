@@ -158,16 +158,16 @@ export default function More() {
             <Card style={{ padding: 0, overflow: "hidden" }}>
               <Pressable onPress={() => router.push("/(tabs)/team")} style={({ pressed }) => [styles.row, styles.rowBorder, pressed && { backgroundColor: colors.surface }]} testID="open-team-roster-btn">
                 <Icon name="account-group-outline" size={22} color={colors.brandPrimary} />
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={[styles.rowText, { marginLeft: 0 }]}>Team Roster</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowText}>Team Roster</Text>
                   <Text style={styles.rowSub}>People, skills, tasks & work history</Text>
                 </View>
                 <Icon name="chevron-right" size={22} color={colors.muted} />
               </Pressable>
               <Pressable onPress={() => router.push("/team")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-team-btn">
                 <Icon name="shield-account-outline" size={22} color={colors.brandPrimary} />
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={[styles.rowText, { marginLeft: 0 }]}>Manage Access</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowText}>Manage Access</Text>
                   <Text style={styles.rowSub}>
                     {business?.role === "owner"
                       ? "Invite people and manage who can log into Chaser"
@@ -243,8 +243,8 @@ export default function More() {
                     style={({ pressed }) => [styles.row, i < linksInCat.length - 1 && styles.rowBorder, pressed && { backgroundColor: colors.surface }]}
                   >
                     <Icon name="open-in-new" size={20} color={colors.brandPrimary} />
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={[styles.rowText, { marginLeft: 0 }]}>{l.name}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowText}>{l.name}</Text>
                       {l.description ? <Text style={styles.rowSub}>{l.description}</Text> : null}
                     </View>
                     <Icon name="chevron-right" size={22} color={colors.muted} />
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   manage: { fontSize: 13, fontWeight: "700", color: colors.brandPrimary, marginTop: spacing.lg },
   row: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, minHeight: 56, gap: 12 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  rowText: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.onSurface, marginLeft: 12 },
+  rowText: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.onSurface },
   rowSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   manageBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, height: 48 },
   manageBtnText: { color: colors.brandPrimary, fontWeight: "700", fontSize: 15 },
