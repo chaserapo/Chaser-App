@@ -35,8 +35,12 @@ router = APIRouter()
 # so a KeyError here previously took down the *entire* app - every route and
 # every background cron - over a single missing invitations-only setting.
 # Each var is checked for real at the point it's used instead.
+#
+# Emergent consolidated per-service API keys into one "Universal Key" -
+# EMERGENT_LLM_KEY is the current name; EMERGENT_EMAIL_KEY is kept as a
+# fallback only for anyone still running an older env setup.
 EMAIL_BASE_URL = "https://integrations.emergentagent.com"
-EMAIL_KEY = os.getenv("EMERGENT_EMAIL_KEY")
+EMAIL_KEY = os.getenv("EMERGENT_LLM_KEY") or os.getenv("EMERGENT_EMAIL_KEY")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME")
 EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
