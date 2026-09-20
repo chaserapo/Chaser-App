@@ -29,12 +29,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Emergent-managed email proxy — CONSTANT, not env-read.
+#
+# Read lazily (os.getenv, not os.environ[...]) rather than hard-requiring
+# these at import time: server.py imports this module to build its routes,
+# so a KeyError here previously took down the *entire* app - every route and
+# every background cron - over a single missing invitations-only setting.
+# Each var is checked for real at the point it's used instead.
 EMAIL_BASE_URL = "https://integrations.emergentagent.com"
-EMAIL_KEY = os.environ["EMERGENT_EMAIL_KEY"]
-EMAIL_FROM_NAME = os.environ["EMAIL_FROM_NAME"]
+EMAIL_KEY = os.getenv("EMERGENT_EMAIL_KEY")
+EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME")
 EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO")
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_PUBLISHABLE_KEY = os.environ["SUPABASE_PUBLISHABLE_KEY"]
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
 APP_URL = os.environ.get("APP_URL", "https://hectarehq.app")
 
 # ---------------------------------------------------------------------------
@@ -114,6 +120,8 @@ def _assert_safe_email(subject: str, html: str) -> None:
 
 
 async def send_email(*, to: str, subject: str, html: str) -> str | None:
+    if not EMAIL_KEY or not EMAIL_FROM_NAME:
+        raise HTTPException(status_code=503, detail="Email sending is not configured on this server")
     _assert_safe_email(subject, html)
     payload = {"to": [to], "subject": subject, "html": html, "from_name": EMAIL_FROM_NAME}
     if EMAIL_REPLY_TO:
@@ -144,6 +152,8 @@ class SendInviteResponse(BaseModel):
 
 
 async def _supabase_select(path: str, auth_header: str) -> list[dict]:
+    if not SUPABASE_URL or not SUPABASE_PUBLISHABLE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase is not configured on this server")
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get(
             f"{SUPABASE_URL}/rest/v1/{path}",

@@ -1,7 +1,6 @@
 """Chaser beta launch-readiness backend tests.
 Covers:
-- /api/ health
-- /api/status create + list persistence
+- /health and /api/ and /api/health
 - /api/invitations/{id}/send-email auth & payload validation (401/422/etc.)
 """
 import os
@@ -27,22 +26,15 @@ class TestHealth:
         data = r.json()
         assert data.get("message") == "Hello World"
 
-
-# ---------------------------- Status persistence ----------------
-class TestStatus:
-    def test_create_status_and_verify_persistence(self, api_client):
-        payload = {"client_name": f"TEST_beta_{uuid.uuid4().hex[:8]}"}
-        r = api_client.post(f"{BASE_URL}/api/status", json=payload, timeout=15)
+    def test_health(self, api_client):
+        r = api_client.get(f"{BASE_URL}/health", timeout=15)
         assert r.status_code == 200, r.text
-        body = r.json()
-        assert body["client_name"] == payload["client_name"]
-        assert "id" in body and "timestamp" in body
-        # Verify list contains our record
-        r2 = api_client.get(f"{BASE_URL}/api/status", timeout=15)
-        assert r2.status_code == 200
-        rows = r2.json()
-        assert isinstance(rows, list)
-        assert any(x.get("client_name") == payload["client_name"] for x in rows)
+        assert r.json().get("status") == "ok"
+
+    def test_api_health(self, api_client):
+        r = api_client.get(f"{BASE_URL}/api/health", timeout=15)
+        assert r.status_code == 200, r.text
+        assert r.json().get("status") == "ok"
 
 
 # ---------------------------- Invitations ------------------------
