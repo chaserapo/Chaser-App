@@ -72,7 +72,7 @@ create index if not exists stock_movements_stock_line_id_idx on stock_movements(
 -- Only chemicals that actually have a pack_size recorded get a line; ones
 -- with nothing set are left alone (the app treats "no lines yet" as "add
 -- your first pack size" rather than assuming zero stock).
-insert into chemical_stock_lines (id, business_id, chemical_id, pack_size, qty, location, low_stock_threshold, created_at)
+insert into chemical_stock_lines (id, business_id, chemical_id, pack_size, qty, location, created_at)
 select
   gen_random_uuid(),
   c.business_id,
@@ -80,7 +80,6 @@ select
   c.pack_size,
   coalesce(c.stock_qty, 0),
   c.storage_location,
-  c.low_stock_threshold,
   now()
 from chemicals c
 where c.pack_size is not null
