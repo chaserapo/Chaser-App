@@ -5,11 +5,11 @@ import { useLocalSearchParams, useFocusEffect } from "expo-router";
 import QRCode from "react-native-qrcode-svg";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
-import { Button, Card } from "@/src/components/ui";
+import { Button, Card, Input, Chip } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { stageLabel } from "@/src/lib/crop-stages";
-import type { SprayJob } from "@/src/lib/types";
+import type { SprayJob, Operator, Machinery } from "@/src/lib/types";
 
 function buildSignOffPayload(j: SprayJob) {
   return {
@@ -44,13 +44,127 @@ function buildSignOffPayload(j: SprayJob) {
   };
 }
 
+// Editable fields — deliberately excludes farm/paddock (reassigning those has
+// wider effects on weather locations & history groupings), weather readings
+// (already have their own operator-verified-edit flow during the active job),
+// and chemicals (quantities are already tied to stock_movements — editing
+// them here would desync the stock ledger without also reconciling it).
+type EditForm = {
+  crop: string;
+  variety: string;
+  target: string;
+  operator_id: string;
+  operator_name: string;
+  machinery_id: string;
+  machinery_name: string;
+  area_ha: string;
+  actual_area_ha: string;
+  start_time: string;
+  finish_time: string;
+  water_rate: string;
+  speed_kmh: string;
+  boom_width_m: string;
+  nozzle_type: string;
+  pressure: string;
+  notes: string;
+  finish_notes: string;
+};
+
+function toForm(j: SprayJob): EditForm {
+  return {
+    crop: j.crop ?? "",
+    variety: j.variety ?? "",
+    target: j.target ?? "",
+    operator_id: j.operator_id ?? "",
+    operator_name: j.operator ?? "",
+    machinery_id: j.machinery_id ?? "",
+    machinery_name: j.machinery_name ?? "",
+    area_ha: j.area_ha != null ? String(j.area_ha) : "",
+    actual_area_ha: j.actual_area_ha != null ? String(j.actual_area_ha) : "",
+    start_time: j.start_time ?? "",
+    finish_time: j.finish_time ?? "",
+    water_rate: j.water_rate != null ? String(j.water_rate) : "",
+    speed_kmh: j.speed_kmh != null ? String(j.speed_kmh) : "",
+    boom_width_m: j.boom_width_m != null ? String(j.boom_width_m) : "",
+    nozzle_type: j.nozzle_type ?? "",
+    pressure: j.pressure != null ? String(j.pressure) : "",
+    notes: j.notes ?? "",
+    finish_notes: j.finish_notes ?? "",
+  };
+}
+
+function num(s: string): number | undefined {
+  const t = s.trim();
+  if (!t) return undefined;
+  const n = parseFloat(t);
+  return isNaN(n) ? undefined : n;
+}
+
 export default function RecordDetail() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [j, setJ] = useState<SprayJob | null>(null);
   const [showQR, setShowQR] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<EditForm | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [operators, setOperators] = useState<Operator[]>([]);
+  const [machines, setMachines] = useState<Machinery[]>([]);
 
   useFocusEffect(useCallback(() => { if (id) repo.sprayJobs.get(id as string).then(setJ); }, [id]));
+
+  function startEdit() {
+    if (!j) return;
+    setForm(toForm(j));
+    setSaveError(null);
+    setEditing(true);
+    repo.operators.active().then(setOperators).catch(() => {});
+    repo.machinery.list().then((m) => setMachines(m.filter((x) => !x.archived_at))).catch(() => {});
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+    setForm(null);
+    setSaveError(null);
+  }
+
+  async function saveEdit() {
+    if (!j || !form) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const updated: SprayJob = {
+        ...j,
+        crop: form.crop.trim() || undefined,
+        variety: form.variety.trim() || undefined,
+        target: form.target.trim() || undefined,
+        operator_id: form.operator_id || undefined,
+        operator: form.operator_name.trim() || undefined,
+        machinery_id: form.machinery_id || undefined,
+        machinery_name: form.machinery_name.trim() || undefined,
+        area_ha: num(form.area_ha),
+        actual_area_ha: num(form.actual_area_ha),
+        start_time: form.start_time.trim() || undefined,
+        finish_time: form.finish_time.trim() || undefined,
+        water_rate: num(form.water_rate),
+        speed_kmh: num(form.speed_kmh),
+        boom_width_m: num(form.boom_width_m),
+        nozzle_type: form.nozzle_type.trim() || undefined,
+        pressure: num(form.pressure),
+        notes: form.notes.trim() || undefined,
+        finish_notes: form.finish_notes.trim() || undefined,
+      };
+      await repo.sprayJobs.save(updated);
+      setJ(updated);
+      setEditing(false);
+      setForm(null);
+    } catch (e: any) {
+      setSaveError(e?.message ?? "Couldn't save changes");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (!j) return <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}><ScreenHeader title="Spray Record" back /></View>;
 
@@ -65,7 +179,21 @@ export default function RecordDetail() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
-      <ScreenHeader title="Spray Record" back />
+      <ScreenHeader
+        title="Spray Record"
+        back
+        right={
+          editing ? (
+            <Pressable onPress={cancelEdit} hitSlop={8} testID="cancel-edit-record-btn">
+              <Text style={styles.headerCancel}>Cancel</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={startEdit} hitSlop={8} testID="edit-record-btn">
+              <Icon name="pencil" size={22} color={colors.brandPrimary} />
+            </Pressable>
+          )
+        }
+      />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}>
         <Card>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -75,7 +203,14 @@ export default function RecordDetail() {
           <Text style={styles.sub}>{j.farm_name ?? ""} · {j.date}</Text>
         </Card>
 
-        {isCompleted && (
+        {saveError ? (
+          <View style={styles.errorBox} testID="record-save-error">
+            <Icon name="alert-circle-outline" size={16} color={colors.error} />
+            <Text style={styles.errorText}>{saveError}</Text>
+          </View>
+        ) : null}
+
+        {isCompleted && !editing && (
           <>
             <View style={styles.sectionRow}>
               <Text style={styles.section}>Sign-Off QR</Text>
@@ -109,25 +244,74 @@ export default function RecordDetail() {
         )}
 
         <Text style={styles.section}>Job</Text>
-        <Card>
-          <Field label="Crop" value={j.crop} />
-          <Field label="Crop stage" value={j.crop_stage || j.crop_stage_custom ? stageLabel(j.crop_stage, j.crop_stage_custom, j.crop) : undefined} />
-          <Field label="Target" value={j.target} />
-          <Field label="Operator" value={j.operator} />
-          <Field label="Machine" value={j.machinery_name} />
-          <Field label="Area planned" value={j.area_ha != null ? `${j.area_ha} ha` : undefined} />
-          {j.actual_area_ha != null ? <Field label="Actual area treated" value={`${j.actual_area_ha} ha`} /> : null}
-          <Field label="Start / Finish" value={`${j.start_time ?? "—"} → ${j.finish_time ?? "—"}`} />
-        </Card>
+        {editing && form ? (
+          <Card>
+            <Input label="Crop" value={form.crop} onChangeText={(v) => setForm((s) => s && { ...s, crop: v })} testID="edit-crop" />
+            <Input label="Variety" value={form.variety} onChangeText={(v) => setForm((s) => s && { ...s, variety: v })} testID="edit-variety" />
+            <Input label="Target" value={form.target} onChangeText={(v) => setForm((s) => s && { ...s, target: v })} testID="edit-target" />
+
+            <Text style={styles.pickerLabel}>Operator</Text>
+            <View style={styles.chipRow}>
+              {operators.map((o) => (
+                <Chip
+                  key={o.id}
+                  label={o.name}
+                  active={form.operator_id === o.id}
+                  onPress={() => setForm((s) => s && { ...s, operator_id: o.id, operator_name: o.name })}
+                  testID={`edit-operator-${o.id}`}
+                />
+              ))}
+            </View>
+
+            <Text style={styles.pickerLabel}>Machine</Text>
+            <View style={styles.chipRow}>
+              {machines.map((m) => (
+                <Chip
+                  key={m.id}
+                  label={m.name}
+                  active={form.machinery_id === m.id}
+                  onPress={() => setForm((s) => s && { ...s, machinery_id: m.id, machinery_name: m.name })}
+                  testID={`edit-machine-${m.id}`}
+                />
+              ))}
+            </View>
+
+            <Input label="Area planned (ha)" value={form.area_ha} onChangeText={(v) => setForm((s) => s && { ...s, area_ha: v })} keyboardType="decimal-pad" testID="edit-area-ha" />
+            <Input label="Actual area treated (ha)" value={form.actual_area_ha} onChangeText={(v) => setForm((s) => s && { ...s, actual_area_ha: v })} keyboardType="decimal-pad" testID="edit-actual-area-ha" />
+            <Input label="Start time" value={form.start_time} onChangeText={(v) => setForm((s) => s && { ...s, start_time: v })} testID="edit-start-time" />
+            <Input label="Finish time" value={form.finish_time} onChangeText={(v) => setForm((s) => s && { ...s, finish_time: v })} testID="edit-finish-time" />
+          </Card>
+        ) : (
+          <Card>
+            <Field label="Crop" value={j.crop} />
+            <Field label="Crop stage" value={j.crop_stage || j.crop_stage_custom ? stageLabel(j.crop_stage, j.crop_stage_custom, j.crop) : undefined} />
+            <Field label="Target" value={j.target} />
+            <Field label="Operator" value={j.operator} />
+            <Field label="Machine" value={j.machinery_name} />
+            <Field label="Area planned" value={j.area_ha != null ? `${j.area_ha} ha` : undefined} />
+            {j.actual_area_ha != null ? <Field label="Actual area treated" value={`${j.actual_area_ha} ha`} /> : null}
+            <Field label="Start / Finish" value={`${j.start_time ?? "—"} → ${j.finish_time ?? "—"}`} />
+          </Card>
+        )}
 
         <Text style={styles.section}>Application</Text>
-        <Card>
-          <Field label="Water rate" value={j.water_rate ? `${j.water_rate} L/ha` : undefined} />
-          <Field label="Speed" value={j.speed_kmh ? `${j.speed_kmh} km/h` : undefined} />
-          <Field label="Boom width" value={j.boom_width_m ? `${j.boom_width_m} m` : undefined} />
-          <Field label="Nozzle type" value={j.nozzle_type} />
-          <Field label="Pressure" value={j.pressure ? `${j.pressure} bar` : undefined} />
-        </Card>
+        {editing && form ? (
+          <Card>
+            <Input label="Water rate (L/ha)" value={form.water_rate} onChangeText={(v) => setForm((s) => s && { ...s, water_rate: v })} keyboardType="decimal-pad" testID="edit-water-rate" />
+            <Input label="Speed (km/h)" value={form.speed_kmh} onChangeText={(v) => setForm((s) => s && { ...s, speed_kmh: v })} keyboardType="decimal-pad" testID="edit-speed" />
+            <Input label="Boom width (m)" value={form.boom_width_m} onChangeText={(v) => setForm((s) => s && { ...s, boom_width_m: v })} keyboardType="decimal-pad" testID="edit-boom-width" />
+            <Input label="Nozzle type" value={form.nozzle_type} onChangeText={(v) => setForm((s) => s && { ...s, nozzle_type: v })} testID="edit-nozzle-type" />
+            <Input label="Pressure (bar)" value={form.pressure} onChangeText={(v) => setForm((s) => s && { ...s, pressure: v })} keyboardType="decimal-pad" testID="edit-pressure" />
+          </Card>
+        ) : (
+          <Card>
+            <Field label="Water rate" value={j.water_rate ? `${j.water_rate} L/ha` : undefined} />
+            <Field label="Speed" value={j.speed_kmh ? `${j.speed_kmh} km/h` : undefined} />
+            <Field label="Boom width" value={j.boom_width_m ? `${j.boom_width_m} m` : undefined} />
+            <Field label="Nozzle type" value={j.nozzle_type} />
+            <Field label="Pressure" value={j.pressure ? `${j.pressure} bar` : undefined} />
+          </Card>
+        )}
 
         <View style={styles.wxHeaderRow}>
           <Text style={[styles.section, { marginTop: 0 }]}>Starting weather</Text>
@@ -187,24 +371,37 @@ export default function RecordDetail() {
             </Card>
           ))
         )}
+        {editing ? <Text style={styles.editNotice}>Chemicals and weather readings aren&apos;t editable here — they&apos;re tied to stock records and the verified capture flow.</Text> : null}
 
-        {j.notes ? (
+        <Text style={styles.section}>Notes</Text>
+        {editing && form ? (
+          <Card>
+            <Input label="Notes" value={form.notes} onChangeText={(v) => setForm((s) => s && { ...s, notes: v })} multiline testID="edit-notes" />
+            <Input label="Final notes" value={form.finish_notes} onChangeText={(v) => setForm((s) => s && { ...s, finish_notes: v })} multiline testID="edit-finish-notes" />
+          </Card>
+        ) : (
           <>
-            <Text style={styles.section}>Notes</Text>
-            <Card><Text style={{ color: colors.onSurface, lineHeight: 20 }}>{j.notes}</Text></Card>
+            {j.notes ? <Card><Text style={{ color: colors.onSurface, lineHeight: 20 }}>{j.notes}</Text></Card> : null}
+            {j.finish_notes ? (
+              <>
+                <View style={{ height: spacing.sm }} />
+                <Card><Text style={{ color: colors.onSurface, lineHeight: 20 }}>{j.finish_notes}</Text></Card>
+              </>
+            ) : null}
+            {!j.notes && !j.finish_notes ? <Card><Text style={styles.empty}>No notes recorded.</Text></Card> : null}
           </>
-        ) : null}
+        )}
 
-        {j.finish_notes ? (
+        {editing ? (
           <>
-            <Text style={styles.section}>Final notes</Text>
-            <Card><Text style={{ color: colors.onSurface, lineHeight: 20 }}>{j.finish_notes}</Text></Card>
+            <View style={{ height: spacing.md }} />
+            <Button title="Save changes" icon="content-save-outline" onPress={saveEdit} loading={saving} disabled={saving} testID="save-record-btn" />
           </>
-        ) : null}
-
-        <Text style={styles.discl}>
-          Check current product label, weather conditions and local spraying requirements before application.
-        </Text>
+        ) : (
+          <Text style={styles.discl}>
+            Check current product label, weather conditions and local spraying requirements before application.
+          </Text>
+        )}
       </ScrollView>
     </View>
   );
@@ -246,4 +443,10 @@ const styles = StyleSheet.create({
   autoNoteTitle: { fontSize: 11, color: colors.muted, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4 },
   autoNoteBody: { fontSize: 13, color: colors.onSurface, marginTop: 3, fontWeight: "600" },
   autoNoteMeta: { fontSize: 10, color: colors.muted, marginTop: 4, fontStyle: "italic" },
+  headerCancel: { color: colors.brandPrimary, fontWeight: "700", fontSize: 15 },
+  errorBox: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: spacing.md, backgroundColor: "#FEE2E2", padding: 10, borderRadius: radius.md },
+  errorText: { color: colors.error, fontWeight: "600", fontSize: 12, flex: 1, lineHeight: 16 },
+  pickerLabel: { fontSize: 12, color: colors.muted, fontWeight: "600", textTransform: "uppercase", marginTop: spacing.sm, marginBottom: 6 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.sm },
+  editNotice: { fontSize: 12, color: colors.muted, fontStyle: "italic", marginTop: spacing.sm, lineHeight: 16 },
 });

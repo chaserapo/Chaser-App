@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Switc
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { v4 as uuid } from "uuid";
+import * as Notifications from "expo-notifications";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
 import { Card, Button } from "@/src/components/ui";
@@ -39,6 +40,7 @@ export default function AlertsScreen() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyKind, setBusyKind] = useState<AlertKind | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user || !business) return;
@@ -55,11 +57,13 @@ export default function AlertsScreen() {
   async function toggle(kind: AlertKind) {
     if (!user || !business) return;
     setBusyKind(kind);
+    setError(null);
     try {
       const existing = alerts.find((a) => a.kind === kind);
       if (existing) {
-        const { error } = await supabase.from("weather_alerts").update({ enabled: !existing.enabled }).eq("id", existing.id);
-        if (!error) setAlerts((s) => s.map((a) => (a.id === existing.id ? { ...a, enabled: !a.enabled } : a)));
+        const { error: err } = await supabase.from("weather_alerts").update({ enabled: !existing.enabled }).eq("id", existing.id);
+        if (err) { setError(err.message); return; }
+        setAlerts((s) => s.map((a) => (a.id === existing.id ? { ...a, enabled: !a.enabled } : a)));
       } else {
         const row: Alert = {
           id: uuid(),
@@ -71,8 +75,19 @@ export default function AlertsScreen() {
           enabled: true,
           created_at: new Date().toISOString(),
         };
-        const { error } = await supabase.from("weather_alerts").insert(row);
-        if (!error) setAlerts((s) => [row, ...s]);
+        const { error: err } = await supabase.from("weather_alerts").insert(row);
+        if (err) { setError(err.message); return; }
+        setAlerts((s) => [row, ...s]);
+      }
+      // Enabling an alert needs a registered push token to ever fire — make
+      // sure OS permission is actually granted, and if it was previously
+      // denied, tell the user rather than leaving the switch "on" but silently dead.
+      const perms = await Notifications.getPermissionsAsync();
+      if (perms.status !== "granted") {
+        const req = await Notifications.requestPermissionsAsync();
+        if (req.status !== "granted") {
+          setError("Notifications are turned off for Chaser in your phone's settings — this alert is saved but won't be able to notify you until you allow notifications.");
+        }
       }
     } finally { setBusyKind(null); }
   }
@@ -108,6 +123,13 @@ export default function AlertsScreen() {
           </View>
         </Card>
 
+        {error ? (
+          <View style={styles.errorBox} testID="alerts-error">
+            <Icon name="alert-circle-outline" size={16} color={colors.error} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
         {KINDS.map((k) => {
           const existing = alerts.find((a) => a.kind === k.kind);
           const enabled = existing?.enabled ?? false;
@@ -141,6 +163,8 @@ export default function AlertsScreen() {
 const styles = StyleSheet.create({
   notice: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
   noticeText: { flex: 1, fontSize: 12, color: colors.onSurface, lineHeight: 17 },
+  errorBox: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: spacing.sm, backgroundColor: "#FEE2E2", padding: 10, borderRadius: radius.md },
+  errorText: { color: colors.error, fontWeight: "600", fontSize: 12, flex: 1, lineHeight: 16 },
   alertRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
   alertLabel: { fontSize: 14, fontWeight: "800", color: colors.onSurface },
   alertSub: { fontSize: 11, color: colors.muted, marginTop: 2, lineHeight: 15 },

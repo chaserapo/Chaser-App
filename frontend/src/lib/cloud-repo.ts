@@ -7,7 +7,7 @@ import { getActiveBusinessId } from "./backend";
 import { offlineQueue } from "./offline-queue";
 import { issuesOfflineQueue } from "./issues-offline-queue";
 import type {
-  Business, Farm, Paddock, Chemical, ChemicalBatch, Machinery, Maintenance,
+  Business, Farm, Paddock, Chemical, ChemicalBatch, ChemicalStockLine, Machinery, Maintenance,
   MaintenanceCompletion, SprayJob, SprayJobProduct, ExternalLink, Operator, StockMovement,
   FarmIssue,
 } from "./types";
@@ -247,6 +247,12 @@ export const cloudRepo = {
     forChemical: (chemId: string) => listRows<ChemicalBatch>("chemical_batches", { extraEq: [["chemical_id", chemId]] }),
     save: (b: ChemicalBatch) => upsertRow("chemical_batches", b),
     remove: (id: string) => softDelete("chemical_batches", id),
+  },
+  chemicalStockLines: {
+    list: () => listRows<ChemicalStockLine>("chemical_stock_lines"),
+    forChemical: (chemId: string) => listRows<ChemicalStockLine>("chemical_stock_lines", { extraEq: [["chemical_id", chemId]] }),
+    save: (l: ChemicalStockLine) => upsertRow("chemical_stock_lines", l),
+    remove: (id: string) => softDelete("chemical_stock_lines", id),
   },
   stockMovements: {
     list: () => listRows<StockMovement>("stock_movements"),

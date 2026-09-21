@@ -16,6 +16,7 @@ import {
   rainRiskNext24,
   confidenceLabel,
   MODELS,
+  MODEL_META,
   type ForecastBundle,
   type ModelId,
   type SprayThresholds,
@@ -192,6 +193,15 @@ export default function WeatherScreen() {
               <ConfChip label="Wind" pct={currentHour.confidence.wind} />
             </View>
             <Text style={styles.heroDisc}>Chaser Consensus Forecast — indicative only. Always check actual conditions at the application site.</Text>
+          </View>
+        ) : null}
+
+        {bundle && bundle.models_failed.length > 0 ? (
+          <View style={styles.modelWarning} testID="weather-model-warning">
+            <Icon name="alert-outline" size={16} color={colors.warning} />
+            <Text style={styles.modelWarningText}>
+              {bundle.models_failed.length} of {MODELS.length} weather sources didn't respond this time ({bundle.models_failed.map((f) => MODEL_META[f.model].short).join(", ")}) — showing a consensus from the rest.
+            </Text>
           </View>
         ) : null}
 
@@ -528,6 +538,9 @@ const styles = StyleSheet.create({
 
   loading: { alignItems: "center", padding: spacing.xl, gap: 8 },
   loadingText: { color: colors.muted, fontSize: 12 },
+
+  modelWarning: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#FEF3C7", padding: 10, borderRadius: radius.md, marginBottom: spacing.md },
+  modelWarningText: { flex: 1, fontSize: 12, color: colors.warning, lineHeight: 16, fontWeight: "600" },
 
   emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: 10 },
   emptyTitle: { fontSize: 18, fontWeight: "800", color: colors.onSurface },

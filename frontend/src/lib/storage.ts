@@ -7,6 +7,7 @@ import type {
   Paddock,
   Chemical,
   ChemicalBatch,
+  ChemicalStockLine,
   Machinery,
   Maintenance,
   MaintenanceCompletion,
@@ -23,6 +24,7 @@ const KEYS = {
   paddocks: "as.paddocks",
   chemicals: "as.chemicals",
   chemical_batches: "as.chemical_batches",
+  chemical_stock_lines: "as.chemical_stock_lines",
   stock_movements: "as.stock_movements",
   machinery: "as.machinery",
   maintenance: "as.maintenance",
@@ -111,6 +113,21 @@ export const localRepo = {
     remove: async (id: string) => {
       const list = (await readList<ChemicalBatch>(KEYS.chemical_batches)).filter((x) => x.id !== id);
       await writeList(KEYS.chemical_batches, list);
+    },
+  },
+  chemicalStockLines: {
+    list: () => readList<ChemicalStockLine>(KEYS.chemical_stock_lines),
+    forChemical: async (chemId: string) => (await readList<ChemicalStockLine>(KEYS.chemical_stock_lines)).filter((l) => l.chemical_id === chemId),
+    save: async (l: ChemicalStockLine) => {
+      const list = await readList<ChemicalStockLine>(KEYS.chemical_stock_lines);
+      const idx = list.findIndex((x) => x.id === l.id);
+      if (idx >= 0) list[idx] = l;
+      else list.push(l);
+      await writeList(KEYS.chemical_stock_lines, list);
+    },
+    remove: async (id: string) => {
+      const list = (await readList<ChemicalStockLine>(KEYS.chemical_stock_lines)).filter((x) => x.id !== id);
+      await writeList(KEYS.chemical_stock_lines, list);
     },
   },
   stockMovements: {

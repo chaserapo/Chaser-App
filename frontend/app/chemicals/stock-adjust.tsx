@@ -8,7 +8,7 @@ import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { recordManualMovement } from "@/src/lib/stock";
-import type { Chemical, StockMovementReason } from "@/src/lib/types";
+import type { Chemical, ChemicalStockLine, StockMovementReason } from "@/src/lib/types";
 
 const REASONS: StockMovementReason[] = ["Purchase", "Correction", "Spill", "Transfer", "Usage", "Other"];
 
@@ -17,20 +17,28 @@ export default function StockAdjust() {
   const router = useRouter();
   const { chemicalId } = useLocalSearchParams<{ chemicalId: string }>();
   const [chem, setChem] = useState<Chemical | null>(null);
+  const [stockLines, setStockLines] = useState<ChemicalStockLine[]>([]);
+  const [lineId, setLineId] = useState<string | null>(null);
   const [direction, setDirection] = useState<"add" | "remove">("add");
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState<StockMovementReason>("Purchase");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useFocusEffect(useCallback(() => { if (chemicalId) repo.chemicals.get(chemicalId as string).then(setChem); }, [chemicalId]));
+  useFocusEffect(useCallback(() => {
+    if (!chemicalId) return;
+    repo.chemicals.get(chemicalId as string).then(setChem);
+    repo.chemicalStockLines.forChemical(chemicalId as string).then((lines) => setStockLines(lines.filter((l) => !l.archived_at)));
+  }, [chemicalId]));
+
+  const selectedLine = stockLines.find((l) => l.id === lineId) ?? null;
 
   async function save() {
     const q = parseFloat(qty);
     if (!chem || !q || q <= 0) return;
     setSaving(true);
     const delta = direction === "add" ? q : -q;
-    await recordManualMovement(chem.id, delta, reason, notes.trim() || undefined);
+    await recordManualMovement(chem.id, delta, reason, notes.trim() || undefined, lineId ?? undefined);
     setSaving(false);
     router.back();
   }
@@ -52,6 +60,26 @@ export default function StockAdjust() {
             <Text style={styles.currentStock}>Current stock: <Text style={{ fontWeight: "800" }}>{current} {chem.stock_unit ?? chem.pack_size ?? ""}</Text></Text>
           </Card>
 
+          {stockLines.length > 0 ? (
+            <>
+              <View style={{ height: spacing.md }} />
+              <Card>
+                <Text style={styles.reasonLabel}>Which pack size? (optional)</Text>
+                <View style={styles.reasonGrid}>
+                  <Pressable onPress={() => setLineId(null)} style={[styles.reasonChip, lineId === null && styles.reasonChipActive]} testID="adjust-line-none">
+                    <Text style={[styles.reasonText, lineId === null && { color: colors.onBrandPrimary }]}>Just the total</Text>
+                  </Pressable>
+                  {stockLines.map((l) => (
+                    <Pressable key={l.id} onPress={() => setLineId(l.id)} style={[styles.reasonChip, lineId === l.id && styles.reasonChipActive]} testID={`adjust-line-${l.id}`}>
+                      <Text style={[styles.reasonText, lineId === l.id && { color: colors.onBrandPrimary }]}>{l.pack_size}{l.location ? ` · ${l.location}` : ""}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={styles.hint}>Pick a pack size to keep that line&apos;s own count in sync — useful for &quot;how many 20L drums do we have&quot; history later.</Text>
+              </Card>
+            </>
+          ) : null}
+
           <View style={{ height: spacing.md }} />
           <Card>
             <View style={styles.toggleRow}>
@@ -65,7 +93,7 @@ export default function StockAdjust() {
               </Pressable>
             </View>
 
-            <Input label="Quantity" value={qty} onChangeText={setQty} keyboardType="decimal-pad" suffix={chem.stock_unit ?? "packs"} testID="input-adjust-qty" />
+            <Input label={selectedLine ? `Quantity (number of ${selectedLine.pack_size} packs)` : "Quantity"} value={qty} onChangeText={setQty} keyboardType="decimal-pad" suffix={selectedLine ? "packs" : (chem.stock_unit ?? "packs")} testID="input-adjust-qty" />
 
             <Text style={styles.reasonLabel}>Reason</Text>
             <View style={styles.reasonGrid}>
@@ -111,4 +139,5 @@ const styles = StyleSheet.create({
   reasonChip: { paddingHorizontal: 12, height: 36, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, alignItems: "center", justifyContent: "center" },
   reasonChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
   reasonText: { fontSize: 12, fontWeight: "700", color: colors.onSurfaceTertiary },
+  hint: { fontSize: 12, color: colors.muted, fontStyle: "italic", lineHeight: 17, marginTop: 6 },
 });

@@ -8,8 +8,9 @@ import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { CHEMICAL_CATEGORIES, ChemicalCategory, RATE_UNITS, RateUnit } from "@/src/lib/types";
-import type { Chemical } from "@/src/lib/types";
+import type { Chemical, ChemicalStockLine } from "@/src/lib/types";
 import { confirm } from "@/src/lib/confirm";
+import { parsePackSize } from "@/src/lib/stock";
 
 export default function ChemicalDetail() {
   const insets = useSafeAreaInsets();
@@ -18,6 +19,7 @@ export default function ChemicalDetail() {
   const [c, setC] = useState<Chemical | null>(null);
   const [batches, setBatches] = useState<import("@/src/lib/types").ChemicalBatch[]>([]);
   const [movements, setMovements] = useState<import("@/src/lib/types").StockMovement[]>([]);
+  const [stockLines, setStockLines] = useState<ChemicalStockLine[]>([]);
   const [editing, setEditing] = useState(false);
   const [type, setType] = useState<ChemicalCategory>("Herbicide");
   const [rateUnit, setRateUnit] = useState<RateUnit>("L/ha");
@@ -61,8 +63,20 @@ export default function ChemicalDetail() {
       setBatches(bs.sort((a, b) => (a.expiry_date ?? "").localeCompare(b.expiry_date ?? "")));
       const mvs = await repo.stockMovements.forChemical(id as string);
       setMovements(mvs.slice(0, 10));
+      const lines = await repo.chemicalStockLines.forChemical(id as string);
+      setStockLines(lines.filter((l) => !l.archived_at).sort((a, b) => a.pack_size.localeCompare(b.pack_size)));
     })();
   }, [id]));
+
+  // Total volume across all pack-size lines, grouped by unit — most products
+  // only ever have one unit (e.g. all-L or all-kg), but mixed products show
+  // each unit's total separately rather than silently adding L to kg.
+  const totalsByUnit = stockLines.reduce<Record<string, number>>((acc, l) => {
+    const parsed = parsePackSize(l.pack_size);
+    if (!parsed) return acc;
+    acc[parsed.unit] = (acc[parsed.unit] ?? 0) + parsed.size * l.qty;
+    return acc;
+  }, {});
 
   async function save() {
     if (!c || !f.product_name.trim()) return;
@@ -215,16 +229,53 @@ export default function ChemicalDetail() {
           <Text style={styles.hint}>Chaser never suggests application rates. This is your saved default.</Text>
         </Card>
 
-        <Text style={styles.section}>Inventory</Text>
+        <Text style={styles.section}>Inventory (at a glance)</Text>
         <Card>
           <Field label="Pack size" value={c.pack_size} />
           <Field label="Current stock" value={c.stock_qty != null ? `${c.stock_qty} ${c.stock_unit ?? c.pack_size ?? ""}` : undefined} />
           <Field label="Low stock warning" value={c.low_stock_threshold != null ? `${c.low_stock_threshold} ${c.stock_unit ?? ""}`.trim() : "Using your default"} />
           <Field label="Storage location" value={c.storage_location} />
+          <Text style={styles.hint}>This single total drives low-stock alerts and spray-job deductions. Use &quot;Adjust Stock&quot; below to change it.</Text>
         </Card>
+
+        <View style={styles.sectionRow}>
+          <Text style={[styles.section, { marginTop: 0 }]}>Pack sizes on hand</Text>
+          <Pressable onPress={() => router.push({ pathname: "/chemicals/stock-line-new", params: { chemicalId: c.id } })} testID="add-stock-line-btn">
+            <Text style={styles.linkAction}>+ Add</Text>
+          </Pressable>
+        </View>
+        {stockLines.length === 0 ? (
+          <Card><Text style={styles.hint}>No pack sizes tracked yet. Add each pack size you keep on hand (e.g. &quot;20 L&quot; and &quot;110 L&quot;) to break down stock and location per pack, and see history by pack size over time.</Text></Card>
+        ) : (
+          <>
+            {stockLines.map((l) => (
+              <Card
+                key={l.id}
+                style={{ marginBottom: spacing.sm }}
+                onPress={() => router.push({ pathname: "/chemicals/stock-line-new", params: { chemicalId: c.id, lineId: l.id } })}
+                testID={`stock-line-${l.id}`}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.lineTitle}>{l.qty} × {l.pack_size}</Text>
+                    {l.location ? <Text style={styles.lineMeta}>{l.location}</Text> : null}
+                  </View>
+                  <Icon name="chevron-right" size={20} color={colors.muted} />
+                </View>
+              </Card>
+            ))}
+            <Card>
+              {Object.entries(totalsByUnit).map(([unit, total]) => (
+                <Text key={unit} style={styles.totalVolume}>Total: {Math.round(total * 100) / 100} {unit}</Text>
+              ))}
+            </Card>
+          </>
+        )}
 
         <View style={{ height: spacing.sm }} />
         <Button title="Adjust Stock" icon="plus-minus" variant="secondary" onPress={() => router.push({ pathname: "/chemicals/stock-adjust", params: { chemicalId: c.id } })} testID="adjust-stock-btn" />
+        <View style={{ height: spacing.sm }} />
+        <Button title="View Stock History" icon="chart-line" variant="outline" onPress={() => router.push({ pathname: "/chemicals/history", params: { chemicalId: c.id } })} testID="view-history-btn" />
 
         {movements.length > 0 && (
           <>
@@ -349,6 +400,9 @@ const styles = StyleSheet.create({
   unitText: { fontSize: 12, fontWeight: "700", color: colors.onSurfaceTertiary },
   sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.lg, marginBottom: spacing.sm },
   linkAction: { fontSize: 13, fontWeight: "700", color: colors.brandPrimary },
+  lineTitle: { fontSize: 15, fontWeight: "700", color: colors.onSurface },
+  lineMeta: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  totalVolume: { fontSize: 14, fontWeight: "800", color: colors.brandPrimary },
   expBadge: { backgroundColor: colors.error, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
   expBadgeText: { color: colors.onError, fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
   expSoonBadge: { backgroundColor: "#FEF3C7", paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },

@@ -67,12 +67,28 @@ export type StockMovement = {
   id: ID;
   business_id: ID;
   chemical_id: ID;
+  stock_line_id?: ID | null;
   ts: string;
   delta: number;
   unit?: string;
   reason: StockMovementReason;
   spray_job_id?: ID;
   notes?: string;
+  created_at: string;
+};
+
+// A concurrent pack-size line for a chemical — e.g. "Ester 680" can have both
+// a "110 L" line and a "20 L" line on hand at once, each tracked separately.
+export type ChemicalStockLine = {
+  id: ID;
+  business_id: ID;
+  chemical_id: ID;
+  pack_size: string;
+  qty: number;
+  location?: string;
+  low_stock_threshold?: number;
+  notes?: string;
+  archived_at?: string;
   created_at: string;
 };
 

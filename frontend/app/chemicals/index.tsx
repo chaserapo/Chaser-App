@@ -49,9 +49,14 @@ export default function ChemicalsList() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
       <ScreenHeader title="Chemical Register" back right={
-        <Pressable onPress={() => router.push("/chemicals/new")} testID="add-chem-header-btn">
-          <Icon name="plus" size={24} color={colors.brandPrimary} />
-        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+          <Pressable onPress={() => router.push("/chemicals/history")} testID="chem-history-header-btn">
+            <Icon name="chart-line" size={22} color={colors.brandPrimary} />
+          </Pressable>
+          <Pressable onPress={() => router.push("/chemicals/new")} testID="add-chem-header-btn">
+            <Icon name="plus" size={24} color={colors.brandPrimary} />
+          </Pressable>
+        </View>
       } />
 
       <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
