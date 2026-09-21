@@ -69,6 +69,7 @@ export type ForecastBundle = {
   lon: number;
   retrieved_at: string;
   models_returned: ModelId[];
+  models_failed: ModelFailure[];
   by_model: Record<ModelId, ModelHour[]>;
   consensus: ConsensusHour[];
   daily: DailyConsensus[];
@@ -197,18 +198,39 @@ async function fetchOne(model: ModelId, lat: number, lon: number, horizonH: numb
   } catch {
     // One retry - a single slow/dropped request on mobile shouldn't cost a
     // model out of the consensus for the next 45 minutes (the stale-refetch
-    // window).
-    return await fetchOnceRaw(model, lat, lon, days, 25_000);
+    // window). If the retry fails too, log why before giving up — a
+    // consistently-failing model (e.g. a renamed/retired Open-Meteo model id)
+    // was previously invisible since this error was swallowed entirely.
+    try {
+      return await fetchOnceRaw(model, lat, lon, days, 25_000);
+    } catch (e2: any) {
+      console.warn(`weather model "${model}" failed twice:`, e2?.message ?? e2);
+      throw e2;
+    }
   }
 }
 
-export async function fetchAllModels(lat: number, lon: number, horizonH = 168): Promise<Record<ModelId, ModelHour[]>> {
+export type ModelFailure = { model: ModelId; reason: string };
+
+export async function fetchAllModels(
+  lat: number,
+  lon: number,
+  horizonH = 168,
+): Promise<{ byModel: Record<ModelId, ModelHour[]>; failed: ModelFailure[] }> {
   const results = await Promise.allSettled(MODELS.map((m) => fetchOne(m.id, lat, lon, horizonH)));
-  const out: Record<ModelId, ModelHour[]> = {} as any;
+  const byModel: Record<ModelId, ModelHour[]> = {} as any;
+  const failed: ModelFailure[] = [];
   results.forEach((r, i) => {
-    if (r.status === "fulfilled" && r.value.length > 0) out[MODELS[i].id] = r.value;
+    if (r.status === "fulfilled" && r.value.length > 0) {
+      byModel[MODELS[i].id] = r.value;
+    } else {
+      failed.push({
+        model: MODELS[i].id,
+        reason: r.status === "rejected" ? (r.reason?.message ?? String(r.reason)) : "empty response",
+      });
+    }
   });
-  return out;
+  return { byModel, failed };
 }
 
 // ─── Consensus ─────────────────────────────────────────────────────────────
@@ -518,8 +540,9 @@ export async function persistRun(bundle: ForecastBundle, source: "client" | "cro
 
 /** Convenience: fetch + consensus + persist. */
 export async function runForecast(params: { locationId: string | null; lat: number; lon: number; source?: "client" | "cron" }): Promise<ForecastBundle> {
-  const byModel = await fetchAllModels(params.lat, params.lon);
+  const { byModel, failed } = await fetchAllModels(params.lat, params.lon);
   const models = Object.keys(byModel) as ModelId[];
+  if (failed.length > 0) console.warn("weather models unavailable:", failed);
   const consensus = computeConsensus(byModel);
   const daily = buildDaily(consensus);
   const bundle: ForecastBundle = {
@@ -528,6 +551,7 @@ export async function runForecast(params: { locationId: string | null; lat: numb
     lon: params.lon,
     retrieved_at: new Date().toISOString(),
     models_returned: models,
+    models_failed: failed,
     by_model: byModel,
     consensus,
     daily,

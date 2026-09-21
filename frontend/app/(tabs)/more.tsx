@@ -202,9 +202,17 @@ export default function More() {
 
         <Text style={styles.sectionTitle}>Tools</Text>
         <Card style={{ padding: 0, overflow: "hidden" }}>
-          <Pressable onPress={() => router.push("/chemicals")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-chemicals-btn">
+          <Pressable onPress={() => router.push("/chemicals")} style={({ pressed }) => [styles.row, styles.rowBorder, pressed && { backgroundColor: colors.surface }]} testID="open-chemicals-btn">
             <Icon name="flask-outline" size={22} color={colors.brandPrimary} />
             <Text style={styles.rowText}>Chemicals</Text>
+            <Icon name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+          <Pressable onPress={() => router.push("/records/history")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-spray-history-btn">
+            <Icon name="clipboard-clock-outline" size={22} color={colors.brandPrimary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowText}>Spray History</Text>
+              <Text style={styles.rowSub}>Browse past jobs by farm, paddock, and month</Text>
+            </View>
             <Icon name="chevron-right" size={22} color={colors.muted} />
           </Pressable>
         </Card>

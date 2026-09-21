@@ -140,19 +140,35 @@ export async function recordManualMovement(
   delta: number,
   reason: StockMovementReason,
   notes?: string,
+  stockLineId?: string,
 ): Promise<void> {
   const chem = await repo.chemicals.get(chemicalId);
   if (!chem) return;
   const current = chem.stock_qty ?? 0;
   const next = Math.round((current + delta) * 100) / 100;
   await repo.chemicals.save({ ...chem, stock_qty: next });
+
+  // When the adjustment is attributed to a specific pack-size line, keep
+  // that line's own qty in sync too — this is what makes point-in-time
+  // history per pack size possible going forward.
+  let lineUnit: string | undefined;
+  if (stockLineId) {
+    const lines = await repo.chemicalStockLines.forChemical(chemicalId);
+    const line = lines.find((l) => l.id === stockLineId);
+    if (line) {
+      lineUnit = line.pack_size;
+      await repo.chemicalStockLines.save({ ...line, qty: Math.round((line.qty + delta) * 100) / 100 });
+    }
+  }
+
   const mv: StockMovement = {
     id: uuid(),
     business_id: chem.business_id,
     chemical_id: chem.id,
+    stock_line_id: stockLineId ?? null,
     ts: new Date().toISOString(),
     delta: Math.round(delta * 100) / 100,
-    unit: chem.stock_unit ?? "packs",
+    unit: lineUnit ?? chem.stock_unit ?? "packs",
     reason,
     notes,
     created_at: new Date().toISOString(),
