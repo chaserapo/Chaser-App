@@ -150,6 +150,19 @@ const MAP: Record<string, keyof HourlyVars> = {
 };
 
 // ─── Fetcher ───────────────────────────────────────────────────────────────
+// Open-Meteo doesn't serve every model off the general /v1/forecast endpoint
+// selected via &models= — ECMWF (IFS + AIFS) and BOM each have their own
+// dedicated endpoint (/v1/ecmwf, /v1/bom). Querying them through /v1/forecast
+// fails every time regardless of retries, which is exactly what was making
+// three of the four "independent models" silently never return data while
+// gfs_seamless (which *is* valid on /v1/forecast) always succeeded.
+const ENDPOINT: Record<ModelId, string> = {
+  ecmwf_ifs04: "ecmwf",
+  ecmwf_aifs025: "ecmwf",
+  bom_access_global: "bom",
+  gfs_seamless: "forecast",
+};
+
 // Each model's request pulls a full week of hourly data across 17 variables -
 // a sizeable payload. On a weak mobile connection, four of these fired in
 // parallel can easily have some finish well after the others; a short
@@ -157,7 +170,7 @@ const MAP: Record<string, keyof HourlyVars> = {
 // race. Give it real room, and retry once before giving up entirely.
 async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: number, timeoutMs: number): Promise<ModelHour[]> {
   const url =
-    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `https://api.open-meteo.com/v1/${ENDPOINT[model]}?latitude=${lat}&longitude=${lon}` +
     `&hourly=${HOURLY_VARS}` +
     `&wind_speed_unit=kmh&timezone=auto&forecast_days=${days}` +
     `&models=${model}`;
