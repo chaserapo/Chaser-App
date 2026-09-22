@@ -10,7 +10,7 @@ import { LINK_CATEGORIES } from "@/src/lib/links";
 import { useAuth } from "@/src/lib/auth-context";
 import { confirm } from "@/src/lib/confirm";
 import { profileRepo, useOnboarding } from "@/src/lib/onboarding";
-import { useEntitlement, purchasesConfigured } from "@/src/lib/purchases";
+import { useEntitlement, purchasesConfigured, presentCustomerCenter } from "@/src/lib/purchases";
 import type { ExternalLink } from "@/src/lib/types";
 
 const TOOLS = [
@@ -186,7 +186,7 @@ export default function More() {
           <>
             <Text style={styles.sectionTitle}>Subscription</Text>
             <Card style={{ padding: 0, overflow: "hidden" }}>
-              <Pressable onPress={() => router.push("/paywall")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-subscription-btn">
+              <Pressable onPress={() => (entitlement.isPro ? presentCustomerCenter() : router.push("/paywall"))} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-subscription-btn">
                 <Icon name={entitlement.isPro ? "star" : "star-outline"} size={22} color={colors.brandPrimary} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowText}>{entitlement.isPro ? "Chaser Pro" : "Free trial"}</Text>

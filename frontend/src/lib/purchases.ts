@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 
-export const PRO_ENTITLEMENT_ID = "pro";
+export const PRO_ENTITLEMENT_ID = "chaser";
 export const TRIAL_DAYS = 7;
 
 const IOS_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY;
@@ -65,6 +65,17 @@ export async function restorePurchases(): Promise<{ ok: boolean; message?: strin
     return { ok: active, message: active ? undefined : "No active subscription found for this Apple ID." };
   } catch (e: any) {
     return { ok: false, message: e?.message ?? "Restore failed" };
+  }
+}
+
+/** Opens Apple's native "manage subscription" flow (cancel, upgrade, billing history). */
+export async function presentCustomerCenter(): Promise<void> {
+  if (!purchasesConfigured()) return;
+  try {
+    const RevenueCatUI = require("react-native-purchases-ui").default;
+    await RevenueCatUI.presentCustomerCenter();
+  } catch (e) {
+    console.warn("RevenueCat presentCustomerCenter failed", e);
   }
 }
 

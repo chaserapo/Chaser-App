@@ -5635,6 +5635,13 @@ react-native-is-edge-to-edge@^1.3.1:
   resolved "https://registry.yarnpkg.com/react-native-is-edge-to-edge/-/react-native-is-edge-to-edge-1.3.1.tgz#feb9a6a8faf0874298947edd556e5af22044e139"
   integrity sha512-NIXU/iT5+ORyCc7p0z2nnlkouYKX425vuU1OEm6bMMtWWR9yvb+Xg5AZmImTKoF9abxCPqrKC3rOZsKzUYgYZA==
 
+react-native-purchases-ui@10.10.1:
+  version "10.10.1"
+  resolved "https://registry.yarnpkg.com/react-native-purchases-ui/-/react-native-purchases-ui-10.10.1.tgz#6a805d5276abc02aaeb8460641bcdff9d1daa0d3"
+  integrity sha512-UMb0eKKUehHLdR1K4TEtHE4dpN/3v5UZ5/I4kNYMjBgsyQrizxvKYanHDD7bJ1w8A3YR4C4errhDBN0BNPolfQ==
+  dependencies:
+    "@revenuecat/purchases-typescript-internal" "19.2.0"
+
 react-native-purchases@10.10.1:
   version "10.10.1"
   resolved "https://registry.yarnpkg.com/react-native-purchases/-/react-native-purchases-10.10.1.tgz#e4b48093f9f968ea8e739d6198ca8342d6c38961"
