@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Pre
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { v4 as uuid } from "uuid";
+import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
 import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
@@ -24,10 +25,14 @@ export default function NewChemical() {
     stock_qty: "", stock_unit: "", low_stock_threshold: "", storage_location: "",
     label_url: "", sds_url: "", notes: "",
   });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function save() {
     const business = await repo.getBusiness();
     if (!business || !f.product_name.trim()) return;
+    setSaving(true);
+    setError(null);
     const c: Chemical = {
       id: uuid(),
       business_id: business.id,
@@ -50,8 +55,14 @@ export default function NewChemical() {
       notes: f.notes.trim() || undefined,
       created_at: new Date().toISOString(),
     };
-    await repo.chemicals.save(c);
-    router.replace({ pathname: "/chemicals/[id]", params: { id: c.id } });
+    try {
+      await repo.chemicals.save(c);
+      router.replace({ pathname: "/chemicals/[id]", params: { id: c.id } });
+    } catch (e: any) {
+      setError(e?.message ?? "Couldn't save this chemical");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function applyApvmaProduct(p: ApvmaProduct) {
@@ -138,8 +149,14 @@ export default function NewChemical() {
             <Input label="Notes" value={f.notes} onChangeText={(v) => setF({ ...f, notes: v })} multiline testID="input-notes" />
           </Card>
 
+          {error ? (
+            <View style={styles.errorBox} testID="save-chem-error">
+              <Icon name="alert-circle-outline" size={16} color={colors.error} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
           <View style={{ height: spacing.md }} />
-          <Button title="Save Chemical" icon="content-save-outline" onPress={save} disabled={!f.product_name.trim()} testID="save-chem-btn" />
+          <Button title="Save Chemical" icon="content-save-outline" onPress={save} loading={saving} disabled={saving || !f.product_name.trim()} testID="save-chem-btn" />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -157,4 +174,6 @@ const styles = StyleSheet.create({
   unitChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
   unitText: { fontSize: 12, fontWeight: "700", color: colors.onSurfaceTertiary },
   hint: { fontSize: 12, color: colors.muted, fontStyle: "italic", marginBottom: spacing.md, lineHeight: 17 },
+  errorBox: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: spacing.md, backgroundColor: "#FEE2E2", padding: 10, borderRadius: radius.md },
+  errorText: { color: colors.error, fontWeight: "600", fontSize: 12, flex: 1, lineHeight: 16 },
 });

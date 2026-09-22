@@ -21,6 +21,8 @@ export default function ChemicalDetail() {
   const [movements, setMovements] = useState<import("@/src/lib/types").StockMovement[]>([]);
   const [stockLines, setStockLines] = useState<ChemicalStockLine[]>([]);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [type, setType] = useState<ChemicalCategory>("Herbicide");
   const [rateUnit, setRateUnit] = useState<RateUnit>("L/ha");
   const [f, setF] = useState({
@@ -80,6 +82,8 @@ export default function ChemicalDetail() {
 
   async function save() {
     if (!c || !f.product_name.trim()) return;
+    setSaving(true);
+    setSaveError(null);
     const next: Chemical = {
       ...c,
       product_name: f.product_name.trim(),
@@ -100,21 +104,35 @@ export default function ChemicalDetail() {
       sds_url: f.sds_url.trim() || undefined,
       notes: f.notes.trim() || undefined,
     };
-    await repo.chemicals.save(next);
-    setC(next);
-    setEditing(false);
+    try {
+      await repo.chemicals.save(next);
+      setC(next);
+      setEditing(false);
+    } catch (e: any) {
+      setSaveError(e?.message ?? "Couldn't save changes");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function archive() {
     if (!c) return;
-    await repo.chemicals.save({ ...c, archived_at: new Date().toISOString() });
-    router.back();
+    try {
+      await repo.chemicals.save({ ...c, archived_at: new Date().toISOString() });
+      router.back();
+    } catch (e: any) {
+      setSaveError(e?.message ?? "Couldn't archive this product");
+    }
   }
   async function unarchive() {
     if (!c) return;
     const next = { ...c, archived_at: undefined };
-    await repo.chemicals.save(next);
-    setC(next);
+    try {
+      await repo.chemicals.save(next);
+      setC(next);
+    } catch (e: any) {
+      setSaveError(e?.message ?? "Couldn't unarchive this product");
+    }
   }
 
   function confirmDelete() {
@@ -190,8 +208,14 @@ export default function ChemicalDetail() {
               <Input label="Notes" value={f.notes} onChangeText={(v) => setF({ ...f, notes: v })} multiline testID="edit-notes" />
             </Card>
 
+            {saveError ? (
+              <View style={styles.errorBox} testID="save-chem-error">
+                <Icon name="alert-circle-outline" size={16} color={colors.error} />
+                <Text style={styles.errorText}>{saveError}</Text>
+              </View>
+            ) : null}
             <View style={{ height: spacing.md }} />
-            <Button title="Save Changes" icon="content-save-outline" onPress={save} disabled={!f.product_name.trim()} testID="save-chem-edit-btn" />
+            <Button title="Save Changes" icon="content-save-outline" onPress={save} loading={saving} disabled={saving || !f.product_name.trim()} testID="save-chem-edit-btn" />
             <View style={{ height: spacing.sm }} />
             <Button title="Cancel" variant="outline" onPress={() => { setEditing(false); loadState(c); }} testID="cancel-chem-edit-btn" />
           </ScrollView>
@@ -215,6 +239,13 @@ export default function ChemicalDetail() {
           {c.active_ingredient ? <Text style={styles.ai}>{c.active_ingredient}</Text> : null}
           {c.formulation ? <Text style={styles.form}>{c.formulation}</Text> : null}
         </Card>
+
+        {saveError ? (
+          <View style={styles.errorBox} testID="chem-detail-error">
+            <Icon name="alert-circle-outline" size={16} color={colors.error} />
+            <Text style={styles.errorText}>{saveError}</Text>
+          </View>
+        ) : null}
 
         <Text style={styles.section}>Identification</Text>
         <Card>
@@ -376,6 +407,8 @@ function Field({ label, value }: { label: string; value?: string | number }) {
 }
 
 const styles = StyleSheet.create({
+  errorBox: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: spacing.md, backgroundColor: "#FEE2E2", padding: 10, borderRadius: radius.md },
+  errorText: { color: colors.error, fontWeight: "600", fontSize: 12, flex: 1, lineHeight: 16 },
   section: { fontSize: 13, fontWeight: "800", color: colors.muted, marginTop: spacing.lg, marginBottom: spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 },
   pName: { fontSize: 22, fontWeight: "800", color: colors.onSurface, flexShrink: 1 },
   ai: { fontSize: 14, color: colors.onSurfaceTertiary, marginTop: 6, fontWeight: "600" },
