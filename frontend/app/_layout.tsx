@@ -17,6 +17,8 @@ import { getBackendMode } from "@/src/lib/backend";
 import { registerPushToken, useNotificationRouting } from "@/src/lib/push-tokens";
 import { useOnboarding } from "@/src/lib/onboarding";
 import DiscoveryScreen, { useDiscoveryGate } from "@/src/features/onboarding/DiscoveryScreen";
+import { configurePurchases, useEntitlement } from "@/src/lib/purchases";
+import { PaywallScreen } from "@/src/features/subscription/PaywallScreen";
 
 LogBox.ignoreAllLogs(true);
 
@@ -43,6 +45,11 @@ function AuthGate() {
     registerPushToken(session.user.id, business.id);
   }, [business, session]);
 
+  useEffect(() => {
+    if (!session?.user) return;
+    configurePurchases(session.user.id);
+  }, [session]);
+
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }}>
@@ -65,13 +72,14 @@ function DeferredOnboarding() {
 }
 
 function PostAuthShell() {
-  const { session } = useAuth();
+  const { session, business } = useAuth();
   const userId = session?.user?.id ?? null;
   const { needsOnboarding, loading, profile } = useOnboarding();
   const discovery = useDiscoveryGate(userId);
+  const entitlement = useEntitlement(business?.created_at ?? null);
   useNotificationRouting();
 
-  if ((loading && !profile) || discovery.isLoading) {
+  if ((loading && !profile) || discovery.isLoading || entitlement.loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color={colors.brandPrimary} />
@@ -81,6 +89,9 @@ function PostAuthShell() {
 
   if (userId && !discovery.data?.completed) return <DiscoveryScreen userId={userId} />;
   if (needsOnboarding) return <DeferredOnboarding />;
+  // Trial/subscription gate comes last — after onboarding, so a brand-new
+  // signup always gets to set up their farm before ever seeing a paywall.
+  if (entitlement.showPaywall) return <PaywallScreen />;
   return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }} />;
 }
 

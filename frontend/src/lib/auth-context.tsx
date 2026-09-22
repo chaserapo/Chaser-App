@@ -6,7 +6,7 @@ import { setBackend } from "./backend";
 import { isMigrated, localBackupBelongsToAnotherAccount, runMigration, MigrationProgress } from "./migrate";
 import { acceptPendingInvitations } from "./members";
 
-export type ActiveBusiness = { id: string; name: string; role: "owner" | "manager" | "operator" };
+export type ActiveBusiness = { id: string; name: string; role: "owner" | "manager" | "operator"; created_at: string };
 export type MigrationState =
   | { kind: "idle" }
   | { kind: "running"; progress: MigrationProgress }
@@ -65,25 +65,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isFreshBusiness = false;
     if (members && members.length > 0) {
       const m = members[0];
-      const { data: bz, error: bzErr } = await supabase.from("businesses").select("id, name").eq("id", m.business_id).maybeSingle();
+      const { data: bz, error: bzErr } = await supabase.from("businesses").select("id, name, created_at").eq("id", m.business_id).maybeSingle();
       if (bzErr) throw bzErr;
       if (!bz) throw new Error("Business record missing.");
-      biz = { id: bz.id, name: bz.name, role: m.role as ActiveBusiness["role"] };
+      biz = { id: bz.id, name: bz.name, role: m.role as ActiveBusiness["role"], created_at: bz.created_at };
     } else {
       // Fresh account — must create the business. Use pending signup name if we have it,
       // otherwise fall back to a friendly default (user can rename in Account later).
       const businessName = pendingSignupBusinessName.current || "My Farm";
       pendingSignupBusinessName.current = null;
       const bId = uuid();
+      const createdAt = new Date().toISOString();
       const { error: insBizErr } = await supabase
         .from("businesses")
-        .insert({ id: bId, owner_id: u.id, name: businessName });
+        .insert({ id: bId, owner_id: u.id, name: businessName, created_at: createdAt });
       if (insBizErr) throw insBizErr;
       const { error: insMemErr } = await supabase
         .from("business_members")
         .insert({ id: uuid(), business_id: bId, user_id: u.id, role: "owner" });
       if (insMemErr) throw insMemErr;
-      biz = { id: bId, name: businessName, role: "owner" };
+      biz = { id: bId, name: businessName, role: "owner", created_at: createdAt };
       isFreshBusiness = true;
     }
 
