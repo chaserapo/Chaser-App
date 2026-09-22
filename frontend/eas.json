@@ -31,6 +31,22 @@
         "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "test_BdrtXaAtfDmHCADosQwwtvZxpIF"
       }
     },
+    "preview-device": {
+      "distribution": "internal",
+      "channel": "preview",
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://vcbwhlfbmqmwzntpnsjs.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
+        "EXPO_PUBLIC_BACKEND_URL": "https://chaser-app-production.up.railway.app",
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "test_BdrtXaAtfDmHCADosQwwtvZxpIF"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "channel": "production",
