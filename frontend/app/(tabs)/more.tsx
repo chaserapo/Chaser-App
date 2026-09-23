@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   setupBadgeText: { color: colors.brandPrimary, fontSize: 11, fontWeight: "800" },
   linkSectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   manage: { fontSize: 13, fontWeight: "700", color: colors.brandPrimary, marginTop: spacing.lg },
-  row: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, minHeight: 56, gap: 12 },
+  row: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingVertical: spacing.md, minHeight: 48, gap: 12 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   rowText: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.onSurface },
   rowSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
