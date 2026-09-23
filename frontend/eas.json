@@ -12,7 +12,7 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://vcbwhlfbmqmwzntpnsjs.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
         "EXPO_PUBLIC_BACKEND_URL": "https://chaser-app-production.up.railway.app",
-        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "test_BdrtXaAtfDmHCADosQwwtvZxpIF"
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_gvcgItFmaVNzdgkwhNQHlAiIPSi"
       }
     },
     "preview": {
@@ -28,7 +28,7 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://vcbwhlfbmqmwzntpnsjs.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
         "EXPO_PUBLIC_BACKEND_URL": "https://chaser-app-production.up.railway.app",
-        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "test_BdrtXaAtfDmHCADosQwwtvZxpIF"
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_gvcgItFmaVNzdgkwhNQHlAiIPSi"
       }
     },
     "preview-device": {
@@ -44,7 +44,7 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://vcbwhlfbmqmwzntpnsjs.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
         "EXPO_PUBLIC_BACKEND_URL": "https://chaser-app-production.up.railway.app",
-        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "test_BdrtXaAtfDmHCADosQwwtvZxpIF"
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_gvcgItFmaVNzdgkwhNQHlAiIPSi"
       }
     },
     "production": {
@@ -60,7 +60,7 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://vcbwhlfbmqmwzntpnsjs.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
         "EXPO_PUBLIC_BACKEND_URL": "https://chaser-app-production.up.railway.app",
-        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "test_BdrtXaAtfDmHCADosQwwtvZxpIF"
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_gvcgItFmaVNzdgkwhNQHlAiIPSi"
       }
     }
   },
