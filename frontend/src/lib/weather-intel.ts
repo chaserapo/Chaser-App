@@ -150,27 +150,17 @@ const MAP: Record<string, keyof HourlyVars> = {
 };
 
 // ─── Fetcher ───────────────────────────────────────────────────────────────
-// Open-Meteo doesn't serve every model off the general /v1/forecast endpoint
-// selected via &models= — ECMWF (IFS + AIFS) and BOM each have their own
-// dedicated endpoint (/v1/ecmwf, /v1/bom). Querying them through /v1/forecast
-// fails every time regardless of retries, which is exactly what was making
-// three of the four "independent models" silently never return data while
-// gfs_seamless (which *is* valid on /v1/forecast) always succeeded.
-const ENDPOINT: Record<ModelId, string> = {
-  ecmwf_ifs025: "ecmwf",
-  ecmwf_aifs025: "ecmwf",
-  bom_access_global: "bom",
-  gfs_seamless: "forecast",
-};
-
-// Each model's request pulls a full week of hourly data across 17 variables -
-// a sizeable payload. On a weak mobile connection, four of these fired in
-// parallel can easily have some finish well after the others; a short
-// timeout turns "slow" into "silently missing" for whichever models lose the
-// race. Give it real room, and retry once before giving up entirely.
+// Every model is queried through the general /v1/forecast endpoint with
+// &models=<id> — that's how Open-Meteo's own API docs document the `models`
+// parameter (a plain string array on /v1/forecast, default "auto"). An
+// earlier version of this code routed ECMWF and BOM to their own dedicated
+// /v1/ecmwf and /v1/bom subdomains instead, which turned out to serve a
+// stale model catalog (ecmwf_ifs04 accepted the request but returned null
+// for every hour; bom_access_global did the same on /v1/bom). Confirmed
+// live against the API: /v1/forecast is the actively-maintained endpoint.
 async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: number, timeoutMs: number): Promise<ModelHour[]> {
   const url =
-    `https://api.open-meteo.com/v1/${ENDPOINT[model]}?latitude=${lat}&longitude=${lon}` +
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     `&hourly=${HOURLY_VARS}` +
     `&wind_speed_unit=kmh&timezone=auto&forecast_days=${days}` +
     `&models=${model}`;
