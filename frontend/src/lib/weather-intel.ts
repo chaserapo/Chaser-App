@@ -183,6 +183,20 @@ async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: numb
     const hours: ModelHour[] = [];
     const times: string[] = j?.hourly?.time ?? [];
     const nowMs = Date.now();
+
+    // The dedicated per-provider endpoints (/v1/ecmwf, /v1/bom) sometimes
+    // suffix hourly variable names with the model id (e.g.
+    // "temperature_2m_ecmwf_ifs025") instead of the flat name the general
+    // /v1/forecast endpoint uses. Resolve each variable to whatever key is
+    // actually present once per response, rather than assuming the flat
+    // name — otherwise these models "succeed" (non-empty time array) while
+    // every value silently comes back undefined.
+    const hourlyKeys: string[] = j?.hourly ? Object.keys(j.hourly) : [];
+    const resolvedKey: Record<string, string | undefined> = {};
+    for (const k of Object.keys(MAP)) {
+      resolvedKey[k] = hourlyKeys.includes(k) ? k : hourlyKeys.find((hk) => hk.startsWith(`${k}_`));
+    }
+
     for (let i = 0; i < times.length; i++) {
       const validIso = times[i];
       const validMs = new Date(validIso).getTime();
@@ -193,10 +207,19 @@ async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: numb
         horizon_h: Math.round((validMs - nowMs) / 3_600_000),
       };
       for (const k of Object.keys(MAP)) {
-        const arr = j.hourly[k];
+        const rk = resolvedKey[k];
+        if (!rk) continue;
+        const arr = j.hourly[rk];
         if (Array.isArray(arr) && arr[i] != null) (hour as any)[MAP[k]] = arr[i] as number;
       }
       hours.push(hour);
+    }
+    // A response with times but every variable unresolved is effectively
+    // useless — treat it as a failure so it shows up in the "sources didn't
+    // respond" banner instead of silently rendering as dashes with no
+    // explanation of why.
+    if (hours.length > 0 && !Object.values(resolvedKey).some((v) => v != null)) {
+      throw new Error(`open-meteo ${model}: no recognized hourly variables in response`);
     }
     return hours;
   } finally {
