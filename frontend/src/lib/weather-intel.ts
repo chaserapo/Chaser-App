@@ -17,10 +17,10 @@
 import { supabase } from "./supabase";
 import { getActiveBusinessId } from "./backend";
 
-export type ModelId = "ecmwf_ifs04" | "ecmwf_aifs025" | "bom_access_global" | "gfs_seamless";
+export type ModelId = "ecmwf_ifs025" | "ecmwf_aifs025" | "bom_access_global" | "gfs_seamless";
 
 export const MODELS: { id: ModelId; label: string; provider: string }[] = [
-  { id: "ecmwf_ifs04",       label: "ECMWF IFS",   provider: "ECMWF" },
+  { id: "ecmwf_ifs025",       label: "ECMWF IFS",   provider: "ECMWF" },
   { id: "ecmwf_aifs025",     label: "ECMWF AIFS",  provider: "ECMWF" },
   { id: "bom_access_global", label: "BOM ACCESS-G", provider: "BOM" },
   { id: "gfs_seamless",      label: "NOAA GFS",    provider: "NOAA" },
@@ -28,7 +28,7 @@ export const MODELS: { id: ModelId; label: string; provider: string }[] = [
 
 // Short + long labels for compact UI (accuracy scorecard, model chips).
 export const MODEL_META: Record<ModelId, { short: string; long: string; provider: string }> = {
-  ecmwf_ifs04:       { short: "ECMWF IFS",   long: "ECMWF Integrated Forecasting System", provider: "ECMWF" },
+  ecmwf_ifs025:       { short: "ECMWF IFS",   long: "ECMWF Integrated Forecasting System", provider: "ECMWF" },
   ecmwf_aifs025:     { short: "ECMWF AIFS",  long: "ECMWF AI Forecasting System",         provider: "ECMWF" },
   bom_access_global: { short: "BOM ACCESS-G", long: "Bureau of Meteorology ACCESS Global", provider: "BOM" },
   gfs_seamless:      { short: "NOAA GFS",    long: "NOAA Global Forecast System",          provider: "NOAA" },
@@ -157,7 +157,7 @@ const MAP: Record<string, keyof HourlyVars> = {
 // three of the four "independent models" silently never return data while
 // gfs_seamless (which *is* valid on /v1/forecast) always succeeded.
 const ENDPOINT: Record<ModelId, string> = {
-  ecmwf_ifs04: "ecmwf",
+  ecmwf_ifs025: "ecmwf",
   ecmwf_aifs025: "ecmwf",
   bom_access_global: "bom",
   gfs_seamless: "forecast",
@@ -807,7 +807,7 @@ export async function computeFarmAccuracy(farmId: string, farmName?: string, sin
   }
 
   const perModel: ModelAccuracy[] = [];
-  const models: ModelId[] = ["ecmwf_ifs04", "ecmwf_aifs025", "bom_access_global", "gfs_seamless"];
+  const models: ModelId[] = ["ecmwf_ifs025", "ecmwf_aifs025", "bom_access_global", "gfs_seamless"];
   for (const m of models) {
     for (const v of ACCURACY_VARS) {
       const b = errorsByModelVar.get(`${m}::${v}`);
