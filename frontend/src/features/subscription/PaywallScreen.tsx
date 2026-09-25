@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
 import { Button, Card } from "@/src/components/ui";
@@ -8,6 +9,19 @@ import { colors, radius, spacing } from "@/src/theme";
 import { getOfferings, purchasePackage, restorePurchases, TRIAL_DAYS } from "@/src/lib/purchases";
 
 const ICON = require("../../../assets/images/chaser-icon.png");
+
+const PERIOD_LABEL: Record<string, string> = {
+  WEEKLY: "/week",
+  MONTHLY: "/month",
+  TWO_MONTH: "/2 months",
+  THREE_MONTH: "/3 months",
+  SIX_MONTH: "/6 months",
+  ANNUAL: "/year",
+};
+
+function periodSuffix(pkg: any): string {
+  return PERIOD_LABEL[pkg?.packageType] ?? "";
+}
 
 const FEATURES = [
   "Unlimited spray records with auto-captured weather",
@@ -20,6 +34,7 @@ const FEATURES = [
 
 export function PaywallScreen({ back }: { back?: boolean }) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [offering, setOffering] = useState<any | null>(null);
   const [loadingOffering, setLoadingOffering] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -81,7 +96,7 @@ export function PaywallScreen({ back }: { back?: boolean }) {
           offering.availablePackages.map((pkg: any) => (
             <View key={pkg.identifier} style={{ marginBottom: spacing.sm }}>
               <Button
-                title={busy ? "Please wait…" : `Subscribe — ${pkg.product.priceString}`}
+                title={busy ? "Please wait…" : `Subscribe — ${pkg.product.priceString}${periodSuffix(pkg)}`}
                 icon="star-outline"
                 onPress={() => subscribe(pkg)}
                 loading={busy}
@@ -101,6 +116,16 @@ export function PaywallScreen({ back }: { back?: boolean }) {
         <Text style={styles.disclaimer}>
           New subscribers get a {TRIAL_DAYS}-day free trial. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel any time in your device&apos;s App Store account settings.
         </Text>
+
+        <View style={styles.legalLinks}>
+          <Text style={styles.legalLink} onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "terms" } })} testID="paywall-terms-link">
+            Terms of Use
+          </Text>
+          <Text style={styles.legalDivider}>·</Text>
+          <Text style={styles.legalLink} onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "privacy" } })} testID="paywall-privacy-link">
+            Privacy Policy
+          </Text>
+        </View>
       </ScrollView>
     </View>
   );
@@ -118,4 +143,7 @@ const styles = StyleSheet.create({
   hint: { fontSize: 13, color: colors.muted, textAlign: "center", lineHeight: 18 },
   restoreText: { color: colors.brandPrimary, fontWeight: "700", fontSize: 13 },
   disclaimer: { fontSize: 11, color: colors.muted, textAlign: "center", marginTop: spacing.lg, lineHeight: 16, paddingHorizontal: 12 },
+  legalLinks: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, marginTop: spacing.md },
+  legalLink: { fontSize: 12, color: colors.muted, fontWeight: "600", textDecorationLine: "underline" },
+  legalDivider: { fontSize: 12, color: colors.muted },
 });
