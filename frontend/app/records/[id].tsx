@@ -9,6 +9,8 @@ import { Button, Card, Input, Chip } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { stageLabel } from "@/src/lib/crop-stages";
+import { useAuth } from "@/src/lib/auth-context";
+import { exportJobsPdf } from "@/src/lib/pdf-report";
 import type { SprayJob, Operator, Machinery } from "@/src/lib/types";
 
 function buildSignOffPayload(j: SprayJob) {
@@ -102,6 +104,7 @@ function num(s: string): number | undefined {
 
 export default function RecordDetail() {
   const insets = useSafeAreaInsets();
+  const { business } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [j, setJ] = useState<SprayJob | null>(null);
   const [showQR, setShowQR] = useState(false);
@@ -226,7 +229,14 @@ export default function RecordDetail() {
                 <Text style={styles.qrCaption}>Scan to verify this spray job at the paddock gate.</Text>
                 <Text style={styles.qrId}>Record ID: {j.id.slice(0, 8)}</Text>
                 <View style={{ height: spacing.md, alignSelf: "stretch" }} />
-                <Button title="Share Record" icon="share-variant-outline" variant="outline" onPress={shareRecord} testID="share-record-btn" />
+                <View style={{ flexDirection: "row", gap: 8, alignSelf: "stretch" }}>
+                  <View style={{ flex: 1 }}>
+                    <Button title="Share" icon="share-variant-outline" variant="outline" onPress={shareRecord} testID="share-record-btn" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Button title="Export PDF" icon="file-pdf-box" variant="outline" onPress={() => exportJobsPdf([j], business?.name ?? "Chaser")} testID="export-record-pdf-btn" />
+                  </View>
+                </View>
               </Card>
             ) : (
               <Card onPress={() => setShowQR(true)} testID="qr-preview-card">
