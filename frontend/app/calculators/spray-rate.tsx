@@ -216,7 +216,7 @@ export default function SprayRateCalc() {
             L/min per nozzle = L/ha × speed × nozzle spacing ÷ 600 · Flow ∝ √pressure
           </Text>
           <Text style={styles.disclaimer}>
-            Nozzle data is indicative. Always verify against the manufacturer's chart and current label requirements before spraying.
+            Nozzle data is indicative. Always verify against the manufacturer&apos;s chart and current label requirements before spraying.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

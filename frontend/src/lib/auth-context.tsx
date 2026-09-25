@@ -159,10 +159,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const suffix = Math.random().toString(36).slice(2, 10);
     const channel = supabase.channel(`biz-${business.id}-${suffix}`);
     channel.on(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       "postgres_changes" as any,
       { event: "UPDATE", schema: "public", table: "businesses", filter: `id=eq.${business.id}` },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (payload: any) => {
         const next = payload?.new;
         if (next?.name && next.name !== business.name) {
@@ -172,7 +170,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
     if (session?.user) {
       channel.on(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "postgres_changes" as any,
         { event: "*", schema: "public", table: "business_members", filter: `business_id=eq.${business.id}` },
         async () => {

@@ -100,7 +100,9 @@ export function useEntitlement(businessCreatedAt: string | null): EntitlementSta
   const [loading, setLoading] = useState(purchasesConfigured());
 
   useEffect(() => {
-    if (!purchasesConfigured()) { setLoading(false); return; }
+    // loading's initial state already matches purchasesConfigured(), so
+    // nothing to set here when it's false.
+    if (!purchasesConfigured()) return;
     let mounted = true;
     const Purchases = require("react-native-purchases").default;
 

@@ -5,7 +5,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
 import { Card, Chip } from "@/src/components/ui";
-import { colors, radius, spacing } from "@/src/theme";
+import { colors, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { exportJobsPdf } from "@/src/lib/pdf-report";
 import { useAuth } from "@/src/lib/auth-context";

@@ -18,7 +18,6 @@ import {
   MODELS,
   MODEL_META,
   type ForecastBundle,
-  type ModelId,
   type SprayThresholds,
   DEFAULT_THRESHOLDS,
 } from "@/src/lib/weather-intel";
@@ -109,11 +108,12 @@ export default function WeatherScreen() {
   useEffect(() => {
     if (!target) return;
     const stale = !bundle || Date.now() - new Date(bundle.retrieved_at).getTime() > STALE_MS || fetchedForTargetId !== target.id;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- runFetch is also called directly by the manual-refresh handler.
     if (stale) runFetch();
   }, [target, bundle, fetchedForTargetId, runFetch]);
 
-  const daily = bundle?.daily ?? [];
-  const consensus = bundle?.consensus ?? [];
+  const daily = useMemo(() => bundle?.daily ?? [], [bundle]);
+  const consensus = useMemo(() => bundle?.consensus ?? [], [bundle]);
   const nextHours = useMemo(() => consensus.slice(0, 24), [consensus]);
   const currentHour = consensus[0];
   const sprayWindows = useMemo(() => findSprayWindows(consensus, thresholds), [consensus, thresholds]);
@@ -202,7 +202,7 @@ export default function WeatherScreen() {
           <View style={styles.modelWarning} testID="weather-model-warning">
             <Icon name="alert-outline" size={16} color={colors.warning} />
             <Text style={styles.modelWarningText}>
-              {bundle.models_failed.length} of {MODELS.length} weather sources didn't respond this time ({bundle.models_failed.map((f) => MODEL_META[f.model].short).join(", ")}) — showing a consensus from the rest.
+              {bundle.models_failed.length} of {MODELS.length} weather sources didn&apos;t respond this time ({bundle.models_failed.map((f) => MODEL_META[f.model].short).join(", ")}) — showing a consensus from the rest.
             </Text>
           </View>
         ) : null}

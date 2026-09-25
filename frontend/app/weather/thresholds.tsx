@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
 import { Card, Input, Button } from "@/src/components/ui";
-import { colors, radius, spacing } from "@/src/theme";
+import { colors, spacing } from "@/src/theme";
 import { loadThresholds, saveThresholds, DEFAULT_THRESHOLDS, type SprayThresholds } from "@/src/lib/weather-intel";
 
 export default function ThresholdsScreen() {
@@ -16,12 +16,16 @@ export default function ThresholdsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
     if (!farmId) return;
+    // Intentional: re-show the spinner on every farmId change, not just first mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    try { setT(await loadThresholds(farmId as string)); } finally { setLoading(false); }
+    loadThresholds(farmId as string).then((thresholds) => {
+      setT(thresholds);
+      setLoading(false);
+    });
   }, [farmId]);
-  useEffect(() => { load(); }, [load]);
 
   async function save() {
     if (!farmId) return;
@@ -53,7 +57,7 @@ export default function ThresholdsScreen() {
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xxl }}>
         <Card>
           <Text style={styles.intro}>
-            Chaser uses these values to find "best spraying windows" in the consensus forecast for this farm. Adjust to match your operation. These are recommendations only and do not replace chemical-label conditions or legal spray requirements.
+            Chaser uses these values to find &quot;best spraying windows&quot; in the consensus forecast for this farm. Adjust to match your operation. These are recommendations only and do not replace chemical-label conditions or legal spray requirements.
           </Text>
         </Card>
 

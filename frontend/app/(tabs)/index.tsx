@@ -113,6 +113,8 @@ export default function Home() {
     }
   }, []);
 
+  // loadWeather is also used as the pull-to-refresh/refresh-button handler, so it can't be inlined.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadWeather(); }, [loadWeather]);
   useFocusEffect(useCallback(() => { loadData(); loadOperator(); }, [loadData, loadOperator]));
   useRealtime(
@@ -191,7 +193,7 @@ export default function Home() {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.setupTitle}>Finish setting up Chaser</Text>
-              <Text style={styles.setupSub}>You're {onboardingPercent}% of the way there — add the rest whenever you like.</Text>
+              <Text style={styles.setupSub}>You&apos;re {onboardingPercent}% of the way there — add the rest whenever you like.</Text>
               <View style={styles.setupBar}><View style={[styles.setupBarFill, { width: `${onboardingPercent}%` }]} /></View>
             </View>
             <Icon name="chevron-right" size={22} color={colors.brandPrimary} />

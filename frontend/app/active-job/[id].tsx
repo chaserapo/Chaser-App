@@ -29,7 +29,7 @@ export default function ActiveJob() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [job, setJob] = useState<SprayJob | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [finishMode, setFinishMode] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [actualHa, setActualHa] = useState("");

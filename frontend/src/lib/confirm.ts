@@ -17,7 +17,6 @@ export function confirm(options: ConfirmOptions, onConfirm: () => void, onCancel
   const { title, message, confirmLabel = "Confirm", cancelLabel = "Cancel", destructive } = options;
   if (Platform.OS === "web") {
     const text = message ? `${title}\n\n${message}` : title;
-    // eslint-disable-next-line no-alert
     const ok = typeof window !== "undefined" && typeof window.confirm === "function"
       ? window.confirm(text)
       : true;

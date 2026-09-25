@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Switch } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { v4 as uuid } from "uuid";
 import * as Notifications from "expo-notifications";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
-import { Card, Button } from "@/src/components/ui";
+import { Card } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { supabase } from "@/src/lib/supabase";
 import { useAuth } from "@/src/lib/auth-context";
@@ -34,7 +34,6 @@ const KINDS: { kind: AlertKind; icon: string; label: string; sub: string }[] = [
 
 export default function AlertsScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { farmId } = useLocalSearchParams<{ farmId: string }>();
   const { user, business } = useAuth();
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -42,17 +41,18 @@ export default function AlertsScreen() {
   const [busyKind, setBusyKind] = useState<AlertKind | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
     if (!user || !business) return;
+    // Intentional: re-show the spinner on every user/business/farmId change, not just first mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    try {
-      let q = supabase.from("weather_alerts").select("*").eq("user_id", user.id);
-      if (farmId) q = q.eq("farm_id", farmId as string);
-      const { data, error } = await q.order("created_at", { ascending: false });
+    let q = supabase.from("weather_alerts").select("*").eq("user_id", user.id);
+    if (farmId) q = q.eq("farm_id", farmId as string);
+    q.order("created_at", { ascending: false }).then(({ data, error }) => {
       if (!error && data) setAlerts(data as Alert[]);
-    } finally { setLoading(false); }
+      setLoading(false);
+    });
   }, [user, business, farmId]);
-  useEffect(() => { load(); }, [load]);
 
   async function toggle(kind: AlertKind) {
     if (!user || !business) return;

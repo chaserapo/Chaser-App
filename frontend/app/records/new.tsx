@@ -9,8 +9,8 @@ import { Button, Card, Input, Chip } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { fetchWeather } from "@/src/lib/weather";
-import { deltaT, nozzleFlowLpm, numNozzles, fmt, productTotalForJob, productPerTank } from "@/src/lib/calculators";
-import { stagesForCrop, stageLabel } from "@/src/lib/crop-stages";
+import { deltaT, nozzleFlowLpm, fmt, productTotalForJob, productPerTank } from "@/src/lib/calculators";
+import { stagesForCrop } from "@/src/lib/crop-stages";
 import type { Farm, Paddock, Machinery, Chemical, RateUnit, SprayJob, SprayJobProduct, SprayJobStatus, Operator } from "@/src/lib/types";
 import { RATE_UNITS } from "@/src/lib/types";
 
@@ -110,7 +110,7 @@ export default function NewSprayJob() {
     })();
   }, [params.draft, params.plannedId]);
 
-  useEffect(() => { captureWeather(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { captureWeather(); }, []);
 
   async function captureWeather() {
     setLoadingWeather(true);
@@ -426,7 +426,7 @@ export default function NewSprayJob() {
                       testID="crop-stage-custom-input"
                     />
                   ) : null}
-                  <Text style={styles.overrideHint}>{group} stage list — pick "Other" to enter your own.</Text>
+                  <Text style={styles.overrideHint}>{group} stage list — pick &quot;Other&quot; to enter your own.</Text>
                 </>
               );
             })()}

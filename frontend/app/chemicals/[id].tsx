@@ -16,6 +16,7 @@ export default function ChemicalDetail() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [now] = useState(() => Date.now());
   const [c, setC] = useState<Chemical | null>(null);
   const [batches, setBatches] = useState<import("@/src/lib/types").ChemicalBatch[]>([]);
   const [movements, setMovements] = useState<import("@/src/lib/types").StockMovement[]>([]);
@@ -337,7 +338,7 @@ export default function ChemicalDetail() {
           <Card><Text style={styles.hint}>No batches recorded. Add lot numbers and expiry dates to enable expiry alerts.</Text></Card>
         ) : (
           batches.map((b) => {
-            const daysToExpiry = b.expiry_date ? Math.floor((new Date(b.expiry_date).getTime() - Date.now()) / 86400000) : null;
+            const daysToExpiry = b.expiry_date ? Math.floor((new Date(b.expiry_date).getTime() - now) / 86400000) : null;
             const expiring = daysToExpiry != null && daysToExpiry <= 30 && daysToExpiry >= 0;
             const expired = daysToExpiry != null && daysToExpiry < 0;
             return (
