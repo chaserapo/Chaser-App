@@ -41,6 +41,8 @@ export default function PaddocksTab() {
   const [gpsOn, setGpsOn] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [searching, setSearching] = useState(false);
+  const [mapLoadTimedOut, setMapLoadTimedOut] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
   const mapRef = useRef<PaddockMapHandle>(null);
   const gpsWatch = useRef<Location.LocationSubscription | null>(null);
   const driveWatch = useRef<Location.LocationSubscription | null>(null);
@@ -238,6 +240,8 @@ export default function PaddocksTab() {
   }
 
   const selectedPaddock = selectedId ? paddocks.find((p) => p.id === selectedId) : null;
+  const showList = viewKind === "list" && mode === "view";
+  function retryMapLoad() { setMapLoadTimedOut(false); setMapKey((k) => k + 1); }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
@@ -276,11 +280,11 @@ export default function PaddocksTab() {
         </View>
       ) : null}
 
-      {viewKind === "list" && mode === "view" ? (
-        <ScrollView
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xxl }}
-          testID="paddock-list-scroll"
-        >
+      <ScrollView
+        style={{ display: showList ? "flex" : "none", flex: 1 }}
+        contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xxl }}
+        testID="paddock-list-scroll"
+      >
           {grouped.length === 0 ? (
             <Card>
               <Text style={styles.emptyTitle}>No paddocks yet</Text>
@@ -353,9 +357,10 @@ export default function PaddocksTab() {
             );
           })}
         </ScrollView>
-      ) : (
-        <View style={{ flex: 1 }}>
+
+      <View style={{ display: showList ? "none" : "flex", flex: 1 }}>
         <PaddockMap
+          key={mapKey}
           ref={mapRef}
           paddocks={paddocks.map((p) => ({
             id: p.id, name: p.name, area_ha: p.area_ha, crop: p.crop, boundary_geojson: p.boundary ?? null,
@@ -366,8 +371,20 @@ export default function PaddocksTab() {
           onIssueSelect={(id) => { if (mode === "view") { setSelectedId(null); setSelectedIssueId(id); } }}
           onPointsUpdate={(count, areaHa) => setDrawInfo({ count, areaHa })}
           onSaveGeometry={persistPaddock}
-          onReady={() => { if (modeRef.current === "draw") mapRef.current?.setMode("draw"); }}
+          onReady={() => { setMapLoadTimedOut(false); if (modeRef.current === "draw") mapRef.current?.setMode("draw"); }}
+          onLoadTimeout={() => setMapLoadTimedOut(true)}
         />
+
+        {mapLoadTimedOut ? (
+          <View style={styles.loadTimeoutOverlay} testID="map-load-timeout">
+            <Card>
+              <Text style={styles.emptyTitle}>Map is taking a while to load</Text>
+              <Text style={styles.emptyBody}>Check your connection, then try again.</Text>
+              <View style={{ height: spacing.md }} />
+              <Button title="Retry" icon="refresh" onPress={retryMapLoad} testID="map-retry-btn" />
+            </Card>
+          </View>
+        ) : null}
 
         {/* GPS toggle */}
         <Pressable onPress={toggleGps} style={[styles.gpsBtn, gpsOn && styles.gpsBtnOn]} testID="gps-toggle-btn">
@@ -531,7 +548,6 @@ export default function PaddocksTab() {
           </View>
         ) : null}
       </View>
-      )}
     </View>
   );
 }
@@ -570,6 +586,7 @@ const styles = StyleSheet.create({
   summaryName: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
   summaryMeta: { fontSize: 13, color: colors.muted, marginTop: 2 },
   emptyOverlay: { position: "absolute", left: 12, right: 12, bottom: 0 },
+  loadTimeoutOverlay: { position: "absolute", left: 12, right: 12, top: "40%" },
   emptyTitle: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
   emptyBody: { color: colors.muted, marginTop: 4, fontSize: 13, lineHeight: 18 },
   savingOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.4)" },

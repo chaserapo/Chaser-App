@@ -26,7 +26,7 @@ export const MAP_HTML = `<!doctype html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet" />
   <style>
     html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; touch-action: none; background: #E8ECE9; }
@@ -73,8 +73,8 @@ export const MAP_HTML = `<!doctype html>
 </head>
 <body>
   <div id="map"></div>
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="https://unpkg.com/@turf/turf@7.1.0/turf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/turf.min.js"></script>
   <script>
     const isRN = !!(window.ReactNativeWebView && window.ReactNativeWebView.postMessage);
     const post = (obj) => { try { (isRN ? window.ReactNativeWebView : window.parent).postMessage(JSON.stringify(obj), '*'); } catch(e) {} };
@@ -84,6 +84,7 @@ export const MAP_HTML = `<!doctype html>
       container: 'map',
       style: {
         version: 8,
+        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
         sources: {
           osm: {
             type: 'raster',
@@ -102,6 +103,20 @@ export const MAP_HTML = `<!doctype html>
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
+
+    // If the map's 'load' event (fired once the style + initial tiles are
+    // ready) hasn't happened within LOAD_TIMEOUT_MS — usually a stalled CDN
+    // fetch on a weak connection — tell React Native so it can show a retry
+    // affordance instead of leaving the user staring at a blank map forever.
+    const LOAD_TIMEOUT_MS = 12000;
+    let mapLoaded = false;
+    setTimeout(() => { if (!mapLoaded) post({ type: 'loadTimeout' }); }, LOAD_TIMEOUT_MS);
+    map.on('error', (e) => log((e && e.error && e.error.message) || e));
+
+    // Zoom threshold where the map switches from one broad farm-name bubble
+    // per property to individual paddock-name labels once zoomed in close
+    // enough to actually distinguish paddocks.
+    const PADDOCK_LABEL_MIN_ZOOM = 13;
 
     let paddocks = [];
     let farmPins = [];      // [{ id, name, lat, lon }]
@@ -167,6 +182,15 @@ export const MAP_HTML = `<!doctype html>
           .setLngLat([p.lon, p.lat])
           .addTo(map);
       });
+      updateFarmPinVisibility();
+    }
+
+    // Broad view: show the farm-name bubble. Zoomed in past
+    // PADDOCK_LABEL_MIN_ZOOM: hide it in favour of the individual paddock
+    // name labels (a native symbol layer, so it fades in/out on its own).
+    function updateFarmPinVisibility() {
+      const show = map.getZoom() < PADDOCK_LABEL_MIN_ZOOM;
+      farmMarkers.forEach(m => { m.getElement().style.display = show ? '' : 'none'; });
     }
     // Renders one small colored marker per fault/risk report, using the same
     // MDI icon name shown for that category in the native app (loaded via
@@ -264,11 +288,20 @@ export const MAP_HTML = `<!doctype html>
     }
 
     map.on('load', () => {
+      mapLoaded = true;
       map.addSource('paddocks', { type: 'geojson', data: paddockGeoJSON() });
       map.addLayer({ id: 'paddocks-fill', type: 'fill', source: 'paddocks',
         paint: { 'fill-color': '#3B6E3B', 'fill-opacity': 0.22 } });
       map.addLayer({ id: 'paddocks-line', type: 'line', source: 'paddocks',
         paint: { 'line-color': '#3B6E3B', 'line-width': 2 } });
+      // Individual paddock name labels — only kick in once zoomed in close
+      // enough to tell paddocks apart; see PADDOCK_LABEL_MIN_ZOOM above.
+      map.addLayer({ id: 'paddocks-label', type: 'symbol', source: 'paddocks',
+        minzoom: PADDOCK_LABEL_MIN_ZOOM,
+        layout: { 'text-field': ['get', 'name'], 'text-size': 12, 'text-font': ['Open Sans Bold'] },
+        paint: { 'text-color': '#1F2937', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 } });
+
+      map.on('zoom', updateFarmPinVisibility);
 
       map.addSource('draw-fill', { type: 'geojson', data: drawingGeoJSON().fill });
       map.addLayer({ id: 'draw-fill', type: 'fill', source: 'draw-fill',
