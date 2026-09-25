@@ -19,8 +19,10 @@ import { useOnboarding } from "@/src/lib/onboarding";
 import DiscoveryScreen, { useDiscoveryGate } from "@/src/features/onboarding/DiscoveryScreen";
 import { configurePurchases, useEntitlement } from "@/src/lib/purchases";
 import { PaywallScreen } from "@/src/features/subscription/PaywallScreen";
+import { installGlobalErrorLogger } from "@/src/lib/error-log";
 
 LogBox.ignoreAllLogs(true);
+installGlobalErrorLogger();
 
 function AuthGate() {
   const { loading, session, business, migration } = useAuth();
