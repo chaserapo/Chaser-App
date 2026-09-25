@@ -7,6 +7,8 @@ import { ScreenHeader } from "@/src/components/header";
 import { Card, Chip } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
+import { exportJobsPdf } from "@/src/lib/pdf-report";
+import { useAuth } from "@/src/lib/auth-context";
 import type { SprayJob, Farm, Paddock } from "@/src/lib/types";
 
 const UNASSIGNED = "__unassigned__";
@@ -24,6 +26,7 @@ function monthYearLabel(key: string): string {
 export default function SprayHistory() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { business } = useAuth();
   const [jobs, setJobs] = useState<SprayJob[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [paddocks, setPaddocks] = useState<Paddock[]>([]);
@@ -76,7 +79,20 @@ export default function SprayHistory() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
-      <ScreenHeader title="Spray History" back />
+      <ScreenHeader
+        title="Spray History"
+        back
+        right={
+          <Pressable
+            onPress={() => { if (filtered.length > 0) exportJobsPdf(filtered, business?.name ?? "Chaser"); }}
+            disabled={filtered.length === 0}
+            hitSlop={8}
+            testID="history-export-pdf-btn"
+          >
+            <Icon name="file-pdf-box" size={22} color={filtered.length > 0 ? colors.brandPrimary : colors.muted} />
+          </Pressable>
+        }
+      />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
         {farms.map((f) => (
