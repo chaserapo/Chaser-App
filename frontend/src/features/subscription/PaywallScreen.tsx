@@ -11,7 +11,7 @@ const ICON = require("../../../assets/images/chaser-icon.png");
 
 const FEATURES = [
   "Unlimited spray records with auto-captured weather",
-  "Chaser Weather Intelligence — 4-model consensus forecasting",
+  "Chaser Weather Intelligence — 6-model consensus forecasting",
   "Chemical register with APVMA lookup & stock tracking",
   "Machinery maintenance & fault reporting",
   "Team roster, task assignment & invites",

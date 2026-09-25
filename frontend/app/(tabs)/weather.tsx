@@ -171,7 +171,7 @@ export default function WeatherScreen() {
 
         {/* Consensus header */}
         {loading && !bundle ? (
-          <View style={styles.loading}><ActivityIndicator color={colors.brandPrimary} /><Text style={styles.loadingText}>Fetching four independent models…</Text></View>
+          <View style={styles.loading}><ActivityIndicator color={colors.brandPrimary} /><Text style={styles.loadingText}>Fetching six independent models…</Text></View>
         ) : currentHour ? (
           <View style={styles.heroCard}>
             <View style={styles.heroTopRow}>

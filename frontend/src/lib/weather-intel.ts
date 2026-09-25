@@ -1,8 +1,9 @@
 // Chaser Weather Intelligence — client-side lib.
 //
 // Responsibilities:
-//   1. Fetch the same hourly forecast from four independent numeric weather
-//      models via Open-Meteo (ECMWF IFS, ECMWF AIFS, BOM ACCESS-G, NOAA GFS).
+//   1. Fetch the same hourly forecast from six independent numeric weather
+//      models via Open-Meteo (ECMWF IFS, ECMWF AIFS, BOM ACCESS-G, NOAA GFS,
+//      DWD ICON, Météo-France ARPEGE).
 //   2. Compute a Chaser Consensus Forecast — weighted mean + circular vector
 //      average for wind direction — and a confidence score based on
 //      inter-model agreement.
@@ -17,13 +18,21 @@
 import { supabase } from "./supabase";
 import { getActiveBusinessId } from "./backend";
 
-export type ModelId = "ecmwf_ifs025" | "ecmwf_aifs025_single" | "bom_access_global" | "gfs_seamless";
+export type ModelId =
+  | "ecmwf_ifs025"
+  | "ecmwf_aifs025_single"
+  | "bom_access_global"
+  | "gfs_seamless"
+  | "dwd_icon_global"
+  | "meteofrance_arpege_world";
 
 export const MODELS: { id: ModelId; label: string; provider: string }[] = [
   { id: "ecmwf_ifs025",       label: "ECMWF IFS",   provider: "ECMWF" },
   { id: "ecmwf_aifs025_single",     label: "ECMWF AIFS",  provider: "ECMWF" },
   { id: "bom_access_global", label: "BOM ACCESS-G", provider: "BOM" },
   { id: "gfs_seamless",      label: "NOAA GFS",    provider: "NOAA" },
+  { id: "dwd_icon_global",   label: "DWD ICON",    provider: "DWD" },
+  { id: "meteofrance_arpege_world", label: "Météo-France ARPEGE", provider: "Météo-France" },
 ];
 
 // Short + long labels for compact UI (accuracy scorecard, model chips).
@@ -32,6 +41,8 @@ export const MODEL_META: Record<ModelId, { short: string; long: string; provider
   ecmwf_aifs025_single:     { short: "ECMWF AIFS",  long: "ECMWF AI Forecasting System",         provider: "ECMWF" },
   bom_access_global: { short: "BOM ACCESS-G", long: "Bureau of Meteorology ACCESS Global", provider: "BOM" },
   gfs_seamless:      { short: "NOAA GFS",    long: "NOAA Global Forecast System",          provider: "NOAA" },
+  dwd_icon_global:   { short: "DWD ICON",    long: "Deutscher Wetterdienst ICON Global",   provider: "DWD" },
+  meteofrance_arpege_world: { short: "Météo-France ARPEGE", long: "Météo-France ARPEGE World", provider: "Météo-France" },
 };
 
 export type HourlyVars = {
@@ -797,7 +808,7 @@ export async function computeFarmAccuracy(farmId: string, farmName?: string, sin
   }
 
   const perModel: ModelAccuracy[] = [];
-  const models: ModelId[] = ["ecmwf_ifs025", "ecmwf_aifs025_single", "bom_access_global", "gfs_seamless"];
+  const models: ModelId[] = ["ecmwf_ifs025", "ecmwf_aifs025_single", "bom_access_global", "gfs_seamless", "dwd_icon_global", "meteofrance_arpege_world"];
   for (const m of models) {
     for (const v of ACCURACY_VARS) {
       const b = errorsByModelVar.get(`${m}::${v}`);
