@@ -65,6 +65,7 @@ export default function WeatherScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedModelsHour, setExpandedModelsHour] = useState<string | null>(null);
+  const [fetchedForTargetId, setFetchedForTargetId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [fs, ps] = await Promise.all([repo.farms.active(), repo.paddocks.active()]);
@@ -95,6 +96,7 @@ export default function WeatherScreen() {
       const locationId = loc?.id ?? null;
       const b = await runForecast({ locationId, lat: target.lat, lon: target.lon, source: "client" });
       setBundle(b);
+      setFetchedForTargetId(target.id);
     } catch (e) {
       console.warn("weather fetch failed", e);
     } finally {
@@ -106,9 +108,9 @@ export default function WeatherScreen() {
   // Auto-fetch when target changes or the previous fetch is stale.
   useEffect(() => {
     if (!target) return;
-    const stale = !bundle || Date.now() - new Date(bundle.retrieved_at).getTime() > STALE_MS || bundle.location_id !== target.id;
+    const stale = !bundle || Date.now() - new Date(bundle.retrieved_at).getTime() > STALE_MS || fetchedForTargetId !== target.id;
     if (stale) runFetch();
-  }, [target, bundle, runFetch]);
+  }, [target, bundle, fetchedForTargetId, runFetch]);
 
   const daily = bundle?.daily ?? [];
   const consensus = bundle?.consensus ?? [];
