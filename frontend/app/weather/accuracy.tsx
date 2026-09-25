@@ -115,7 +115,7 @@ export default function AccuracyScreen() {
                             <Text key={v} style={[styles.th, { flex: 1, textAlign: "right" }]}>{variableLabel(v).split(" (")[0]}</Text>
                           ))}
                         </View>
-                        {(["ecmwf_ifs025", "ecmwf_aifs025", "bom_access_global", "gfs_seamless"] as ModelId[]).map((m) => (
+                        {(["ecmwf_ifs025", "ecmwf_aifs025_single", "bom_access_global", "gfs_seamless"] as ModelId[]).map((m) => (
                           <View key={m} style={styles.tableRow}>
                             <Text style={[styles.tdBold, { flex: 1.6 }]} numberOfLines={1}>{MODEL_META[m].short}</Text>
                             {VARS.map((v) => {
