@@ -57,6 +57,10 @@ export default function PaddocksTab() {
   // re-apply it instead of relying on that racy synchronous call.
   const modeRef = useRef(mode);
   useEffect(() => { modeRef.current = mode; }, [mode]);
+  // Switching from List to Map re-shows the WebView, which reloads and re-fires
+  // onReady — same race as the draw-mode remount above. Hold the paddock we
+  // want focused so onReady can apply it once the map is actually live.
+  const focusPaddockIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     const [pList, fList, iList] = await Promise.all([repo.paddocks.active(), repo.farms.active(), repo.farmIssues.list()]);
@@ -216,6 +220,16 @@ export default function PaddocksTab() {
   }
   function requestSaveGeometry() { mapRef.current?.save(); }
 
+  function viewPaddockOnMap(id: string) {
+    setSelectedIssueId(null);
+    setSelectedId(id);
+    focusPaddockIdRef.current = id;
+    setViewKind("map");
+    // Covers the case where the map is already visible/ready (no remount, so
+    // onReady won't fire again) — harmless no-op otherwise.
+    mapRef.current?.focusPaddock(id);
+  }
+
   async function persistPaddock(geojson: PaddockBoundary, areaHa: number) {
     if (!business) return;
     if (!name.trim()) { alert("Please give the paddock a name before saving."); return; }
@@ -329,7 +343,7 @@ export default function PaddocksTab() {
                   ? g.paddocks.map((p) => (
                       <Pressable
                         key={p.id}
-                        onPress={() => router.push({ pathname: "/paddocks/[id]", params: { id: p.id } })}
+                        onPress={() => viewPaddockOnMap(p.id)}
                         style={({ pressed }) => [styles.paddockRow, pressed && { backgroundColor: colors.surface }]}
                         testID={`paddock-row-${p.id}`}
                       >
@@ -371,7 +385,14 @@ export default function PaddocksTab() {
           onIssueSelect={(id) => { if (mode === "view") { setSelectedId(null); setSelectedIssueId(id); } }}
           onPointsUpdate={(count, areaHa) => setDrawInfo({ count, areaHa })}
           onSaveGeometry={persistPaddock}
-          onReady={() => { setMapLoadTimedOut(false); if (modeRef.current === "draw") mapRef.current?.setMode("draw"); }}
+          onReady={() => {
+            setMapLoadTimedOut(false);
+            if (modeRef.current === "draw") mapRef.current?.setMode("draw");
+            if (focusPaddockIdRef.current) {
+              mapRef.current?.focusPaddock(focusPaddockIdRef.current);
+              focusPaddockIdRef.current = null;
+            }
+          }}
           onLoadTimeout={() => setMapLoadTimedOut(true)}
         />
 
