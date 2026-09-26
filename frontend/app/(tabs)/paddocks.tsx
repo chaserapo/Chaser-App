@@ -19,6 +19,14 @@ import type { Paddock, PaddockBoundary, Farm, FarmIssue } from "@/src/lib/types"
 type Mode = "view" | "draw";
 type ViewKind = "map" | "list";
 
+function boundaryCentroid(boundary: PaddockBoundary): { lat: number; lon: number } | null {
+  const ring = boundary?.coordinates?.[0];
+  if (!ring || ring.length === 0) return null;
+  let sumLon = 0, sumLat = 0;
+  for (const [lon, lat] of ring) { sumLon += lon; sumLat += lat; }
+  return { lat: sumLat / ring.length, lon: sumLon / ring.length };
+}
+
 export default function PaddocksTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -58,34 +66,54 @@ export default function PaddocksTab() {
   const modeRef = useRef(mode);
   useEffect(() => { modeRef.current = mode; }, [mode]);
   // Switching from List to Map re-shows the WebView, which reloads and re-fires
-  // onReady — same race as the draw-mode remount above. Hold the paddock we
+  // onReady — same race as the draw-mode remount above. Hold the target we
   // want focused so onReady can apply it once the map is actually live.
-  const focusPaddockIdRef = useRef<string | null>(null);
+  const pendingFocusRef = useRef<{ paddockId: string } | { lat: number; lon: number } | null>(null);
 
   const load = useCallback(async () => {
     const [pList, fList, iList] = await Promise.all([repo.paddocks.active(), repo.farms.active(), repo.farmIssues.list()]);
     setPaddocks(pList);
     setFarms(fList);
     setIssues(iList);
+
+    const nameByFarm = new Map(fList.map((f) => [f.id, f.name]));
+    // Farm pins that already have a farm_id are covered — everything else falls
+    // back to a centroid of that farm's own paddock boundaries below, so a
+    // farm shows up on the map as soon as it has a drawn paddock, without
+    // requiring anyone to have opened the Weather tab for it first.
+    const farmIdsWithPin = new Set<string>();
+    let weatherLocationPins: FarmPin[] = [];
     // Load farm pins from weather_locations so operators can see all their
     // properties on the map even before drawing paddock boundaries. Silent
     // fail-safe if the SQL migration hasn't been run yet.
     try {
       const businessId = business?.id;
-      if (!businessId) return;
-      const { data, error } = await supabase
-        .from("weather_locations")
-        .select("id, lat, lon, label, farm_id")
-        .eq("business_id", businessId)
-        .eq("is_active", true);
-      if (error || !data) return;
-      const nameByFarm = new Map(fList.map((f) => [f.id, f.name]));
-      setFarmPins(
-        data
-          .filter((r: any) => typeof r.lat === "number" && typeof r.lon === "number")
-          .map((r: any) => ({ id: r.id, lat: r.lat, lon: r.lon, name: r.label || (r.farm_id ? nameByFarm.get(r.farm_id) : "Farm") || "Farm" }))
-      );
+      if (businessId) {
+        const { data, error } = await supabase
+          .from("weather_locations")
+          .select("id, lat, lon, label, farm_id")
+          .eq("business_id", businessId)
+          .eq("is_active", true);
+        if (!error && data) {
+          weatherLocationPins = data
+            .filter((r: any) => typeof r.lat === "number" && typeof r.lon === "number")
+            .map((r: any) => {
+              if (r.farm_id) farmIdsWithPin.add(r.farm_id);
+              return { id: r.id, lat: r.lat, lon: r.lon, name: r.label || (r.farm_id ? nameByFarm.get(r.farm_id) : "Farm") || "Farm", farm_id: r.farm_id ?? undefined };
+            });
+        }
+      }
     } catch { /* fail-safe */ }
+
+    const boundaryPins: FarmPin[] = [];
+    for (const f of fList) {
+      if (farmIdsWithPin.has(f.id)) continue;
+      const withBoundary = pList.find((p) => p.farm_id === f.id && p.boundary);
+      const centroid = withBoundary?.boundary ? boundaryCentroid(withBoundary.boundary) : null;
+      if (centroid) boundaryPins.push({ id: `farm-${f.id}`, lat: centroid.lat, lon: centroid.lon, name: f.name, farm_id: f.id });
+    }
+
+    setFarmPins([...weatherLocationPins, ...boundaryPins]);
   }, [business]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useRealtime(["paddocks", "farms", "farm_issues"], load, [load]);
@@ -151,6 +179,7 @@ export default function PaddocksTab() {
     const first = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
     mapRef.current?.addPoint(first.coords.latitude, first.coords.longitude);
     mapRef.current?.setPosition(first.coords.latitude, first.coords.longitude, true);
+    // eslint-disable-next-line react-hooks/purity -- event handler (onPress), not render.
     lastDrivePoint.current = { lat: first.coords.latitude, lon: first.coords.longitude, ts: Date.now() };
     driveWatch.current = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.Highest, timeInterval: 2000, distanceInterval: 3 },
@@ -223,11 +252,22 @@ export default function PaddocksTab() {
   function viewPaddockOnMap(id: string) {
     setSelectedIssueId(null);
     setSelectedId(id);
-    focusPaddockIdRef.current = id;
     setViewKind("map");
-    // Covers the case where the map is already visible/ready (no remount, so
-    // onReady won't fire again) — harmless no-op otherwise.
-    mapRef.current?.focusPaddock(id);
+    const paddock = paddocks.find((p) => p.id === id);
+    if (paddock?.boundary) {
+      pendingFocusRef.current = { paddockId: id };
+      // Covers the case where the map is already visible/ready (no remount,
+      // so onReady won't fire again) — harmless no-op otherwise.
+      mapRef.current?.focusPaddock(id);
+    } else {
+      // No boundary drawn yet, so there's nothing to fit to — fly toward its
+      // farm's pin instead of leaving the map wherever it happened to be.
+      const pin = paddock?.farm_id ? farmPins.find((fp) => fp.farm_id === paddock.farm_id) : null;
+      if (pin) {
+        pendingFocusRef.current = { lat: pin.lat, lon: pin.lon };
+        mapRef.current?.flyTo(pin.lat, pin.lon, 14);
+      }
+    }
   }
 
   async function persistPaddock(geojson: PaddockBoundary, areaHa: number) {
@@ -388,9 +428,11 @@ export default function PaddocksTab() {
           onReady={() => {
             setMapLoadTimedOut(false);
             if (modeRef.current === "draw") mapRef.current?.setMode("draw");
-            if (focusPaddockIdRef.current) {
-              mapRef.current?.focusPaddock(focusPaddockIdRef.current);
-              focusPaddockIdRef.current = null;
+            const target = pendingFocusRef.current;
+            if (target) {
+              if ("paddockId" in target) mapRef.current?.focusPaddock(target.paddockId);
+              else mapRef.current?.flyTo(target.lat, target.lon, 14);
+              pendingFocusRef.current = null;
             }
           }}
           onLoadTimeout={() => setMapLoadTimedOut(true)}

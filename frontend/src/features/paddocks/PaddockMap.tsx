@@ -11,7 +11,7 @@ export type PaddockOnMap = {
   boundary_geojson: { type: "Polygon"; coordinates: number[][][] } | null;
 };
 
-export type FarmPin = { id: string; name: string; lat: number; lon: number };
+export type FarmPin = { id: string; name: string; lat: number; lon: number; farm_id?: string };
 export type IssuePin = { id: string; lat: number; lon: number; icon: string; severity: string };
 
 export type PaddockMapHandle = {
