@@ -25,6 +25,7 @@ export type PaddockMapHandle = {
   flyTo: (lat: number, lon: number, zoom?: number) => void;
   setReportPin: (lat: number, lon: number) => void;
   clearReportPin: () => void;
+  resize: () => void;
 };
 
 type Props = {
@@ -74,6 +75,7 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
     flyTo: (lat, lon, zoom) => send({ type: "flyTo", lat, lon, zoom }),
     setReportPin: (lat, lon) => send({ type: "setReportPin", lat, lon }),
     clearReportPin: () => send({ type: "clearReportPin" }),
+    resize: () => send({ type: "resize" }),
   }), [send]);
 
   useEffect(() => {
@@ -160,6 +162,7 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
     flyTo: (lat, lon, zoom) => send({ type: "flyTo", lat, lon, zoom }),
     setReportPin: (lat, lon) => send({ type: "setReportPin", lat, lon }),
     clearReportPin: () => send({ type: "clearReportPin" }),
+    resize: () => send({ type: "resize" }),
   }), [send]);
 
   const onMessage = useCallback((e: WebViewMessageEvent) => {

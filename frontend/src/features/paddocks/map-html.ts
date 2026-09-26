@@ -112,6 +112,15 @@ export const MAP_HTML = `<!doctype html>
     let mapLoaded = false;
     setTimeout(() => { if (!mapLoaded) post({ type: 'loadTimeout' }); }, LOAD_TIMEOUT_MS);
     map.on('error', (e) => log((e && e.error && e.error.message) || e));
+    // Toggling to List view sets this WebView's container to display:none.
+    // On iOS that can lay the canvas out at zero size (and on some devices
+    // lose the WebGL context outright) — coming back to Map view leaves a
+    // blank map until something tells MapLibre to re-measure and repaint.
+    // The 'resize' message (sent once the container is visible again) covers
+    // that; the context-loss listeners are belt-and-braces for the rarer case.
+    const canvas = map.getCanvas();
+    canvas.addEventListener('webglcontextlost', () => log('webgl context lost'));
+    canvas.addEventListener('webglcontextrestored', () => { map.resize(); map.triggerRepaint(); });
 
     // Zoom threshold where the map switches from one broad farm-name bubble
     // per property to individual paddock-name labels once zoomed in close
@@ -330,6 +339,7 @@ export const MAP_HTML = `<!doctype html>
     function handleMessage(raw) {
       let msg; try { msg = JSON.parse(raw); } catch (e) { return; }
       switch (msg.type) {
+        case 'resize': if (map.loaded()) { map.resize(); map.triggerRepaint(); } break;
         case 'setPaddocks': paddocks = msg.paddocks || []; if (map.loaded()) { renderPaddocks(); fitToPaddocks(); } break;
         case 'setFarmPins': farmPins = msg.pins || []; if (map.loaded()) { renderFarmPins(); fitToPaddocks(); } break;
         case 'setIssuePins': issuePins = msg.pins || []; if (map.loaded()) renderIssuePins(); break;

@@ -65,6 +65,13 @@ export default function PaddocksTab() {
   // re-apply it instead of relying on that racy synchronous call.
   const modeRef = useRef(mode);
   useEffect(() => { modeRef.current = mode; }, [mode]);
+  // The map's container gets display:none while List is showing. On iOS that
+  // can lay the WebView's canvas out at zero size, so MapLibre needs a nudge
+  // to re-measure once it's actually visible again — otherwise it can come
+  // back blank even though its data (paddocks/pins) never went anywhere.
+  useEffect(() => {
+    if (mode === "view" && viewKind === "map") mapRef.current?.resize();
+  }, [viewKind, mode]);
   // Switching from List to Map re-shows the WebView, which reloads and re-fires
   // onReady — same race as the draw-mode remount above. Hold the target we
   // want focused so onReady can apply it once the map is actually live.
@@ -179,7 +186,6 @@ export default function PaddocksTab() {
     const first = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
     mapRef.current?.addPoint(first.coords.latitude, first.coords.longitude);
     mapRef.current?.setPosition(first.coords.latitude, first.coords.longitude, true);
-    // eslint-disable-next-line react-hooks/purity -- event handler (onPress), not render.
     lastDrivePoint.current = { lat: first.coords.latitude, lon: first.coords.longitude, ts: Date.now() };
     driveWatch.current = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.Highest, timeInterval: 2000, distanceInterval: 3 },
