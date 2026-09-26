@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -8,6 +8,15 @@ import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { useRealtime } from "@/src/lib/realtime";
 import type { SprayJob } from "@/src/lib/types";
+
+function dayLabel(dateStr: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  if (dateStr === today) return "Today";
+  if (dateStr === tomorrow) return "Tomorrow";
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+}
 
 const TOOLS = [
   { key: "records", title: "All Spray Records", subtitle: "Search & filter history", icon: "clipboard-text-outline", route: "/records" },
@@ -27,7 +36,7 @@ export default function SprayHub() {
   const load = useCallback(async () => {
     const [act, plannedList, done] = await Promise.all([
       repo.sprayJobs.active(),
-      repo.sprayJobs.list().then((all) => all.filter((j) => (j.status as string) === "planned")),
+      repo.sprayJobs.planned(),
       repo.sprayJobs.completed(),
     ]);
     setActive(act);
@@ -37,6 +46,16 @@ export default function SprayHub() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useRealtime(["spray_jobs", "spray_job_products"], load, [load]);
+
+  const plannedByDay = useMemo(() => {
+    const byDay = new Map<string, SprayJob[]>();
+    for (const j of planned) {
+      const arr = byDay.get(j.date) ?? [];
+      arr.push(j);
+      byDay.set(j.date, arr);
+    }
+    return Array.from(byDay.keys()).sort().map((date) => ({ date, jobs: byDay.get(date)! }));
+  }, [planned]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
@@ -77,18 +96,23 @@ export default function SprayHub() {
         {planned.length === 0 ? (
           <Card><Text style={styles.empty}>No planned jobs. Tap New Job to plan or start one.</Text></Card>
         ) : (
-          planned.map((j) => (
-            <Card key={j.id} style={{ marginBottom: spacing.sm }} onPress={() => router.push({ pathname: "/records/new", params: { plannedId: j.id } })} testID={`planned-${j.id}`}>
-              <View style={styles.rowTop}>
-                <View style={[styles.rowIcon, { backgroundColor: "#DBEAFE" }]}><Icon name="calendar-clock" size={20} color="#1E40AF" /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>{j.paddock_name ?? j.farm_name ?? "Spray job"}</Text>
-                  <Text style={styles.rowSub}>{j.date} · {j.crop ?? "—"} · {j.area_ha ?? "—"} ha</Text>
-                  <Text style={styles.rowMeta}>{j.operator ?? "Not assigned"} · {j.machinery_name ?? "No machine"}</Text>
-                </View>
-                <View style={styles.plannedBadge}><Text style={styles.plannedBadgeText}>PLANNED</Text></View>
-              </View>
-            </Card>
+          plannedByDay.map((group) => (
+            <View key={group.date}>
+              <Text style={styles.dayHeader}>{dayLabel(group.date)}</Text>
+              {group.jobs.map((j) => (
+                <Card key={j.id} style={{ marginBottom: spacing.sm }} onPress={() => router.push({ pathname: "/records/new", params: { plannedId: j.id } })} testID={`planned-${j.id}`}>
+                  <View style={styles.rowTop}>
+                    <View style={[styles.rowIcon, { backgroundColor: "#DBEAFE" }]}><Icon name="calendar-clock" size={20} color="#1E40AF" /></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowTitle} numberOfLines={1}>{j.paddock_name ?? j.farm_name ?? "Spray job"}</Text>
+                      <Text style={styles.rowSub}>{j.crop ?? "—"} · {j.area_ha ?? "—"} ha</Text>
+                      <Text style={styles.rowMeta}>{j.operator ?? "Not assigned"} · {j.machinery_name ?? "No machine"}</Text>
+                    </View>
+                    <View style={styles.plannedBadge}><Text style={styles.plannedBadgeText}>PLANNED</Text></View>
+                  </View>
+                </Card>
+              ))}
+            </View>
           ))
         )}
 
@@ -144,6 +168,7 @@ const styles = StyleSheet.create({
   newBtnText: { color: colors.onBrandPrimary, fontWeight: "700" },
   sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.lg, marginBottom: spacing.sm },
   sectionTitle: { fontSize: 13, fontWeight: "800", color: colors.muted, marginTop: spacing.lg, marginBottom: spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 },
+  dayHeader: { fontSize: 13, fontWeight: "700", color: colors.onSurfaceTertiary, marginBottom: spacing.xs, marginTop: 2 },
   link: { color: colors.brandPrimary, fontWeight: "700", fontSize: 13 },
   rowTop: { flexDirection: "row", alignItems: "center" },
   rowIcon: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center", marginRight: 12 },

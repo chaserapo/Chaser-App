@@ -197,6 +197,7 @@ export const localRepo = {
     list: () => readList<SprayJob>(KEYS.spray_jobs),
     active: async () => (await readList<SprayJob>(KEYS.spray_jobs)).find((j) => j.status === "active") ?? null,
     completed: async () => (await readList<SprayJob>(KEYS.spray_jobs)).filter((j) => j.status === "completed"),
+    planned: async () => (await readList<SprayJob>(KEYS.spray_jobs)).filter((j) => j.status === "planned"),
     save: async (j: SprayJob) => {
       const list = await readList<SprayJob>(KEYS.spray_jobs);
       const idx = list.findIndex((x) => x.id === j.id);

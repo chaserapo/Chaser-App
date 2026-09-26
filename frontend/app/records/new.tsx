@@ -11,6 +11,8 @@ import { repo } from "@/src/lib/storage";
 import { fetchWeather } from "@/src/lib/weather";
 import { deltaT, nozzleFlowLpm, fmt, productTotalForJob, productPerTank } from "@/src/lib/calculators";
 import { stagesForCrop } from "@/src/lib/crop-stages";
+import { checkGroupRotation, type ResistanceWarning } from "@/src/lib/resistance-check";
+import { groupLabel } from "@/src/lib/chemical-groups";
 import type { Farm, Paddock, Machinery, Chemical, RateUnit, SprayJob, SprayJobProduct, SprayJobStatus, Operator } from "@/src/lib/types";
 import { RATE_UNITS } from "@/src/lib/types";
 
@@ -47,6 +49,7 @@ export default function NewSprayJob() {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
   const [showMissing, setShowMissing] = useState<Record<string, boolean>>({});
+  const [resistanceWarnings, setResistanceWarnings] = useState<ResistanceWarning[]>([]);
   const [lastJob, setLastJob] = useState<SprayJob | null>(null);
 
   const [f, setF] = useState({
@@ -57,6 +60,7 @@ export default function NewSprayJob() {
     machinery_id: "", machinery_name: "",
     area_ha: "", water_rate: "", speed_kmh: "",
     boom_width_m: "", nozzle_type: "", nozzle_spacing_m: "", pressure: "3",
+    date: new Date().toISOString().slice(0, 10),
     start_time: new Date().toTimeString().slice(0, 5),
     temperature_c: "", humidity: "", delta_t: "",
     wind_speed: "", wind_direction: "",
@@ -103,6 +107,7 @@ export default function NewSprayJob() {
         nozzle_type: draft.nozzle_type ?? "",
         nozzle_spacing_m: draft.nozzle_spacing_m != null ? (draft.nozzle_spacing_m * 1000).toString() : "",
         pressure: draft.pressure?.toString() ?? "3",
+        date: draft.date ?? s.date,
         start_time: draft.start_time ?? s.start_time,
         notes: draft.notes ?? "",
       }));
@@ -192,15 +197,23 @@ export default function NewSprayJob() {
     setShowMissing({});
   }
 
-  function addProduct(c: Chemical) {
+  async function addProduct(c: Chemical) {
+    const groupKey = c.chemical_group_key || c.chemical_group;
     setProducts((ps) => [
       ...ps,
       { id: uuid(), chemical_id: c.id, chemical_name: c.product_name,
+        chemical_group: groupKey,
+        cost_per_unit: c.cost_per_unit, cost_unit: c.stock_unit,
         rate: c.default_rate ?? 0, rateStr: c.default_rate ? c.default_rate.toString() : "",
         unit: (c.default_unit as RateUnit) ?? "L/ha" },
     ]);
     setShowPicker(false);
     setPickerQuery("");
+
+    if (groupKey && f.paddock_id) {
+      const warning = await checkGroupRotation(groupKey, f.paddock_id, f.date || new Date().toISOString().slice(0, 10));
+      if (warning) setResistanceWarnings((ws) => (ws.some((w) => w.id === warning.id) ? ws : [...ws, warning]));
+    }
   }
   function updateProduct(id: string, patch: Partial<SprayJobProduct & { rateStr: string }>) {
     setProducts((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch, rate: patch.rateStr !== undefined ? parseFloat(patch.rateStr) || 0 : p.rate } : p)));
@@ -234,7 +247,7 @@ export default function NewSprayJob() {
     return { nozzle, nn: activeN, total: nozzle * activeN };
   }, [f.water_rate, f.speed_kmh, f.nozzle_spacing_m, f.boom_width_m, f.machinery_id, machs]);
 
-  function missing(field: (typeof REQUIRED)[number]): boolean {
+  function missing(field: (typeof REQUIRED)[number] | "date"): boolean {
     const v = (f as any)[field];
     return showMissing[field] === true && !v;
   }
@@ -250,7 +263,7 @@ export default function NewSprayJob() {
       crop: f.crop || undefined, variety: f.variety || undefined, target: f.target || undefined,
       crop_stage: f.crop_stage || undefined,
       crop_stage_custom: (f.crop_stage === "other" || f.crop_stage === "custom") ? (f.crop_stage_custom || undefined) : undefined,
-      date: new Date().toISOString().slice(0, 10),
+      date: f.date || new Date().toISOString().slice(0, 10),
       start_time: f.start_time || undefined,
       operator_id: f.operator_id || undefined, operator: f.operator_name || undefined,
       machinery_id: f.machinery_id || undefined, machinery_name: f.machinery_name || undefined,
@@ -281,6 +294,7 @@ export default function NewSprayJob() {
         const t = productTotalForJob(p.rate, p.unit, area, water, p.custom_unit_label);
         return {
           id: p.id, chemical_id: p.chemical_id, chemical_name: p.chemical_name,
+          chemical_group: p.chemical_group, cost_per_unit: p.cost_per_unit, cost_unit: p.cost_unit,
           rate: p.rate, unit: p.unit, custom_unit_label: p.custom_unit_label,
           total_qty: area > 0 ? t.amount : undefined,
           total_qty_unit: area > 0 ? t.unit : undefined,
@@ -326,6 +340,7 @@ export default function NewSprayJob() {
   }
 
   async function savePlanned() {
+    if (!f.date) { setShowMissing((s) => ({ ...s, date: true })); return; }
     const business = await repo.getBusiness();
     if (!business) return;
     const job = buildJob("planned");
@@ -482,7 +497,12 @@ export default function NewSprayJob() {
               <View style={{ flex: 1 }}><Input label="Nozzle" value={f.nozzle_type} onChangeText={(v) => setF({ ...f, nozzle_type: v })} testID="input-nozzle" /></View>
               <View style={{ flex: 1 }}><Input label="Nozzle spacing" value={f.nozzle_spacing_m} onChangeText={(v) => setF({ ...f, nozzle_spacing_m: v })} keyboardType="decimal-pad" suffix="mm" testID="input-spacing" /></View>
             </View>
-            <Input label="Start time" value={f.start_time} onChangeText={(v) => setF({ ...f, start_time: v })} testID="input-start" />
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Input label="Schedule date*" value={f.date} onChangeText={(v) => { setF({ ...f, date: v }); if (v) setShowMissing((s) => ({ ...s, date: false })); }} placeholder="YYYY-MM-DD" testID="input-date" error={missing("date")} />
+              </View>
+              <View style={{ flex: 1 }}><Input label="Start time" value={f.start_time} onChangeText={(v) => setF({ ...f, start_time: v })} testID="input-start" /></View>
+            </View>
           </Card>
 
           <View style={{ height: spacing.md }} />
@@ -519,6 +539,19 @@ export default function NewSprayJob() {
           </Card>
 
           <Text style={styles.section}>Tank mix</Text>
+
+          {resistanceWarnings.map((w) => (
+            <View key={w.id} style={styles.warnBanner} testID={`resistance-warning-${w.id}`}>
+              <Icon name="alert-outline" size={18} color={colors.warning} />
+              <Text style={styles.warnBannerText}>
+                {groupLabel(w.chemicalGroup)} was also used on this paddock in {w.priorYear}. Repeated use of the same group across seasons is a resistance risk — worth rotating if you can.
+              </Text>
+              <Pressable onPress={() => setResistanceWarnings((ws) => ws.filter((x) => x.id !== w.id))} hitSlop={8} testID={`dismiss-resistance-${w.id}`}>
+                <Icon name="close" size={18} color={colors.muted} />
+              </Pressable>
+            </View>
+          ))}
+
           <Card>
             <Pressable onPress={() => setShowPicker(true)} style={styles.addProductBtn} testID="add-product-btn">
               <Icon name="plus-circle-outline" size={20} color={colors.brandPrimary} />
@@ -704,6 +737,8 @@ const styles = StyleSheet.create({
   emptyText: { color: colors.muted, fontSize: 13 },
   errorBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.error, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.md },
   errorBannerText: { color: colors.onError, fontWeight: "700", fontSize: 13, flex: 1 },
+  warnBanner: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#FEF3C7", padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.md },
+  warnBannerText: { color: "#92400E", fontWeight: "600", fontSize: 13, flex: 1, lineHeight: 18 },
   errorCard: { borderColor: colors.error, borderWidth: 1.5 },
   repeatTitle: { fontSize: 15, fontWeight: "800", color: colors.onBrandSecondary },
   repeatSub: { fontSize: 12, color: colors.onBrandSecondary, opacity: 0.85, marginTop: 4, lineHeight: 17 },

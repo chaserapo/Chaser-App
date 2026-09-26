@@ -8,6 +8,7 @@ import { Card, Chip } from "@/src/components/ui";
 import { colors, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { exportJobsPdf } from "@/src/lib/pdf-report";
+import { productCost } from "@/src/lib/calculators";
 import { useAuth } from "@/src/lib/auth-context";
 import type { SprayJob, Farm, Paddock } from "@/src/lib/types";
 
@@ -71,10 +72,15 @@ export default function SprayHistory() {
       byMonth.set(key, arr);
     }
     const keys = Array.from(byMonth.keys()).sort((a, b) => (a < b ? 1 : -1));
-    return keys.map((k) => ({
-      title: monthYearLabel(k),
-      data: byMonth.get(k)!.sort((a, b) => (a.date < b.date ? 1 : -1)),
-    }));
+    return keys.map((k) => {
+      const data = byMonth.get(k)!.sort((a, b) => (a.date < b.date ? 1 : -1));
+      const costs = data.flatMap((j) => j.products.map(productCost)).filter((n): n is number => n != null);
+      return {
+        title: monthYearLabel(k),
+        data,
+        totalCost: costs.length > 0 ? costs.reduce((s, n) => s + n, 0) : undefined,
+      };
+    });
   }, [filtered]);
 
   return (
@@ -126,7 +132,10 @@ export default function SprayHistory() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}
           renderSectionHeader={({ section }) => (
-            <Text style={styles.monthHeader}>{section.title} · {section.data.length} job{section.data.length === 1 ? "" : "s"}</Text>
+            <Text style={styles.monthHeader}>
+              {section.title} · {section.data.length} job{section.data.length === 1 ? "" : "s"}
+              {section.totalCost != null ? ` · $${section.totalCost.toFixed(2)}` : ""}
+            </Text>
           )}
           renderItem={({ item }) => (
             <Card style={{ marginBottom: spacing.sm }} onPress={() => router.push({ pathname: "/records/[id]", params: { id: item.id } })} testID={`history-record-${item.id}`}>

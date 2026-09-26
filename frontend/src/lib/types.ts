@@ -45,6 +45,8 @@ export type Chemical = {
   active_ingredient?: string;
   apvma_number?: string;
   chemical_group?: string;
+  chemical_group_key?: string;
+  cost_per_unit?: number;
   formulation?: string;
   manufacturer?: string;
   default_rate?: number;
@@ -224,6 +226,12 @@ export type SprayJobProduct = {
   id: ID;
   chemical_id: ID;
   chemical_name: string;
+  // Snapshotted from the Chemical register at the moment this product was
+  // added to the job — not looked up live — so a job's recorded group/cost
+  // never drifts if the chemical's own record changes later.
+  chemical_group?: string;
+  cost_per_unit?: number;
+  cost_unit?: string;
   rate: number;
   unit: RateUnit;
   custom_unit_label?: string;

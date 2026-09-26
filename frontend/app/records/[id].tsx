@@ -11,6 +11,7 @@ import { repo } from "@/src/lib/storage";
 import { stageLabel } from "@/src/lib/crop-stages";
 import { useAuth } from "@/src/lib/auth-context";
 import { exportJobsPdf } from "@/src/lib/pdf-report";
+import { productCost } from "@/src/lib/calculators";
 import type { SprayJob, Operator, Machinery } from "@/src/lib/types";
 
 function buildSignOffPayload(j: SprayJob) {
@@ -373,13 +374,33 @@ export default function RecordDetail() {
         {j.products.length === 0 ? (
           <Card><Text style={styles.empty}>No chemicals recorded.</Text></Card>
         ) : (
-          j.products.map((p) => (
-            <Card key={p.id} style={{ marginBottom: spacing.sm }}>
-              <Text style={styles.prodName}>{p.chemical_name}</Text>
-              <Text style={styles.prodMeta}>Rate: {p.rate} {p.unit}</Text>
-              {p.total_qty != null ? <Text style={styles.prodMeta}>Total: {p.total_qty.toFixed(2)} {p.total_qty_unit ?? (p.unit === "%v/v" ? "L water" : p.unit.replace("/ha", ""))}</Text> : null}
-            </Card>
-          ))
+          <>
+            {j.products.map((p) => {
+              const cost = productCost(p);
+              return (
+                <Card key={p.id} style={{ marginBottom: spacing.sm }}>
+                  <Text style={styles.prodName}>{p.chemical_name}</Text>
+                  <Text style={styles.prodMeta}>Rate: {p.rate} {p.unit}</Text>
+                  {p.total_qty != null ? <Text style={styles.prodMeta}>Total: {p.total_qty.toFixed(2)} {p.total_qty_unit ?? (p.unit === "%v/v" ? "L water" : p.unit.replace("/ha", ""))}</Text> : null}
+                  {cost != null ? <Text style={styles.prodMeta}>Cost: ${cost.toFixed(2)}</Text> : null}
+                </Card>
+              );
+            })}
+            {(() => {
+              const costs = j.products.map(productCost).filter((n): n is number => n != null);
+              if (costs.length === 0) return null;
+              const total = costs.reduce((s, n) => s + n, 0);
+              return (
+                <Card style={{ marginBottom: spacing.sm }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={styles.prodName}>Total product cost</Text>
+                    <Text style={styles.prodName}>${total.toFixed(2)}</Text>
+                  </View>
+                  {costs.length < j.products.length ? <Text style={styles.editNotice}>Some products don&apos;t have cost data yet, so this isn&apos;t the full job cost.</Text> : null}
+                </Card>
+              );
+            })()}
+          </>
         )}
         {editing ? <Text style={styles.editNotice}>Chemicals and weather readings aren&apos;t editable here — they&apos;re tied to stock records and the verified capture flow.</Text> : null}
 

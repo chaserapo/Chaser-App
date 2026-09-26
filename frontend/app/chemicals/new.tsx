@@ -10,6 +10,7 @@ import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { CHEMICAL_CATEGORIES, ChemicalCategory, PACK_SIZE_PRESETS, RATE_UNITS, RateUnit } from "@/src/lib/types";
 import type { Chemical } from "@/src/lib/types";
+import { groupOptionsFor } from "@/src/lib/chemical-groups";
 import { ApvmaSearch } from "@/src/features/chemicals/ApvmaSearch";
 import { mapApvmaCategory, type ApvmaProduct } from "@/src/lib/apvma";
 
@@ -18,11 +19,12 @@ export default function NewChemical() {
   const router = useRouter();
   const [type, setType] = useState<ChemicalCategory>("Herbicide");
   const [rateUnit, setRateUnit] = useState<RateUnit>("L/ha");
+  const [groupKey, setGroupKey] = useState<string | null>(null);
   const [f, setF] = useState({
     product_name: "", active_ingredient: "", formulation: "",
-    apvma_number: "", chemical_group: "", manufacturer: "",
+    apvma_number: "", manufacturer: "",
     pack_size: "", default_rate: "",
-    stock_qty: "", stock_unit: "", low_stock_threshold: "", storage_location: "",
+    stock_qty: "", stock_unit: "", cost_per_unit: "", low_stock_threshold: "", storage_location: "",
     label_url: "", sds_url: "", notes: "",
   });
   const [saving, setSaving] = useState(false);
@@ -41,13 +43,14 @@ export default function NewChemical() {
       active_ingredient: f.active_ingredient.trim() || undefined,
       formulation: f.formulation.trim() || undefined,
       apvma_number: f.apvma_number.trim() || undefined,
-      chemical_group: f.chemical_group.trim() || undefined,
+      chemical_group_key: groupKey ?? undefined,
       manufacturer: f.manufacturer.trim() || undefined,
       pack_size: f.pack_size.trim() || undefined,
       default_rate: f.default_rate ? parseFloat(f.default_rate) : undefined,
       default_unit: f.default_rate ? rateUnit : undefined,
       stock_qty: f.stock_qty ? parseFloat(f.stock_qty) : undefined,
       stock_unit: f.stock_unit.trim() || undefined,
+      cost_per_unit: f.cost_per_unit ? parseFloat(f.cost_per_unit) : undefined,
       low_stock_threshold: f.low_stock_threshold ? parseFloat(f.low_stock_threshold) : undefined,
       storage_location: f.storage_location.trim() || undefined,
       label_url: f.label_url.trim() || undefined,
@@ -99,7 +102,16 @@ export default function NewChemical() {
             <Input label="Active ingredient" value={f.active_ingredient} onChangeText={(v) => setF({ ...f, active_ingredient: v })} placeholder="e.g. Glyphosate 540 g/L" testID="input-ai" />
             <Input label="Concentration / formulation" value={f.formulation} onChangeText={(v) => setF({ ...f, formulation: v })} placeholder="e.g. Soluble concentrate" testID="input-formulation" />
             <Input label="APVMA registration number" value={f.apvma_number} onChangeText={(v) => setF({ ...f, apvma_number: v })} keyboardType="numeric" testID="input-apvma" />
-            <Input label="Mode of action / group" value={f.chemical_group} onChangeText={(v) => setF({ ...f, chemical_group: v })} placeholder="e.g. M (Glycines)" testID="input-group" />
+
+            <Text style={styles.label}>Mode of action / group</Text>
+            <View style={styles.typeGrid}>
+              {groupOptionsFor(type).map((g) => (
+                <Pressable key={g.key} onPress={() => setGroupKey(g.key)} style={[styles.groupChip, groupKey === g.key && styles.typeChipActive]} testID={`group-chip-${g.key}`}>
+                  <Text style={[styles.typeText, groupKey === g.key && { color: colors.onBrandPrimary }]}>{g.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.groupCaveat}>Group numbers are a general guide, assembled from HRAC/FRAC/IRAC references — check your product label if unsure. Used to warn you if you repeat a group on the same paddock across seasons.</Text>
             <Input label="Manufacturer" value={f.manufacturer} onChangeText={(v) => setF({ ...f, manufacturer: v })} testID="input-manufacturer" />
           </Card>
 
@@ -138,6 +150,7 @@ export default function NewChemical() {
               <View style={{ flex: 1 }}><Input label="Stock quantity" value={f.stock_qty} onChangeText={(v) => setF({ ...f, stock_qty: v })} keyboardType="decimal-pad" placeholder="e.g. 4" testID="input-stock-qty" /></View>
               <View style={{ flex: 1 }}><Input label="Stock unit" value={f.stock_unit} onChangeText={(v) => setF({ ...f, stock_unit: v })} placeholder="packs, L, kg" testID="input-stock-unit" /></View>
             </View>
+            <Input label="Cost per unit (optional)" value={f.cost_per_unit} onChangeText={(v) => setF({ ...f, cost_per_unit: v })} keyboardType="decimal-pad" suffix={`AUD / ${f.stock_unit.trim() || "unit"}`} placeholder="e.g. 12.50" testID="input-cost-per-unit" />
             <Input label="Low stock warning (optional)" value={f.low_stock_threshold} onChangeText={(v) => setF({ ...f, low_stock_threshold: v })} keyboardType="decimal-pad" placeholder="Leave blank to use your default" testID="input-low-stock" />
             <Input label="Storage location" value={f.storage_location} onChangeText={(v) => setF({ ...f, storage_location: v })} placeholder="e.g. Chem shed A" testID="input-storage" />
           </Card>
@@ -169,6 +182,8 @@ const styles = StyleSheet.create({
   typeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
   typeChip: { paddingHorizontal: 12, height: 36, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, alignItems: "center", justifyContent: "center" },
   typeChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
+  groupChip: { paddingHorizontal: 12, paddingVertical: 8, maxWidth: "100%", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary },
+  groupCaveat: { fontSize: 11, color: colors.muted, fontStyle: "italic", marginBottom: spacing.md, lineHeight: 15 },
   typeText: { fontSize: 12, fontWeight: "700", color: colors.onSurfaceTertiary },
   unitChip: { paddingHorizontal: 12, height: 40, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, alignItems: "center", justifyContent: "center" },
   unitChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
