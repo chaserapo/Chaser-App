@@ -336,7 +336,22 @@ export const MAP_HTML = `<!doctype html>
       fitToPaddocks();
     });
 
+    // Every outgoing message from React Native is delivered through two
+    // channels at once (the WebView bridge's own postMessage, which on iOS
+    // dispatches on document, plus a manually injected window.postMessage
+    // for platforms where that alone isn't reliable) — see the 'message'
+    // listeners registered on both document and window below. That means
+    // handleMessage would otherwise run twice per command; harmless for an
+    // idempotent one like setMode, but case 'save' posts a response back
+    // that React turns into an insert, so a duplicate delivery meant every
+    // saved paddock was written twice. Drop an exact repeat of the very
+    // last payload arriving within the same tick.
+    let lastRaw = null;
+    let lastRawAt = 0;
     function handleMessage(raw) {
+      const now = Date.now();
+      if (raw === lastRaw && now - lastRawAt < 250) return;
+      lastRaw = raw; lastRawAt = now;
       let msg; try { msg = JSON.parse(raw); } catch (e) { return; }
       switch (msg.type) {
         case 'resize': if (map.loaded()) { map.resize(); map.triggerRepaint(); } break;
