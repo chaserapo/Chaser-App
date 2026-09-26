@@ -1,0 +1,48 @@
+name: EAS Update (OTA)
+
+# Manual trigger only — click "Run workflow" on this workflow's page in the
+# GitHub Actions tab. Publishes a JS-only over-the-air update to whichever
+# channel you pick; it does NOT rebuild the native app. Only use this for
+# changes that touch JS/TS only — no new native dependencies, no app.json
+# native config changes (permissions, plugins, icons, etc.). Anything native
+# still needs a real build via the EAS Build workflows.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Which build's channel to update — must match an already-installed build (development/preview/production)"
+        required: true
+        default: production
+        type: choice
+        options:
+          - development
+          - preview
+          - production
+      message:
+        description: "Short description of what this update contains (shown in EAS Update history)"
+        required: true
+        type: string
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install eas-cli
+        run: npm install --global eas-cli
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Publish EAS Update
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas update --channel ${{ inputs.channel }} --message "${{ inputs.message }}" --non-interactive

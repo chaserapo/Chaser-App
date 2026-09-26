@@ -11,6 +11,12 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/74bd6554-949b-4fd4-8945-2c8cadf61908"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "au.com.chaserag.chaser",
@@ -80,7 +86,8 @@
       "expo-status-bar",
       "@react-native-vector-icons/material-design-icons",
       "expo-sharing",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-updates"
     ],
     "experiments": {
       "typedRoutes": true
