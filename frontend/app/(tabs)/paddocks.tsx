@@ -340,8 +340,21 @@ export default function PaddocksTab() {
         </View>
       ) : null}
 
+      {/*
+        List and Map are stacked with absolute positioning and swapped via
+        opacity/pointerEvents rather than display:none. display:none collapses
+        the WebView's native layout to 0x0, and MapLibre only re-measures its
+        container on an explicit resize() — so a fresh WebView had to race that
+        resize against RN's own (async) native layout pass to repaint anything,
+        and losing that race meant paddocks/pins came back invisible even
+        though the map's internal camera state was already correct. Keeping
+        both layers permanently laid out at full size means the WebView's
+        frame never collapses, so there's nothing to race.
+      */}
+      <View style={{ flex: 1 }}>
       <ScrollView
-        style={{ display: showList ? "flex" : "none", flex: 1 }}
+        style={[styles.stackedLayer, { opacity: showList ? 1 : 0 }]}
+        pointerEvents={showList ? "auto" : "none"}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xxl }}
         testID="paddock-list-scroll"
       >
@@ -418,7 +431,10 @@ export default function PaddocksTab() {
           })}
         </ScrollView>
 
-      <View style={{ display: showList ? "none" : "flex", flex: 1 }}>
+      <View
+        style={[styles.stackedLayer, { opacity: showList ? 0 : 1 }]}
+        pointerEvents={showList ? "none" : "auto"}
+      >
         <PaddockMap
           key={mapKey}
           ref={mapRef}
@@ -617,11 +633,13 @@ export default function PaddocksTab() {
           </View>
         ) : null}
       </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  stackedLayer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md, gap: spacing.md },
   title: { fontSize: 26, fontWeight: "800", color: colors.onSurface },
   sub: { color: colors.muted, fontSize: 13, marginTop: 2 },
