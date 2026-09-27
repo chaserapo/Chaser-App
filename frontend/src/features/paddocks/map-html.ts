@@ -21,6 +21,21 @@
 //                    { type: "save", geojson, areaHa } |
 //                    { type: "log", msg }
 
+// Base map tiles: MapTiler when a key is configured, otherwise the OSM
+// Foundation's own free tile servers as a fallback so the map still works
+// with zero setup. That OSM fallback is for development only — its Tile
+// Usage Policy (operations.osmfoundation.org/policies/tiles) explicitly
+// disallows production/commercial use, so a real build should always have
+// EXPO_PUBLIC_MAPTILER_KEY set (see eas.json, same pattern as the Supabase
+// and RevenueCat keys).
+const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY;
+const TILE_URLS = MAPTILER_KEY
+  ? [`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`]
+  : ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png', 'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png'];
+const TILE_ATTRIBUTION = MAPTILER_KEY
+  ? '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; OpenStreetMap contributors'
+  : '&copy; OpenStreetMap contributors';
+
 export const MAP_HTML = `<!doctype html>
 <html>
 <head>
@@ -88,9 +103,9 @@ export const MAP_HTML = `<!doctype html>
         sources: {
           osm: {
             type: 'raster',
-            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png','https://b.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tiles: ${JSON.stringify(TILE_URLS)},
             tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '${TILE_ATTRIBUTION}'
           }
         },
         layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
