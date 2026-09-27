@@ -216,6 +216,15 @@ export default function RecordDetail() {
 
         {isCompleted && !editing && (
           <>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <Button title="Share" icon="share-variant-outline" variant="outline" onPress={shareRecord} testID="share-record-btn" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button title="Export PDF" icon="file-pdf-box" variant="outline" onPress={() => exportJobsPdf([j], business?.name ?? "Chaser")} testID="export-record-pdf-btn" />
+              </View>
+            </View>
+
             <View style={styles.sectionRow}>
               <Text style={styles.section}>Sign-Off QR</Text>
               <Pressable onPress={() => setShowQR((v) => !v)} testID="toggle-qr-btn">
@@ -229,15 +238,6 @@ export default function RecordDetail() {
                 </View>
                 <Text style={styles.qrCaption}>Scan to verify this spray job at the paddock gate.</Text>
                 <Text style={styles.qrId}>Record ID: {j.id.slice(0, 8)}</Text>
-                <View style={{ height: spacing.md, alignSelf: "stretch" }} />
-                <View style={{ flexDirection: "row", gap: 8, alignSelf: "stretch" }}>
-                  <View style={{ flex: 1 }}>
-                    <Button title="Share" icon="share-variant-outline" variant="outline" onPress={shareRecord} testID="share-record-btn" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Button title="Export PDF" icon="file-pdf-box" variant="outline" onPress={() => exportJobsPdf([j], business?.name ?? "Chaser")} testID="export-record-pdf-btn" />
-                  </View>
-                </View>
               </Card>
             ) : (
               <Card onPress={() => setShowQR(true)} testID="qr-preview-card">

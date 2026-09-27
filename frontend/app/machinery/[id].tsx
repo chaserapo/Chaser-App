@@ -12,6 +12,7 @@ import { resolveFarmIssue, reopenFarmIssue } from "@/src/lib/issues";
 import { issueCategoryIcon, issueCategoryLabel } from "@/src/lib/issue-categories";
 import { MACHINE_TYPES } from "@/src/lib/types";
 import type { Machinery, Maintenance, MaintenanceCompletion, MachineType, FarmIssue } from "@/src/lib/types";
+import { NOZZLES } from "@/src/lib/nozzles";
 
 const OPEN_ISSUE_STATUSES = ["open", "assigned", "in_progress"];
 
@@ -25,6 +26,7 @@ export default function MachineDetail() {
   const [issues, setIssues] = useState<FarmIssue[]>([]);
   const [editing, setEditing] = useState(false);
   const [fenceJets, setFenceJets] = useState<0 | 1 | 2>(0);
+  const [nozzlePickerOpen, setNozzlePickerOpen] = useState(false);
   const [ef, setEf] = useState({
     name: "", machine_type: "Tractor" as MachineType,
     make: "", model: "", year: "", serial_number: "", registration: "",
@@ -145,7 +147,7 @@ export default function MachineDetail() {
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
       <ScreenHeader title={m.name} back right={
         !editing ? (
-          <Pressable onPress={() => { setFenceJets(0); setEditing(true); }} testID="edit-machine-btn"><Icon name="pencil" size={22} color={colors.brandPrimary} /></Pressable>
+          <Pressable onPress={() => { setFenceJets(0); setNozzlePickerOpen(false); setEditing(true); }} testID="edit-machine-btn"><Icon name="pencil" size={22} color={colors.brandPrimary} /></Pressable>
         ) : null
       } />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }} keyboardShouldPersistTaps="handled">
@@ -198,7 +200,30 @@ export default function MachineDetail() {
                   <Text style={styles.helperText}>
                     Fence jets sit at the boom ends spraying outward, outside the regular nozzle spacing. &quot;# of nozzles&quot; auto-fills from boom width ÷ spacing + fence jets — edit it directly if it doesn&apos;t match your setup.
                   </Text>
-                  <Input label="Default nozzle" value={ef.default_nozzle} onChangeText={(v) => setEf({ ...ef, default_nozzle: v })} testID="edit-def-nozzle" />
+                  <Text style={styles.editLabel}>Default nozzle</Text>
+                  <Pressable onPress={() => setNozzlePickerOpen((v) => !v)} style={styles.nozzleBtn} testID="edit-def-nozzle">
+                    <Text style={styles.nozzleBtnText}>{ef.default_nozzle || "Select fitted nozzle"}</Text>
+                    <Icon name={nozzlePickerOpen ? "chevron-up" : "chevron-down"} size={18} color={colors.muted} />
+                  </Pressable>
+                  {nozzlePickerOpen ? (
+                    <View style={styles.nozzlePickerWrap}>
+                      <ScrollView style={{ maxHeight: 280 }} nestedScrollEnabled>
+                        {NOZZLES.map((n) => (
+                          <Pressable
+                            key={n.id}
+                            onPress={() => { setEf({ ...ef, default_nozzle: n.label }); setNozzlePickerOpen(false); }}
+                            style={[styles.nozzleRow, ef.default_nozzle === n.label && { backgroundColor: colors.brandSecondary }]}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.nozzleName}>{n.label}</Text>
+                              <Text style={styles.nozzleSub}>{n.type} · {n.minPressureBar}–{n.maxPressureBar} bar{n.pwmApproved ? " · PWM" : ""}</Text>
+                            </View>
+                            {ef.default_nozzle === n.label ? <Icon name="check" size={18} color={colors.brandPrimary} /> : null}
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  ) : null}
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     <View style={{ flex: 1 }}><Input label="Default speed" value={ef.default_speed_kmh} onChangeText={(v) => setEf({ ...ef, default_speed_kmh: v })} keyboardType="decimal-pad" suffix="km/h" testID="edit-def-speed" /></View>
                     <View style={{ flex: 1 }}><Input label="Default water rate" value={ef.default_water_rate_lha} onChangeText={(v) => setEf({ ...ef, default_water_rate_lha: v })} keyboardType="decimal-pad" suffix="L/ha" testID="edit-def-water" /></View>
@@ -219,7 +244,7 @@ export default function MachineDetail() {
             <View style={{ height: spacing.md }} />
             <Button title="Save Changes" icon="content-save-outline" onPress={saveEdit} disabled={!ef.name.trim()} testID="save-machine-edit-btn" />
             <View style={{ height: spacing.sm }} />
-            <Button title="Cancel" variant="outline" onPress={() => { setEditing(false); setFenceJets(0); loadFields(m); }} testID="cancel-machine-edit-btn" />
+            <Button title="Cancel" variant="outline" onPress={() => { setEditing(false); setFenceJets(0); setNozzlePickerOpen(false); loadFields(m); }} testID="cancel-machine-edit-btn" />
             <View style={{ height: spacing.md }} />
             <Button title="Delete Machine" variant="danger" icon="trash-can-outline" onPress={confirmDelete} testID="delete-machine-btn" />
           </>
@@ -461,4 +486,10 @@ const styles = StyleSheet.create({
   historyLine: { fontSize: 13, color: colors.onSurface, marginTop: 3 },
   resolveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, minHeight: 36 },
   resolveBtnText: { color: colors.success, fontWeight: "800", fontSize: 13 },
+  nozzleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, borderRadius: radius.sm, paddingHorizontal: 12, minHeight: 46, gap: 8, marginBottom: spacing.md },
+  nozzleBtnText: { flex: 1, fontSize: 13, color: colors.onSurface, fontWeight: "600" },
+  nozzlePickerWrap: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radius.sm, marginTop: -8, marginBottom: spacing.md, padding: 4 },
+  nozzleRow: { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: radius.sm, gap: 8 },
+  nozzleName: { fontSize: 13, fontWeight: "700", color: colors.onSurface },
+  nozzleSub: { fontSize: 11, color: colors.muted, marginTop: 2 },
 });
