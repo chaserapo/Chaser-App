@@ -114,7 +114,7 @@ export function PaywallScreen({ back }: { back?: boolean }) {
         </Pressable>
 
         <Text style={styles.disclaimer}>
-          New subscribers get a {TRIAL_DAYS}-day free trial. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel any time in your device&apos;s App Store account settings.
+          New subscribers get a {TRIAL_DAYS}-day free trial. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel any time in your device&apos;s App Store or Google Play account settings.
         </Text>
 
         <View style={styles.legalLinks}>

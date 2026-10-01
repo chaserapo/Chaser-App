@@ -1,12 +1,14 @@
 // RevenueCat subscription integration.
 //
-// Gated entirely behind EXPO_PUBLIC_REVENUECAT_IOS_KEY being set: until that
-// env var is added (in eas.json, once you've created the RevenueCat app +
-// App Store Connect subscription), every function here is a safe no-op and
+// Gated entirely behind the current platform's EXPO_PUBLIC_REVENUECAT_*_KEY
+// being set: until that env var is added for a given platform (in eas.json,
+// once you've created the matching RevenueCat app + store subscription
+// product), every function here is a safe no-op on that platform and
 // isPro() always returns true — nobody gets locked out of an app that isn't
-// wired up to actually sell anything yet. Once the key is added, the 7-day
-// trial (counted from the business's created_at) and paywall gate turn on
-// automatically — no other code change needed.
+// wired up to actually sell anything yet there. Once a platform's key is
+// added, the 7-day trial (counted from the business's created_at) and
+// paywall gate turn on automatically for that platform — no other code
+// change needed.
 
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
@@ -15,9 +17,16 @@ export const PRO_ENTITLEMENT_ID = "chaser";
 export const TRIAL_DAYS = 7;
 
 const IOS_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY;
+const ANDROID_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY;
+
+function currentApiKey(): string | undefined {
+  if (Platform.OS === "ios") return IOS_API_KEY;
+  if (Platform.OS === "android") return ANDROID_API_KEY;
+  return undefined;
+}
 
 export function purchasesConfigured(): boolean {
-  return Platform.OS === "ios" && !!IOS_API_KEY;
+  return !!currentApiKey();
 }
 
 let configuredForUserId: string | null = null;
@@ -26,7 +35,7 @@ export async function configurePurchases(userId: string): Promise<void> {
   if (!purchasesConfigured() || configuredForUserId === userId) return;
   try {
     const Purchases = require("react-native-purchases").default;
-    Purchases.configure({ apiKey: IOS_API_KEY!, appUserID: userId });
+    Purchases.configure({ apiKey: currentApiKey()!, appUserID: userId });
     configuredForUserId = userId;
   } catch (e) {
     console.warn("RevenueCat configure failed", e);
@@ -62,13 +71,13 @@ export async function restorePurchases(): Promise<{ ok: boolean; message?: strin
     const Purchases = require("react-native-purchases").default;
     const customerInfo = await Purchases.restorePurchases();
     const active = !!customerInfo.entitlements.active[PRO_ENTITLEMENT_ID];
-    return { ok: active, message: active ? undefined : "No active subscription found for this Apple ID." };
+    return { ok: active, message: active ? undefined : "No active subscription found for this account." };
   } catch (e: any) {
     return { ok: false, message: e?.message ?? "Restore failed" };
   }
 }
 
-/** Opens Apple's native "manage subscription" flow (cancel, upgrade, billing history). */
+/** Opens the platform's native "manage subscription" flow (cancel, upgrade, billing history). */
 export async function presentCustomerCenter(): Promise<void> {
   if (!purchasesConfigured()) return;
   try {
