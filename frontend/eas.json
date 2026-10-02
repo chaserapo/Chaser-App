@@ -13,6 +13,7 @@
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
         "EXPO_PUBLIC_BACKEND_URL": "https://chaser-app-production.up.railway.app",
         "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_gvcgItFmaVNzdgkwhNQHlAiIPSi",
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_AmAPfvwpttQrSXufLdKkoDgTAIq",
         "EXPO_PUBLIC_MAPTILER_KEY": "6qkxb2dUUrIaEbN85nuC"
       }
     },
@@ -30,6 +31,7 @@
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
         "EXPO_PUBLIC_BACKEND_URL": "https://chaser-app-production.up.railway.app",
         "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_gvcgItFmaVNzdgkwhNQHlAiIPSi",
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_AmAPfvwpttQrSXufLdKkoDgTAIq",
         "EXPO_PUBLIC_MAPTILER_KEY": "6qkxb2dUUrIaEbN85nuC"
       }
     },
@@ -47,6 +49,7 @@
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
         "EXPO_PUBLIC_BACKEND_URL": "https://chaser-app-production.up.railway.app",
         "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_gvcgItFmaVNzdgkwhNQHlAiIPSi",
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_AmAPfvwpttQrSXufLdKkoDgTAIq",
         "EXPO_PUBLIC_MAPTILER_KEY": "6qkxb2dUUrIaEbN85nuC"
       }
     },
@@ -64,6 +67,7 @@
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4",
         "EXPO_PUBLIC_BACKEND_URL": "https://chaser-app-production.up.railway.app",
         "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_gvcgItFmaVNzdgkwhNQHlAiIPSi",
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_AmAPfvwpttQrSXufLdKkoDgTAIq",
         "EXPO_PUBLIC_MAPTILER_KEY": "6qkxb2dUUrIaEbN85nuC"
       }
     }
