@@ -2,7 +2,7 @@
 
 A free daily "Can I spray today?" forecast site that markets Chaser. It runs itself:
 
-- **SEO pages.** One page per farming town (90 to start) titled "Can I spray in Dubbo today?". Each shows hourly Delta T, wind, gusts, rain and inversion risk, plus FAQ structured data, nearby-town links, a nozzle-selection section that pitches Chaser's Nozzle Selector (with advice keyed to that day's forecast) and a Chaser download call-to-action. Pages are rebuilt twice a day, so search engines see fresh content.
+- **SEO pages.** One page per farming town (173 to start, 99 of them in WA) titled "Can I spray in Dubbo today?". Each shows hourly Delta T, wind, gusts, rain and inversion risk, plus FAQ structured data, nearby-town links, a nozzle-selection section that pitches Chaser's Nozzle Selector (with advice keyed to that day's forecast) and a Chaser download call-to-action. Pages are rebuilt twice a day, so search engines see fresh content.
 - **Social cards.** Each morning there's a 1080×1350 card per state and a caption. Captions are written by Claude when `ANTHROPIC_API_KEY` is set and fall back to a template otherwise.
 - **Auto-posting.** The morning run posts all state cards to the Chaser Facebook Page when `FB_PAGE_ID` / `FB_PAGE_TOKEN` are set.
 - **Post kit.** `<site>/social/` holds every card and caption with copy and download buttons, for sharing in farming Facebook groups. The Graph API can't post to groups.
@@ -38,7 +38,7 @@ All app links carry `utm_source=spraywindow`, with a `utm_campaign` per placemen
 
 ## Adding towns
 
-Append to `src/towns.mjs` (`[name, state, lat, lon]`). Each new town becomes a new page, which means another search query the site can rank for.
+Append to `src/towns.mjs` (`[name, state, lat, lon]`), then run `npm run check-towns` (or a manual run of the workflow) to confirm the coordinates against a geocoder. Each new town becomes a new page, which means another search query the site can rank for.
 
 ## Legal
 

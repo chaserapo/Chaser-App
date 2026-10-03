@@ -7,6 +7,7 @@
     "build": "node src/build.mjs",
     "build:fixture": "node src/build.mjs --fixture",
     "social": "node src/social.mjs",
+    "check-towns": "node src/check-towns.mjs",
     "post:facebook": "node src/post-facebook.mjs",
     "preview": "http-server dist -p 8080 -c-1"
   },
