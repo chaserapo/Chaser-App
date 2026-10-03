@@ -22,6 +22,7 @@ npm run preview          # http://localhost:8080
 
 ## Go live
 
+0. **Hosting at `<domain>/spray`.** The Chaser website on Vercel (`chaserapo/Chaser-website`) proxies `/spray/*` to this site on GitHub Pages; see its `frontend/vercel.json`. Set `SITE_URL` to `https://<domain>/spray`, set `BASE_PATH` to `spray`, and leave `CUSTOM_DOMAIN` empty.
 1. **Turn on Pages.** In the repo, go to Settings → Pages → Source and choose **GitHub Actions**. On a private repo, Pages needs a paid GitHub plan; otherwise deploy `dist/` to Netlify or Cloudflare Pages instead.
 2. **Set repository variables** (Settings → Secrets and variables → Actions → Variables):
    - `SITE_URL`: the public URL, e.g. `https://spray.chaserag.com.au`. It defaults to `https://chaserapo.github.io/Chaser-App`.
