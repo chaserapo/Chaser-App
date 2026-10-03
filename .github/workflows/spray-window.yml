@@ -1,0 +1,109 @@
+name: Spray Window (daily marketing site)
+
+# Rebuilds the free "Can I spray today?" site with fresh forecasts, deploys it
+# to GitHub Pages, and (morning run only) posts the daily cards to Facebook.
+#
+# Setup: Settings → Pages → Source: "GitHub Actions". Optional repo variables:
+# SITE_URL, CUSTOM_DOMAIN, APP_STORE_URL, PLAY_STORE_URL, CHASER_SITE_URL.
+# Optional secrets: OPEN_METEO_API_KEY, ANTHROPIC_API_KEY, FB_PAGE_ID, FB_PAGE_TOKEN.
+
+on:
+  schedule:
+    - cron: "30 19 * * *" # 5:30am AEST / 6:30am AEDT: morning build + social post
+    - cron: "0 2 * * *" # 12pm AEST: midday forecast refresh, no post
+  workflow_dispatch:
+    inputs:
+      post_to_facebook:
+        description: "Post today's cards to the Facebook Page after deploying"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: spray-window
+  cancel-in-progress: false
+
+env:
+  SITE_URL: ${{ vars.SITE_URL }}
+  CUSTOM_DOMAIN: ${{ vars.CUSTOM_DOMAIN }}
+  APP_STORE_URL: ${{ vars.APP_STORE_URL }}
+  PLAY_STORE_URL: ${{ vars.PLAY_STORE_URL }}
+  CHASER_SITE_URL: ${{ vars.CHASER_SITE_URL }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: marketing/spray-window
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: marketing/spray-window/package-lock.json
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Build site from live forecasts
+        run: npm run build
+        env:
+          OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
+
+      - name: Render social cards and captions
+        run: npm run social
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: marketing/spray-window/dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: social-kit
+          path: marketing/spray-window/dist/social
+          retention-days: 14
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  post-facebook:
+    needs: deploy
+    if: github.event.schedule == '30 19 * * *' || inputs.post_to_facebook
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: marketing/spray-window
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: social-kit
+          path: marketing/spray-window/dist/social
+
+      - name: Post to Facebook Page
+        run: node src/post-facebook.mjs
+        env:
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
