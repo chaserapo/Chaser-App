@@ -6,10 +6,17 @@ forecast hour's timestamp is turned into an absolute UTC instant.
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 import httpx
+
+def _forecast_base() -> str:
+    """Open-Meteo's free API is non-commercial only. With OPEN_METEO_API_KEY
+    set (commercial subscription), use the customer host instead."""
+    return "https://customer-api.open-meteo.com" if os.getenv("OPEN_METEO_API_KEY") else "https://api.open-meteo.com"
+
 
 MODELS: List[str] = ["ecmwf_ifs04", "ecmwf_aifs025", "bom_access_global", "gfs_seamless"]
 
@@ -68,10 +75,13 @@ async def fetch_model(client: httpx.AsyncClient, model: str, lat: float, lon: fl
     Returns {"rows": [...], "utc_offset_seconds": int}.
     """
     url = (
-        f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+        f"{_forecast_base()}/v1/forecast?latitude={lat}&longitude={lon}"
         f"&hourly={HOURLY_VARS}&wind_speed_unit=kmh&timezone=auto"
         f"&forecast_days={days}&models={model}"
     )
+    key = os.getenv("OPEN_METEO_API_KEY")
+    if key:
+        url += f"&apikey={key}"
     r = await client.get(url, timeout=25)
     r.raise_for_status()
     j = r.json()

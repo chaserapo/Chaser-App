@@ -1,5 +1,6 @@
 import * as Location from "expo-location";
 import { deltaT } from "./calculators";
+import { openMeteoUrl } from "./open-meteo";
 
 export type WeatherSnapshot = {
   temperature_c: number;
@@ -45,7 +46,7 @@ export async function fetchWeather(): Promise<WeatherSnapshot> {
     // fall through with defaults
   }
 
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m&wind_speed_unit=kmh&timezone=auto`;
+  const url = openMeteoUrl("api", `/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m&wind_speed_unit=kmh&timezone=auto`);
   // Time-box the fetch as well so an offline caller doesn't hang forever.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 6000);
