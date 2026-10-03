@@ -17,24 +17,25 @@ npm install
 npm run build            # live forecasts (needs internet access to Open-Meteo)
 npm run build:fixture    # synthetic data, watermarked "SAMPLE DATA"
 npm run social           # cards + captions into dist/social
-npm run preview          # http://localhost:8080
+npm run preview          # http://localhost:8080/spray/
 ```
 
 ## Go live
 
-0. **Hosting at `<domain>/spray`.** The Chaser website on Vercel (`chaserapo/Chaser-website`) proxies `/spray/*` to this site on GitHub Pages; see its `frontend/vercel.json`. Set `SITE_URL` to `https://<domain>/spray`, set `BASE_PATH` to `spray`, and leave `CUSTOM_DOMAIN` empty.
-1. **Turn on Pages.** In the repo, go to Settings → Pages → Source and choose **GitHub Actions**. On a private repo, Pages needs a paid GitHub plan; otherwise deploy `dist/` to Netlify or Cloudflare Pages instead.
-2. **Set repository variables** (Settings → Secrets and variables → Actions → Variables):
-   - `SITE_URL`: the public URL, e.g. `https://spray.chaserag.com.au`. It defaults to `https://chaserapo.github.io/Chaser-App`.
-   - `BASE_PATH`: sub-folder to serve under, e.g. `spray` for `chaserag.com.au/spray` (with `SITE_URL` = `https://chaserag.com.au/spray`). Leave empty to serve at the domain root.
-   - `CUSTOM_DOMAIN`: the bare domain GitHub Pages serves, e.g. `chaserag.com.au` (writes the Pages `CNAME`).
+The site is served at `chaserag.com.au/spray`. The GitHub Action deploys it to its own Vercel project, `chaser-spray-window`, and the Chaser website (`chaserapo/Chaser-website`, also on Vercel) proxies `/spray/*` to that project. See the website's `frontend/vercel.json`.
+
+1. **Vercel token.** In Vercel, go to Account Settings → Tokens and create one. Add it to this repo as the secret `VERCEL_TOKEN` (Settings → Secrets and variables → Actions). The first deploy creates the `chaser-spray-window` project. If the project should belong to a Vercel team, also set the variable `VERCEL_SCOPE` to the team's slug.
+2. **Repository variables** (all optional):
+   - `SITE_URL`: defaults to `https://chaserag.com.au/spray`. Change it if the site is on another domain.
+   - `BASE_PATH`: defaults to `spray`.
    - `APP_STORE_URL` / `PLAY_STORE_URL`: store links. Play defaults to the `au.com.chaserag.chaser` listing. The iOS button is hidden until `APP_STORE_URL` is set.
-   - `CHASER_SITE_URL`: optional marketing site, used for the header and footer links.
-3. **Set secrets:**
+   - `CHASER_SITE_URL`: the main Chaser site, used for the header and footer links.
+3. **Secrets:**
    - `OPEN_METEO_API_KEY`: **required before launch**. Open-Meteo's free API is non-commercial only, and this site promotes a paid app.
    - `ANTHROPIC_API_KEY`: turns on AI-written captions.
    - `FB_PAGE_ID`, `FB_PAGE_TOKEN`: a long-lived Page token with `pages_manage_posts`.
-4. **Run it once by hand.** Go to Actions → "Spray Window" → Run workflow, then submit `<SITE_URL>/sitemap.xml` in Google Search Console and Bing Webmaster Tools.
+4. **Run it once by hand.** Go to Actions → "Spray Window" → Run workflow. Check the project's address in Vercel: if it isn't `chaser-spray-window.vercel.app`, update the three `/spray` rewrites in the website's `frontend/vercel.json` to match.
+5. **Search engines.** Submit `<SITE_URL>/sitemap.xml` in Google Search Console and Bing Webmaster Tools.
 
 All app links carry `utm_source=spraywindow`, with a `utm_campaign` per placement, so installs can be attributed.
 

@@ -5,7 +5,7 @@ const trimSlash = (s) => s.replace(/\/+$/, "");
 
 export const CONFIG = {
   // Public base URL the site is served from (no trailing slash).
-  siteUrl: trimSlash(process.env.SITE_URL || "https://chaserapo.github.io/Chaser-App"),
+  siteUrl: trimSlash(process.env.SITE_URL || "https://chaserag.com.au/spray"),
   siteName: "Spray Window by Chaser",
   // Store links; a missing one is hidden from the call-to-action.
   appStoreUrl: process.env.APP_STORE_URL || "",
@@ -17,8 +17,9 @@ export const CONFIG = {
 };
 
 // Sub-folder the site lives under on its domain, e.g. "spray" for
-// chaserag.com.au/spray. Empty means the site is at the domain root.
-export const BASE_PATH = (process.env.BASE_PATH || "").replace(/^\/+|\/+$/g, "");
+// chaserag.com.au/spray (the default), so paths on the Vercel project match
+// the paths the Chaser website proxies.
+export const BASE_PATH = (process.env.BASE_PATH || "spray").replace(/^\/+|\/+$/g, "");
 
 // Where the site's own files are built: dist/ or dist/<BASE_PATH>/.
 export function siteDir(distDir) {

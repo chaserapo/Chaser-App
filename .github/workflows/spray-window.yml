@@ -1,10 +1,12 @@
 name: Spray Window (daily marketing site)
 
 # Rebuilds the free "Can I spray today?" site with fresh forecasts, deploys it
-# to GitHub Pages, and (morning run only) posts the daily cards to Facebook.
+# to its own Vercel project ("chaser-spray-window"), and (morning run only)
+# posts the daily cards to Facebook. The Chaser website's vercel.json proxies
+# <domain>/spray/* to that project.
 #
-# Setup: Settings → Pages → Source: "GitHub Actions". Optional repo variables:
-# SITE_URL, BASE_PATH, CUSTOM_DOMAIN, APP_STORE_URL, PLAY_STORE_URL, CHASER_SITE_URL.
+# Required secret: VERCEL_TOKEN. Optional repo variables: SITE_URL, BASE_PATH,
+# VERCEL_SCOPE, APP_STORE_URL, PLAY_STORE_URL, CHASER_SITE_URL.
 # Optional secrets: OPEN_METEO_API_KEY, ANTHROPIC_API_KEY, FB_PAGE_ID, FB_PAGE_TOKEN.
 
 on:
@@ -20,8 +22,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: spray-window
@@ -30,7 +30,6 @@ concurrency:
 env:
   SITE_URL: ${{ vars.SITE_URL }}
   BASE_PATH: ${{ vars.BASE_PATH }}
-  CUSTOM_DOMAIN: ${{ vars.CUSTOM_DOMAIN }}
   APP_STORE_URL: ${{ vars.APP_STORE_URL }}
   PLAY_STORE_URL: ${{ vars.PLAY_STORE_URL }}
   CHASER_SITE_URL: ${{ vars.CHASER_SITE_URL }}
@@ -69,28 +68,25 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: marketing/spray-window/dist
-
       - uses: actions/upload-artifact@v4
         with:
           name: social-kit
-          path: marketing/spray-window/dist/${{ vars.BASE_PATH }}/social
+          path: marketing/spray-window/dist/${{ vars.BASE_PATH || 'spray' }}/social
           retention-days: 14
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      # The folder name becomes the Vercel project name: the first deploy
+      # creates "chaser-spray-window", later deploys reuse it.
+      - name: Deploy to Vercel
+        run: |
+          rm -rf ../chaser-spray-window && cp -r dist ../chaser-spray-window
+          npx --yes vercel@latest deploy ../chaser-spray-window --prod --yes \
+            --token "$VERCEL_TOKEN" ${VERCEL_SCOPE:+--scope "$VERCEL_SCOPE"}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_SCOPE: ${{ vars.VERCEL_SCOPE }}
 
   post-facebook:
-    needs: deploy
+    needs: build
     if: github.event.schedule == '30 19 * * *' || inputs.post_to_facebook
     runs-on: ubuntu-latest
     defaults:
@@ -106,7 +102,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: social-kit
-          path: marketing/spray-window/dist/${{ vars.BASE_PATH }}/social
+          path: marketing/spray-window/dist/${{ vars.BASE_PATH || 'spray' }}/social
 
       - name: Post to Facebook Page
         run: node src/post-facebook.mjs

@@ -61,8 +61,9 @@ await write("sitemap.xml", renderSitemap(paths));
 // Domain-level files always go at the top of dist/, whatever BASE_PATH is.
 const writeRoot = async (rel, content) => writeFile(join(DIST, rel), content);
 await writeRoot("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${CONFIG.siteUrl}/sitemap.xml\n`);
-await writeRoot(".nojekyll", "");
-if (process.env.CUSTOM_DOMAIN) await writeRoot("CNAME", `${process.env.CUSTOM_DOMAIN}\n`);
+// Vercel: every page is a folder index, so always use trailing-slash URLs
+// (keeps the pages' relative links correct).
+await writeRoot("vercel.json", JSON.stringify({ trailingSlash: true }, null, 2) + "\n");
 // Until the main Chaser site is built into dist/, send the bare domain to Spray Window.
 if (BASE_PATH) {
   await writeRoot(
