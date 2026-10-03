@@ -16,6 +16,15 @@ export const CONFIG = {
   utm: "utm_source=spraywindow&utm_medium=organic",
 };
 
+// Sub-folder the site lives under on its domain, e.g. "spray" for
+// chaserag.com.au/spray. Empty means the site is at the domain root.
+export const BASE_PATH = (process.env.BASE_PATH || "").replace(/^\/+|\/+$/g, "");
+
+// Where the site's own files are built: dist/ or dist/<BASE_PATH>/.
+export function siteDir(distDir) {
+  return BASE_PATH ? `${distDir}/${BASE_PATH}` : distDir;
+}
+
 export function withUtm(url, campaign) {
   if (!url) return url;
   const params = `${CONFIG.utm}&utm_campaign=${encodeURIComponent(campaign)}`;

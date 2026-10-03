@@ -11,7 +11,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CONFIG } from "./config.mjs";
+import { CONFIG, siteDir } from "./config.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { FB_PAGE_ID, FB_PAGE_TOKEN } = process.env;
@@ -22,7 +22,7 @@ if (!FB_PAGE_ID || !FB_PAGE_TOKEN) {
   process.exit(0);
 }
 
-const kit = JSON.parse(await readFile(join(ROOT, "dist/social/posts.json"), "utf8"));
+const kit = JSON.parse(await readFile(join(siteDir(join(ROOT, "dist")), "social/posts.json"), "utf8"));
 if (kit.fixture) {
   console.error("Refusing to post: this build used sample data.");
   process.exit(1);

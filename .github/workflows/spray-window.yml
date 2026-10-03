@@ -4,7 +4,7 @@ name: Spray Window (daily marketing site)
 # to GitHub Pages, and (morning run only) posts the daily cards to Facebook.
 #
 # Setup: Settings → Pages → Source: "GitHub Actions". Optional repo variables:
-# SITE_URL, CUSTOM_DOMAIN, APP_STORE_URL, PLAY_STORE_URL, CHASER_SITE_URL.
+# SITE_URL, BASE_PATH, CUSTOM_DOMAIN, APP_STORE_URL, PLAY_STORE_URL, CHASER_SITE_URL.
 # Optional secrets: OPEN_METEO_API_KEY, ANTHROPIC_API_KEY, FB_PAGE_ID, FB_PAGE_TOKEN.
 
 on:
@@ -29,6 +29,7 @@ concurrency:
 
 env:
   SITE_URL: ${{ vars.SITE_URL }}
+  BASE_PATH: ${{ vars.BASE_PATH }}
   CUSTOM_DOMAIN: ${{ vars.CUSTOM_DOMAIN }}
   APP_STORE_URL: ${{ vars.APP_STORE_URL }}
   PLAY_STORE_URL: ${{ vars.PLAY_STORE_URL }}
@@ -75,7 +76,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: social-kit
-          path: marketing/spray-window/dist/social
+          path: marketing/spray-window/dist/${{ vars.BASE_PATH }}/social
           retention-days: 14
 
   deploy:
@@ -105,7 +106,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: social-kit
-          path: marketing/spray-window/dist/social
+          path: marketing/spray-window/dist/${{ vars.BASE_PATH }}/social
 
       - name: Post to Facebook Page
         run: node src/post-facebook.mjs

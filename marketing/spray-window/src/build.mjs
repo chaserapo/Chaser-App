@@ -1,4 +1,4 @@
-// Builds the static Spray Window site into dist/.
+// Builds the static Spray Window site into dist/ (or dist/<BASE_PATH>/).
 //
 //   node src/build.mjs            live forecast from Open-Meteo
 //   node src/build.mjs --fixture  synthetic data, for local previews only
@@ -10,14 +10,15 @@ import { TOWNS, STATES, nearbyTowns } from "./towns.mjs";
 import { fetchForecasts, fixtureForecasts } from "./forecast.mjs";
 import { rateHours, summariseDay } from "./conditions.mjs";
 import { renderTown, renderState, renderIndex, renderSitemap } from "./render.mjs";
-import { CONFIG } from "./config.mjs";
+import { CONFIG, BASE_PATH, siteDir } from "./config.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist");
+const SITE = siteDir(DIST);
 const fixture = process.argv.includes("--fixture");
 
 async function write(rel, content) {
-  const file = join(DIST, rel);
+  const file = join(SITE, rel);
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, content);
 }
@@ -39,7 +40,7 @@ const updated = new Date().toLocaleString("en-AU", {
 const date = results[0].today.date;
 
 await rm(DIST, { recursive: true, force: true });
-await cp(join(ROOT, "static"), join(DIST, "static"), { recursive: true });
+await cp(join(ROOT, "static"), join(SITE, "static"), { recursive: true });
 
 const paths = [""];
 for (const r of results) {
@@ -57,9 +58,18 @@ for (const st of Object.keys(STATES)) {
 
 await write("index.html", renderIndex({ byState, updated, date }));
 await write("sitemap.xml", renderSitemap(paths));
-await write("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${CONFIG.siteUrl}/sitemap.xml\n`);
-await write(".nojekyll", "");
-if (process.env.CUSTOM_DOMAIN) await write("CNAME", `${process.env.CUSTOM_DOMAIN}\n`);
+// Domain-level files always go at the top of dist/, whatever BASE_PATH is.
+const writeRoot = async (rel, content) => writeFile(join(DIST, rel), content);
+await writeRoot("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${CONFIG.siteUrl}/sitemap.xml\n`);
+await writeRoot(".nojekyll", "");
+if (process.env.CUSTOM_DOMAIN) await writeRoot("CNAME", `${process.env.CUSTOM_DOMAIN}\n`);
+// Until the main Chaser site is built into dist/, send the bare domain to Spray Window.
+if (BASE_PATH) {
+  await writeRoot(
+    "index.html",
+    `<!doctype html><meta charset="utf-8"><title>Chaser</title><meta http-equiv="refresh" content="0; url=/${BASE_PATH}/"><link rel="canonical" href="${CONFIG.siteUrl}/"><a href="/${BASE_PATH}/">Spray Window by Chaser</a>\n`,
+  );
+}
 
 // Compact summary consumed by the social-card step.
 await write(

@@ -12,11 +12,11 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import Anthropic from "@anthropic-ai/sdk";
 import { STATES } from "./towns.mjs";
-import { CONFIG, withUtm } from "./config.mjs";
+import { CONFIG, withUtm, siteDir } from "./config.mjs";
 import { VERDICT_LABEL, fmtDate, windowText } from "./conditions.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const DIST = join(ROOT, "dist");
+const DIST = siteDir(join(ROOT, "dist"));
 const OUT = join(DIST, "social");
 
 const data = JSON.parse(await readFile(join(DIST, "data/today.json"), "utf8"));
@@ -202,4 +202,4 @@ ${posts
 </body></html>`,
 );
 
-console.log(`Social cards for ${posts.length} states written to dist/social/${claude ? " (AI captions)" : " (template captions)"}`);
+console.log(`Social cards for ${posts.length} states written to ${OUT}${claude ? " (AI captions)" : " (template captions)"}`);

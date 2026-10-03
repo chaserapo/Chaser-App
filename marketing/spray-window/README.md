@@ -25,7 +25,8 @@ npm run preview          # http://localhost:8080
 1. **Turn on Pages.** In the repo, go to Settings → Pages → Source and choose **GitHub Actions**. On a private repo, Pages needs a paid GitHub plan; otherwise deploy `dist/` to Netlify or Cloudflare Pages instead.
 2. **Set repository variables** (Settings → Secrets and variables → Actions → Variables):
    - `SITE_URL`: the public URL, e.g. `https://spray.chaserag.com.au`. It defaults to `https://chaserapo.github.io/Chaser-App`.
-   - `CUSTOM_DOMAIN`: e.g. `spray.chaserag.com.au` (writes the Pages `CNAME`).
+   - `BASE_PATH`: sub-folder to serve under, e.g. `spray` for `chaserag.com.au/spray` (with `SITE_URL` = `https://chaserag.com.au/spray`). Leave empty to serve at the domain root.
+   - `CUSTOM_DOMAIN`: the bare domain GitHub Pages serves, e.g. `chaserag.com.au` (writes the Pages `CNAME`).
    - `APP_STORE_URL` / `PLAY_STORE_URL`: store links. Play defaults to the `au.com.chaserag.chaser` listing. The iOS button is hidden until `APP_STORE_URL` is set.
    - `CHASER_SITE_URL`: optional marketing site, used for the header and footer links.
 3. **Set secrets:**
