@@ -2,7 +2,7 @@
 
 A free daily "Can I spray today?" forecast site that markets Chaser. It runs itself:
 
-- **SEO pages.** One page per farming town (90 to start) titled "Can I spray in Dubbo today?". Each shows hourly Delta T, wind, gusts, rain and inversion risk, plus FAQ structured data, nearby-town links and a Chaser download call-to-action. Pages are rebuilt twice a day, so search engines see fresh content.
+- **SEO pages.** One page per farming town (90 to start) titled "Can I spray in Dubbo today?". Each shows hourly Delta T, wind, gusts, rain and inversion risk, plus FAQ structured data, nearby-town links, a nozzle-selection section that pitches Chaser's Nozzle Selector (with advice keyed to that day's forecast) and a Chaser download call-to-action. Pages are rebuilt twice a day, so search engines see fresh content.
 - **Social cards.** Each morning there's a 1080×1350 card per state and a caption. Captions are written by Claude when `ANTHROPIC_API_KEY` is set and fall back to a template otherwise.
 - **Auto-posting.** The morning run posts all state cards to the Chaser Facebook Page when `FB_PAGE_ID` / `FB_PAGE_TOKEN` are set.
 - **Post kit.** `<site>/social/` holds every card and caption with copy and download buttons, for sharing in farming Facebook groups. The Graph API can't post to groups.

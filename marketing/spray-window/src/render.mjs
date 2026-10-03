@@ -68,6 +68,36 @@ function ctaBlock(townName) {
 </section>`;
 }
 
+// Nozzle selection: what Chaser's Nozzle Selector (frontend/app/calculators/
+// nozzle-guide.tsx) does, plus a nudge tied to today's forecast.
+function nozzleAdvice(day) {
+  const w = day.window;
+  if (!w) return "There is no usable window today, which makes it a good day to check your nozzle setup before the next one.";
+  const dtMax = w.delta_t ? w.delta_t[1] : 0;
+  const windMax = w.wind ? w.wind[1] : 0;
+  if (dtMax > 8)
+    return `Delta T reaches ${dtMax.toFixed(1)} in today's window. Fine droplets evaporate fast in those conditions, and many labels require a coarse or larger spray quality above Delta T 8.`;
+  if (windMax > 11)
+    return `Wind gets up to ${Math.round(windMax)} km/h in today's window. A coarser spray quality, such as an air-induction nozzle, holds droplets on target better when it's breezy.`;
+  return "Today's window is mild, so this is the time to match spray quality to the product rather than to the weather. Contact products and fungicides usually want better coverage than systemic herbicides.";
+}
+
+function nozzleBlock(day) {
+  return `<section class="card nozzle">
+  <h2>Right conditions, wrong nozzle?</h2>
+  <p>Good weather only gets you halfway. The nozzle sets droplet size, and droplet size decides how much reaches the target and how much drifts. Too fine and it evaporates or drifts off the paddock. Too coarse and coverage suffers, especially with contact products. Nozzles also only work properly within their pressure range, so changing speed or water rate can push your current set out of it.</p>
+  ${day ? `<p class="callout">${esc(nozzleAdvice(day))}</p>` : ""}
+  <h3>How Chaser helps</h3>
+  <ul>
+    <li><b>Nozzle Selector.</b> Enter water rate, travel speed and nozzle spacing. Chaser works out the flow each nozzle needs and recommends matching nozzles from TeeJet, Lechler, Hardi, Hypro and ARAG, with the pressure each will run at.</li>
+    <li><b>Matched to the job.</b> Choose systemic or contact herbicide, fungicide, insecticide, drift control or liquid fertiliser. It also handles PWM sprayers and spot spraying.</li>
+    <li><b>Catches a bad match.</b> It flags any nozzle that would run under or over its recommended pressure range at your settings.</li>
+    <li><b>On the record.</b> Each sprayer keeps its nozzle spacing and default nozzle, and the nozzle used is saved with every spray job.</li>
+  </ul>
+  <p class="muted">Example: 80 L/ha at 18 km/h on 50 cm spacing needs 1.2 L/min per nozzle. That's an 03 (blue) at about 3.1 bar. Always check the spray quality required on the product label.</p>
+</section>`;
+}
+
 function hourTable(day) {
   const rows = day.hours
     .map(
@@ -136,6 +166,10 @@ export function renderTown({ town, today, tomorrow, nearby, updated }) {
       a: "Most labels require a steady wind between about 3 and 15–20 km/h blowing away from sensitive areas. Very light or calm wind, especially near dawn and dusk under clear skies, can indicate a surface temperature inversion.",
     },
     {
+      q: "How do I choose the right spray nozzle?",
+      a: "Work out the flow each nozzle needs from your water rate, travel speed and nozzle spacing (L/ha × km/h × spacing in m ÷ 600 = L/min). Then pick a nozzle that delivers that flow within its recommended pressure range and produces the spray quality your product label requires. Chaser's Nozzle Selector does this calculation and recommends matching nozzles.",
+    },
+    {
       q: `How is the ${town.name} spray forecast calculated?`,
       a: "Hourly temperature, humidity, wind, gusts, cloud and rain from public weather models for the town centre are rated against common spray thresholds, including Delta T, wind range, gusts, heat, rain and likely inversion periods around sunrise and sunset.",
     },
@@ -166,6 +200,8 @@ ${hourTable(today)}
 
 <h2>Tomorrow</h2>
 ${hourTable(tomorrow)}
+
+${nozzleBlock(today)}
 
 ${ctaBlock(town.name)}
 
@@ -229,6 +265,7 @@ export function renderIndex({ byState, updated, date }) {
 ${Object.entries(byState)
   .map(([st, rows]) => `<h2><a href="./${st.toLowerCase()}/">${esc(STATES[st])}</a></h2>${townList(rows, "./")}`)
   .join("")}
+${nozzleBlock(null)}
 ${ctaBlock("")}
 ${SEARCH_JS}`;
   return layout({
