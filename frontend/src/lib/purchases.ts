@@ -107,6 +107,13 @@ export type EntitlementState = {
 export function useEntitlement(businessCreatedAt: string | null): EntitlementState {
   const [isPro, setIsPro] = useState(false);
   const [loading, setLoading] = useState(purchasesConfigured());
+  // Could not confirm entitlement status at all (e.g. flaky connection on
+  // launch) — distinct from "confirmed not pro". Without this, a paying
+  // subscriber whose trial has elapsed would get locked out by a transient
+  // network error with no retry, since isPro's default is false. Keep the
+  // paywall off until we actually know, same "never lock someone out on an
+  // error" stance as purchasesConfigured()'s own safe-default gating.
+  const [fetchFailed, setFetchFailed] = useState(false);
 
   useEffect(() => {
     // loading's initial state already matches purchasesConfigured(), so
@@ -115,12 +122,21 @@ export function useEntitlement(businessCreatedAt: string | null): EntitlementSta
     let mounted = true;
     const Purchases = require("react-native-purchases").default;
 
-    Purchases.getCustomerInfo()
-      .then((info: any) => { if (mounted) setIsPro(!!info.entitlements.active[PRO_ENTITLEMENT_ID]); })
-      .catch((e: any) => console.warn("RevenueCat getCustomerInfo failed", e))
-      .finally(() => { if (mounted) setLoading(false); });
+    async function loadWithRetry() {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const info = await Purchases.getCustomerInfo();
+          if (mounted) { setIsPro(!!info.entitlements.active[PRO_ENTITLEMENT_ID]); setFetchFailed(false); }
+          return;
+        } catch (e) {
+          if (attempt === 0) await new Promise((r) => setTimeout(r, 2000));
+          else { console.warn("RevenueCat getCustomerInfo failed twice", e); if (mounted) setFetchFailed(true); }
+        }
+      }
+    }
+    loadWithRetry().finally(() => { if (mounted) setLoading(false); });
 
-    const listener = (info: any) => setIsPro(!!info.entitlements.active[PRO_ENTITLEMENT_ID]);
+    const listener = (info: any) => { setIsPro(!!info.entitlements.active[PRO_ENTITLEMENT_ID]); setFetchFailed(false); };
     Purchases.addCustomerInfoUpdateListener(listener);
     return () => { mounted = false; Purchases.removeCustomerInfoUpdateListener(listener); };
   }, []);
@@ -136,6 +152,6 @@ export function useEntitlement(businessCreatedAt: string | null): EntitlementSta
     isPro,
     trialDaysLeft: daysLeft,
     isTrialActive,
-    showPaywall: !loading && !isPro && !isTrialActive,
+    showPaywall: !loading && !fetchFailed && !isPro && !isTrialActive,
   };
 }

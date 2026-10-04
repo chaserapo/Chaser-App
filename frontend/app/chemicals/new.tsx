@@ -68,6 +68,17 @@ export default function NewChemical() {
     }
   }
 
+  // Group options are category-specific (groupOptionsFor(type)) — a group
+  // chip picked under one product type can be meaningless or outright wrong
+  // under another (e.g. an HRAC herbicide group saved on a record later
+  // switched to Fungicide), which would also corrupt resistance-rotation
+  // matching against that group later. Clear the selection whenever it's no
+  // longer one of the new type's own options.
+  function changeType(next: ChemicalCategory) {
+    setType(next);
+    setGroupKey((gk) => (gk && groupOptionsFor(next).some((g) => g.key === gk) ? gk : null));
+  }
+
   function applyApvmaProduct(p: ApvmaProduct) {
     setF({
       ...f,
@@ -77,7 +88,7 @@ export default function NewChemical() {
       formulation: p.formulation || f.formulation,
     });
     const mapped = mapApvmaCategory(p.category);
-    if (mapped) setType(mapped);
+    if (mapped) changeType(mapped);
   }
 
   return (
@@ -93,7 +104,7 @@ export default function NewChemical() {
             <Text style={styles.label}>Product type*</Text>
             <View style={styles.typeGrid}>
               {CHEMICAL_CATEGORIES.map((c) => (
-                <Pressable key={c} onPress={() => setType(c)} style={[styles.typeChip, type === c && styles.typeChipActive]} testID={`type-chip-${c}`}>
+                <Pressable key={c} onPress={() => changeType(c)} style={[styles.typeChip, type === c && styles.typeChipActive]} testID={`type-chip-${c}`}>
                   <Text style={[styles.typeText, type === c && { color: colors.onBrandPrimary }]}>{c}</Text>
                 </Pressable>
               ))}

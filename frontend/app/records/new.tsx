@@ -161,6 +161,25 @@ export default function NewSprayJob() {
       variety: p.variety ?? s.variety,
       area_ha: p.area_ha != null ? p.area_ha.toString() : s.area_ha,
     }));
+    // Products can be added before a paddock is picked (chemicals sit above
+    // farm/paddock on this form) — addProduct's own check only covers
+    // products added AFTER a paddock is already selected, so re-run it here
+    // for everything already on the job against the newly-picked paddock.
+    // Warnings from whatever paddock was previously selected no longer
+    // apply, so start fresh rather than appending.
+    setResistanceWarnings([]);
+    checkResistanceForProducts(p.id, products);
+  }
+  async function checkResistanceForProducts(paddockId: string, productsToCheck: SprayJobProduct[]) {
+    const dateStr = f.date || new Date().toISOString().slice(0, 10);
+    const seenGroups = new Set<string>();
+    for (const prod of productsToCheck) {
+      const groupKey = prod.chemical_group;
+      if (!groupKey || seenGroups.has(groupKey)) continue;
+      seenGroups.add(groupKey);
+      const warning = await checkGroupRotation(groupKey, paddockId, dateStr);
+      if (warning) setResistanceWarnings((ws) => (ws.some((w) => w.id === warning.id) ? ws : [...ws, warning]));
+    }
   }
   function pickOperator(o: Operator) {
     setF((s) => ({ ...s, operator_id: o.id, operator_name: o.name }));
@@ -199,21 +218,20 @@ export default function NewSprayJob() {
 
   async function addProduct(c: Chemical) {
     const groupKey = c.chemical_group_key || c.chemical_group;
-    setProducts((ps) => [
-      ...ps,
-      { id: uuid(), chemical_id: c.id, chemical_name: c.product_name,
-        chemical_group: groupKey,
-        cost_per_unit: c.cost_per_unit, cost_unit: c.stock_unit,
-        rate: c.default_rate ?? 0, rateStr: c.default_rate ? c.default_rate.toString() : "",
-        unit: (c.default_unit as RateUnit) ?? "L/ha" },
-    ]);
+    const newProduct: SprayJobProduct & { rateStr: string } = {
+      id: uuid(), chemical_id: c.id, chemical_name: c.product_name,
+      chemical_group: groupKey,
+      cost_per_unit: c.cost_per_unit, cost_unit: c.stock_unit,
+      rate: c.default_rate ?? 0, rateStr: c.default_rate ? c.default_rate.toString() : "",
+      unit: (c.default_unit as RateUnit) ?? "L/ha",
+    };
+    setProducts((ps) => [...ps, newProduct]);
     setShowPicker(false);
     setPickerQuery("");
 
-    if (groupKey && f.paddock_id) {
-      const warning = await checkGroupRotation(groupKey, f.paddock_id, f.date || new Date().toISOString().slice(0, 10));
-      if (warning) setResistanceWarnings((ws) => (ws.some((w) => w.id === warning.id) ? ws : [...ws, warning]));
-    }
+    // If no paddock is picked yet, this product is covered later by the
+    // re-check in pickPaddock once one is — don't skip it silently.
+    if (f.paddock_id) await checkResistanceForProducts(f.paddock_id, [newProduct]);
   }
   function updateProduct(id: string, patch: Partial<SprayJobProduct & { rateStr: string }>) {
     setProducts((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch, rate: patch.rateStr !== undefined ? parseFloat(patch.rateStr) || 0 : p.rate } : p)));

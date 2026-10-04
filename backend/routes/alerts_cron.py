@@ -21,7 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -124,7 +124,19 @@ async def _cron_tick() -> None:
             "status": "in.(open,assigned,in_progress)",
         }) or []
 
-        today = datetime.now(timezone.utc).date().isoformat()
+        # spray_jobs.date is the grower's own local calendar date — there's
+        # no per-business timezone stored to convert it properly. Every
+        # Australian zone is ahead of UTC (WA UTC+8 through AEDT UTC+11), so
+        # comparing against the server's raw UTC date lags behind a user's
+        # actual local "today" by up to ~11 hours after their local
+        # midnight — a job due locally today gets excluded from this tick
+        # (date > today-in-UTC) until UTC catches up, by which point it's
+        # mislabelled "overdue" below instead of "due today". Shifting by
+        # the latest AU offset (AEDT, +11h) before taking the date is a safe
+        # upper bound: it can only make "today" land a few hours early for
+        # WA users (harmless — it's still their actual local date), never
+        # late for anyone.
+        today = (datetime.now(timezone.utc) + timedelta(hours=11)).date().isoformat()
         due_jobs = await _sb_get(client, conf, "spray_jobs", {
             "select": "id,business_id,paddock_name,farm_name,date",
             "deleted_at": "is.null",

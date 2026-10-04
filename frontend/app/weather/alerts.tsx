@@ -48,10 +48,10 @@ export default function AlertsScreen() {
     setLoading(true);
     let q = supabase.from("weather_alerts").select("*").eq("user_id", user.id);
     if (farmId) q = q.eq("farm_id", farmId as string);
-    q.order("created_at", { ascending: false }).then(({ data, error }) => {
-      if (!error && data) setAlerts(data as Alert[]);
-      setLoading(false);
-    });
+    Promise.resolve(q.order("created_at", { ascending: false }))
+      .then(({ data, error }: { data: Alert[] | null; error: any }) => { if (!error && data) setAlerts(data); })
+      .catch((e) => console.warn("weather_alerts load failed", e))
+      .finally(() => setLoading(false));
   }, [user, business, farmId]);
 
   async function toggle(kind: AlertKind) {

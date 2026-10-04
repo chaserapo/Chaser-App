@@ -36,6 +36,17 @@ export default function ChemicalDetail() {
     label_url: "", sds_url: "", notes: "",
   });
 
+  // Group options are category-specific (groupOptionsFor(type)) — a group
+  // chip picked under one product type can be meaningless or outright wrong
+  // under another (e.g. an HRAC herbicide group saved on a record later
+  // switched to Fungicide), which would also corrupt resistance-rotation
+  // matching against that group later. Clear the selection whenever it's no
+  // longer one of the new type's own options.
+  function changeType(next: ChemicalCategory) {
+    setType(next);
+    setGroupKey((gk) => (gk && groupOptionsFor(next).some((g) => g.key === gk) ? gk : null));
+  }
+
   const loadState = (chem: Chemical) => {
     setType(chem.product_type ?? "Herbicide");
     setRateUnit(chem.default_unit ?? "L/ha");
@@ -167,7 +178,7 @@ export default function ChemicalDetail() {
               <Text style={styles.chipLabel}>Product type</Text>
               <View style={styles.typeGrid}>
                 {CHEMICAL_CATEGORIES.map((cc) => (
-                  <Pressable key={cc} onPress={() => setType(cc)} style={[styles.typeChip, type === cc && styles.typeChipActive]} testID={`edit-type-${cc}`}>
+                  <Pressable key={cc} onPress={() => changeType(cc)} style={[styles.typeChip, type === cc && styles.typeChipActive]} testID={`edit-type-${cc}`}>
                     <Text style={[styles.typeText, type === cc && { color: colors.onBrandPrimary }]}>{cc}</Text>
                   </Pressable>
                 ))}

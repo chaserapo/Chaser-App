@@ -21,10 +21,10 @@ export default function ThresholdsScreen() {
     // Intentional: re-show the spinner on every farmId change, not just first mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    loadThresholds(farmId as string).then((thresholds) => {
-      setT(thresholds);
-      setLoading(false);
-    });
+    loadThresholds(farmId as string)
+      .then((thresholds) => setT(thresholds))
+      .catch((e) => console.warn("loadThresholds failed", e))
+      .finally(() => setLoading(false));
   }, [farmId]);
 
   async function save() {
