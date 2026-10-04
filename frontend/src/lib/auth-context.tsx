@@ -5,6 +5,7 @@ import { supabase } from "./supabase";
 import { setBackend } from "./backend";
 import { isMigrated, localBackupBelongsToAnotherAccount, runMigration, MigrationProgress } from "./migrate";
 import { acceptPendingInvitations } from "./members";
+import { logOutPurchases } from "./purchases";
 
 export type ActiveBusiness = { id: string; name: string; role: "owner" | "manager" | "operator"; created_at: string };
 export type MigrationState =
@@ -182,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .maybeSingle();
           if (!mem) {
             // We've been removed — sign out to force a clean state.
+            await logOutPurchases();
             await supabase.auth.signOut();
             return;
           }
@@ -235,6 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    await logOutPurchases();
     await supabase.auth.signOut();
   }, []);
 
@@ -266,6 +269,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const body = await r.json().catch(() => null);
       throw new Error(body?.detail ?? `Account deletion failed (${r.status})`);
     }
+    await logOutPurchases();
     await supabase.auth.signOut();
   }, [session]);
 

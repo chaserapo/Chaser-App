@@ -19,6 +19,18 @@ import { RATE_UNITS } from "@/src/lib/types";
 const UNITS: RateUnit[] = RATE_UNITS;
 const REQUIRED = ["farm_id", "paddock_id", "operator_id", "machinery_id", "area_ha", "water_rate"] as const;
 
+// The Schedule date field is free text (no native date picker), but its
+// value feeds plain string comparisons elsewhere that assume a real
+// "YYYY-MM-DD" — spray.tsx's day grouping, alerts_cron.py's due/overdue
+// cron filter, and resistance-check.ts's year extraction (NaN there
+// silently defeats the "strictly earlier calendar year" guard). Reject
+// anything that isn't both correctly formatted and a real calendar date.
+function isValidDateStr(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
 // Dedupe list by display name (guards against legacy re-seeded duplicates).
 function uniqueByName<T extends { name: string }>(list: T[]): T[] {
   const seen = new Set<string>();
@@ -267,6 +279,7 @@ export default function NewSprayJob() {
 
   function missing(field: (typeof REQUIRED)[number] | "date"): boolean {
     const v = (f as any)[field];
+    if (field === "date") return showMissing.date === true && (!v || !isValidDateStr(v));
     return showMissing[field] === true && !v;
   }
 
@@ -281,7 +294,7 @@ export default function NewSprayJob() {
       crop: f.crop || undefined, variety: f.variety || undefined, target: f.target || undefined,
       crop_stage: f.crop_stage || undefined,
       crop_stage_custom: (f.crop_stage === "other" || f.crop_stage === "custom") ? (f.crop_stage_custom || undefined) : undefined,
-      date: f.date || new Date().toISOString().slice(0, 10),
+      date: isValidDateStr(f.date) ? f.date : new Date().toISOString().slice(0, 10),
       start_time: f.start_time || undefined,
       operator_id: f.operator_id || undefined, operator: f.operator_name || undefined,
       machinery_id: f.machinery_id || undefined, machinery_name: f.machinery_name || undefined,
@@ -358,7 +371,7 @@ export default function NewSprayJob() {
   }
 
   async function savePlanned() {
-    if (!f.date) { setShowMissing((s) => ({ ...s, date: true })); return; }
+    if (!isValidDateStr(f.date)) { setShowMissing((s) => ({ ...s, date: true })); return; }
     const business = await repo.getBusiness();
     if (!business) return;
     const job = buildJob("planned");

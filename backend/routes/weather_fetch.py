@@ -11,7 +11,22 @@ from typing import Any, Dict, List
 
 import httpx
 
-MODELS: List[str] = ["ecmwf_ifs04", "ecmwf_aifs025", "bom_access_global", "gfs_seamless"]
+# Must match frontend/src/lib/weather-intel.ts's MODELS exactly — that file's
+# own history note explains why: "ecmwf_ifs04" and "ecmwf_aifs025" are
+# retired Open-Meteo model ids that accept the request but return null for
+# every hour (confirmed live against the API when the frontend was fixed).
+# This backend copy kept the old broken ids and was also missing DWD ICON
+# and Météo-France ARPEGE entirely, silently degrading weather_cron.py's
+# accuracy scoring and weather_alerts_cron.py's push-alert consensus to 2 of
+# 4 live models instead of 6.
+MODELS: List[str] = [
+    "ecmwf_ifs025",
+    "ecmwf_aifs025_single",
+    "bom_access_global",
+    "gfs_seamless",
+    "dwd_icon_global",
+    "meteofrance_arpege_world",
+]
 
 HOURLY_VARS = ",".join([
     "temperature_2m",

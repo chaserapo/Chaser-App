@@ -29,16 +29,42 @@ export function purchasesConfigured(): boolean {
   return !!currentApiKey();
 }
 
+let hasConfigured = false;
 let configuredForUserId: string | null = null;
 
+// RevenueCat's SDK expects Purchases.configure() to run exactly once per
+// app lifecycle (typically at first launch); switching which user is
+// "logged in" afterward is meant to go through logIn()/logOut(), not a
+// second configure() call — re-configuring is RevenueCat's own
+// unsupported way to switch identities, and risks a window where stale
+// cached entitlement data from the previous user is read before the SDK's
+// listener catches up. Matters for a shared device: User A signs out,
+// User B signs in, both hit this function with different userIds.
 export async function configurePurchases(userId: string): Promise<void> {
   if (!purchasesConfigured() || configuredForUserId === userId) return;
   try {
     const Purchases = require("react-native-purchases").default;
-    Purchases.configure({ apiKey: currentApiKey()!, appUserID: userId });
+    if (!hasConfigured) {
+      Purchases.configure({ apiKey: currentApiKey()!, appUserID: userId });
+      hasConfigured = true;
+    } else {
+      await Purchases.logIn(userId);
+    }
     configuredForUserId = userId;
   } catch (e) {
     console.warn("RevenueCat configure failed", e);
+  }
+}
+
+/** Call on sign-out so the next configurePurchases() for a different user logs in cleanly rather than re-configuring. */
+export async function logOutPurchases(): Promise<void> {
+  if (!purchasesConfigured() || !hasConfigured) return;
+  try {
+    const Purchases = require("react-native-purchases").default;
+    await Purchases.logOut();
+    configuredForUserId = null;
+  } catch (e) {
+    console.warn("RevenueCat logOut failed", e);
   }
 }
 
@@ -120,25 +146,52 @@ export function useEntitlement(businessCreatedAt: string | null): EntitlementSta
     // nothing to set here when it's false.
     if (!purchasesConfigured()) return;
     let mounted = true;
-    const Purchases = require("react-native-purchases").default;
+    let purchasesRef: any;
+    let listenerRef: ((info: any) => void) | undefined;
 
-    async function loadWithRetry() {
+    async function run() {
+      // Unlike every other require() in this file, this one previously
+      // wasn't wrapped — this hook mounts unconditionally for every
+      // signed-in user once a key is configured, so a missing/unlinked
+      // native module here would throw straight out of a useEffect with
+      // nothing to catch it, crashing the whole post-login app shell
+      // instead of staying a safe no-op.
+      let Purchases: any;
+      try {
+        Purchases = require("react-native-purchases").default;
+        purchasesRef = Purchases;
+      } catch (e) {
+        console.warn("RevenueCat module unavailable", e);
+        return;
+      }
+
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const info = await Purchases.getCustomerInfo();
           if (mounted) { setIsPro(!!info.entitlements.active[PRO_ENTITLEMENT_ID]); setFetchFailed(false); }
-          return;
+          break;
         } catch (e) {
           if (attempt === 0) await new Promise((r) => setTimeout(r, 2000));
           else { console.warn("RevenueCat getCustomerInfo failed twice", e); if (mounted) setFetchFailed(true); }
         }
       }
-    }
-    loadWithRetry().finally(() => { if (mounted) setLoading(false); });
 
-    const listener = (info: any) => { setIsPro(!!info.entitlements.active[PRO_ENTITLEMENT_ID]); setFetchFailed(false); };
-    Purchases.addCustomerInfoUpdateListener(listener);
-    return () => { mounted = false; Purchases.removeCustomerInfoUpdateListener(listener); };
+      const listener = (info: any) => { setIsPro(!!info.entitlements.active[PRO_ENTITLEMENT_ID]); setFetchFailed(false); };
+      listenerRef = listener;
+      try {
+        Purchases.addCustomerInfoUpdateListener(listener);
+      } catch (e) {
+        console.warn("RevenueCat addCustomerInfoUpdateListener failed", e);
+      }
+    }
+    run().finally(() => { if (mounted) setLoading(false); });
+
+    return () => {
+      mounted = false;
+      if (purchasesRef && listenerRef) {
+        try { purchasesRef.removeCustomerInfoUpdateListener(listenerRef); } catch { /* module already gone */ }
+      }
+    };
   }, []);
 
   if (!purchasesConfigured()) {
