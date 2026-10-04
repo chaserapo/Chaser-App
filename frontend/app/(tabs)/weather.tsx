@@ -114,8 +114,20 @@ export default function WeatherScreen() {
 
   const daily = useMemo(() => bundle?.daily ?? [], [bundle]);
   const consensus = useMemo(() => bundle?.consensus ?? [], [bundle]);
-  const nextHours = useMemo(() => consensus.slice(0, 24), [consensus]);
-  const currentHour = consensus[0];
+  // consensus spans the full multi-day forecast starting at the location's
+  // local midnight, not "now" — index 0 is this morning's midnight, not the
+  // current hour. Find the latest hour that isn't in the future yet (ties
+  // broken toward the most recent), and slice "next hours" from there.
+  // Not memoized (reads Date.now(), impure) — cheap enough (<=168 entries)
+  // to recompute every render.
+  let currentIndex = 0;
+  for (let i = 0; i < consensus.length; i++) {
+    // eslint-disable-next-line react-hooks/purity -- reading "now" to find which forecast hour is current is the whole point here, same tradeoff as the staleness check above.
+    if (new Date(consensus[i].valid_time).getTime() <= Date.now()) currentIndex = i;
+    else break;
+  }
+  const nextHours = useMemo(() => consensus.slice(currentIndex, currentIndex + 24), [consensus, currentIndex]);
+  const currentHour = consensus[currentIndex];
   const sprayWindows = useMemo(() => findSprayWindows(consensus, thresholds), [consensus, thresholds]);
   const frost = useMemo(() => frostRiskNext48(consensus), [consensus]);
   const heat = useMemo(() => heatRiskNext48(consensus), [consensus]);

@@ -184,6 +184,17 @@ async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: numb
     const hours: ModelHour[] = [];
     const times: string[] = j?.hourly?.time ?? [];
     const nowMs = Date.now();
+    // Open-Meteo's timezone=auto returns hourly timestamps as the location's
+    // own local wall-clock time with no offset in the string (e.g.
+    // "2026-09-20T14:00") — it never appends "Z". Naively doing
+    // `new Date(iso).getTime()` parses that string as the DEVICE's local
+    // time instead, silently mis-timing every row by the gap between the
+    // device's zone and the forecast location's zone (the backend's Python
+    // fetcher — routes/weather_fetch.py — hit the exact same bug and fixed
+    // it the same way). utc_offset_seconds is what converts it back to a
+    // real instant: treat the wall-clock numbers as if they were UTC, then
+    // subtract the location's offset.
+    const utcOffsetMs = Number(j?.utc_offset_seconds ?? 0) * 1000;
 
     // The dedicated per-provider endpoints (/v1/ecmwf, /v1/bom) sometimes
     // suffix hourly variable names with the model id (e.g.
@@ -200,7 +211,10 @@ async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: numb
 
     for (let i = 0; i < times.length; i++) {
       const validIso = times[i];
-      const validMs = new Date(validIso).getTime();
+      // "Z" forces this to parse as literal UTC numbers (immune to device
+      // timezone), then subtract the location's own offset to land on the
+      // true instant — see the utcOffsetMs comment above.
+      const validMs = Date.parse(`${validIso}Z`) - utcOffsetMs;
       if (isNaN(validMs)) continue;
       const hour: ModelHour = {
         model,
