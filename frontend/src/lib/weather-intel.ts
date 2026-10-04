@@ -16,6 +16,7 @@
 
 import { supabase } from "./supabase";
 import { getActiveBusinessId } from "./backend";
+import { openMeteoUrl } from "./open-meteo";
 
 export type ModelId = "ecmwf_ifs04" | "ecmwf_aifs025" | "bom_access_global" | "gfs_seamless";
 
@@ -169,11 +170,13 @@ const ENDPOINT: Record<ModelId, string> = {
 // timeout turns "slow" into "silently missing" for whichever models lose the
 // race. Give it real room, and retry once before giving up entirely.
 async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: number, timeoutMs: number): Promise<ModelHour[]> {
-  const url =
-    `https://api.open-meteo.com/v1/${ENDPOINT[model]}?latitude=${lat}&longitude=${lon}` +
-    `&hourly=${HOURLY_VARS}` +
-    `&wind_speed_unit=kmh&timezone=auto&forecast_days=${days}` +
-    `&models=${model}`;
+  const url = openMeteoUrl(
+    "api",
+    `/v1/${ENDPOINT[model]}?latitude=${lat}&longitude=${lon}` +
+      `&hourly=${HOURLY_VARS}` +
+      `&wind_speed_unit=kmh&timezone=auto&forecast_days=${days}` +
+      `&models=${model}`,
+  );
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -693,11 +696,13 @@ async function fetchArchiveObservations(lat: number, lon: number, startISO: stri
   // waste a query on unavailable hours.
   const yday = new Date(Date.now() - 24 * 3600_000).toISOString().slice(0, 10);
   const end = endISO > yday ? yday : endISO;
-  const url =
-    `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}` +
-    `&start_date=${startISO}&end_date=${end}` +
-    `&hourly=${Object.values(ARCHIVE_VAR).join(",")}` +
-    `&wind_speed_unit=kmh&timezone=auto`;
+  const url = openMeteoUrl(
+    "archive-api",
+    `/v1/archive?latitude=${lat}&longitude=${lon}` +
+      `&start_date=${startISO}&end_date=${end}` +
+      `&hourly=${Object.values(ARCHIVE_VAR).join(",")}` +
+      `&wind_speed_unit=kmh&timezone=auto`,
+  );
   const out = new Map<string, Record<AccuracyVariable, number>>();
   try {
     const controller = new AbortController();

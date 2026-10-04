@@ -132,6 +132,16 @@ eas secret:create --scope project --name EXPO_PUBLIC_BACKEND_URL --value 'https:
 ```
 …then delete the `env` block from `eas.json`. EAS Secrets take precedence.
 
+**Open-Meteo (weather).** The free Open-Meteo API is for non-commercial use
+only. Once you have a commercial API key, add it as a secret so it stays out
+of the repo. The app then switches to the `customer-*` endpoints
+automatically:
+```bash
+eas secret:create --scope project --name EXPO_PUBLIC_OPEN_METEO_API_KEY --value '<your key>'
+```
+Set the same key as `OPEN_METEO_API_KEY` on the backend host (weather cron
+jobs) and as a GitHub Actions secret (Spray Window site).
+
 ---
 
 ## 7. Submit to the stores
