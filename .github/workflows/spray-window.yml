@@ -76,13 +76,15 @@ jobs:
           path: marketing/spray-window/dist/${{ vars.BASE_PATH || 'spray' }}/social
           retention-days: 14
 
-      # The folder name becomes the Vercel project name: the first deploy
-      # creates "chaser-spray-window", later deploys reuse it.
+      # The folder name becomes the Vercel project name ("chaser-spray-window").
+      # It's copied outside the git checkout so Vercel doesn't link the project
+      # to this repo and start deploying it on every push.
       - name: Deploy to Vercel
         if: env.VERCEL_TOKEN != ''
         run: |
-          rm -rf ../chaser-spray-window && cp -r dist ../chaser-spray-window
-          npx --yes vercel@latest deploy ../chaser-spray-window --prod --yes \
+          out="$RUNNER_TEMP/chaser-spray-window"
+          rm -rf "$out" && cp -r dist "$out"
+          npx --yes vercel@latest deploy "$out" --prod --yes \
             --token "$VERCEL_TOKEN" ${VERCEL_SCOPE:+--scope "$VERCEL_SCOPE"}
         env:
           VERCEL_SCOPE: ${{ vars.VERCEL_SCOPE }}

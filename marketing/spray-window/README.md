@@ -35,7 +35,8 @@ The site is served at `chaserag.com.au/spray`. The GitHub Action deploys it to i
    - `ANTHROPIC_API_KEY`: turns on AI-written captions.
    - `FB_PAGE_ID`, `FB_PAGE_TOKEN`: a long-lived Page token with `pages_manage_posts`.
 4. **Run it once by hand.** Go to Actions → "Spray Window" → Run workflow. Check the project's address in Vercel: if it isn't `chaser-spray-window.vercel.app`, update the three `/spray` rewrites in the website's `frontend/vercel.json` to match.
-5. **Search engines.** Submit `<SITE_URL>/sitemap.xml` in Google Search Console and Bing Webmaster Tools.
+5. **Keep the Vercel project off git.** It's deployed only by the Action. The repo-root `vercel.json` sets `git.deploymentEnabled: false` so pushes to this repo never trigger a Vercel build. In the project's Settings → Deployment Protection, keep Vercel Authentication off, or the `/spray` proxy gets a login page.
+6. **Search engines.** Submit `<SITE_URL>/sitemap.xml` in Google Search Console and Bing Webmaster Tools.
 
 All app links carry `utm_source=spraywindow`, with a `utm_campaign` per placement, so installs can be attributed.
 
