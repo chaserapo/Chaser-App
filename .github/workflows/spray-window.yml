@@ -37,6 +37,8 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     defaults:
       run:
         working-directory: marketing/spray-window
@@ -77,12 +79,12 @@ jobs:
       # The folder name becomes the Vercel project name: the first deploy
       # creates "chaser-spray-window", later deploys reuse it.
       - name: Deploy to Vercel
+        if: env.VERCEL_TOKEN != ''
         run: |
           rm -rf ../chaser-spray-window && cp -r dist ../chaser-spray-window
           npx --yes vercel@latest deploy ../chaser-spray-window --prod --yes \
             --token "$VERCEL_TOKEN" ${VERCEL_SCOPE:+--scope "$VERCEL_SCOPE"}
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_SCOPE: ${{ vars.VERCEL_SCOPE }}
 
   post-facebook:
