@@ -7,7 +7,7 @@ name: Spray Window (daily marketing site)
 #
 # Required secret: VERCEL_TOKEN. Optional repo variables: SITE_URL, BASE_PATH,
 # VERCEL_SCOPE, APP_STORE_URL, PLAY_STORE_URL, CHASER_SITE_URL.
-# Optional secrets: OPEN_METEO_API_KEY, ANTHROPIC_API_KEY, FB_PAGE_ID, FB_PAGE_TOKEN.
+# Optional secrets: OPEN_METEO_API_KEY, DPIRD_API_KEY, ANTHROPIC_API_KEY, FB_PAGE_ID, FB_PAGE_TOKEN.
 
 on:
   schedule:
@@ -64,6 +64,7 @@ jobs:
         run: npm run build
         env:
           OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
+          DPIRD_API_KEY: ${{ secrets.DPIRD_API_KEY }}
 
       - name: Render social cards and captions
         run: npm run social

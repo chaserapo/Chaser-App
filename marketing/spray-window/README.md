@@ -32,6 +32,7 @@ The site is served at `chaserag.com.au/spray`. The GitHub Action deploys it to i
    - `CHASER_SITE_URL`: the main Chaser site, used for the header and footer links.
 3. **Secrets:**
    - `OPEN_METEO_API_KEY`: **required before launch**. Open-Meteo's free API is non-commercial only, and this site promotes a paid app.
+   - `DPIRD_API_KEY`: adds live readings from the nearest DPIRD weather station (within 30 km) to WA town pages: Delta T, temperature, humidity, and wind at 10 m and 3 m. Without it, or if DPIRD is down, pages build without them.
    - `ANTHROPIC_API_KEY`: turns on AI-written captions.
    - `FB_PAGE_ID`, `FB_PAGE_TOKEN`: a long-lived Page token with `pages_manage_posts`.
 4. **Run it once by hand.** Go to Actions → "Spray Window" → Run workflow. Check the project's address in Vercel: if it isn't `chaser-spray-window.vercel.app`, update the three `/spray` rewrites in the website's `frontend/vercel.json` to match.

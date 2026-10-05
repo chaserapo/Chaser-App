@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TOWNS, STATES, nearbyTowns } from "./towns.mjs";
 import { fetchForecasts, fixtureForecasts } from "./forecast.mjs";
+import { fetchObservations, fixtureObservations } from "./observations.mjs";
 import { rateHours, summariseDay } from "./conditions.mjs";
 import { renderTown, renderState, renderIndex, renderSitemap } from "./render.mjs";
 import { CONFIG, BASE_PATH, siteDir } from "./config.mjs";
@@ -24,6 +25,13 @@ async function write(rel, content) {
 }
 
 const forecasts = fixture ? fixtureForecasts(TOWNS) : await fetchForecasts(TOWNS);
+// Station readings are a bonus: a DPIRD outage must never stop the build.
+const observations = fixture
+  ? fixtureObservations(TOWNS)
+  : await fetchObservations(TOWNS).catch((err) => {
+      console.warn(`DPIRD observations skipped: ${err.message}`);
+      return new Map();
+    });
 
 const results = TOWNS.map((town) => {
   const f = forecasts.get(town.slug + town.state);
@@ -45,7 +53,7 @@ await cp(join(ROOT, "static"), join(SITE, "static"), { recursive: true });
 const paths = [""];
 for (const r of results) {
   const nearby = nearbyTowns(r.town).map((n) => ({ ...n, day: byKey.get(n.town.slug + n.town.state).today }));
-  await write(`${r.town.path}index.html`, renderTown({ ...r, nearby, updated }));
+  await write(`${r.town.path}index.html`, renderTown({ ...r, nearby, updated, obs: observations.get(r.town.slug + r.town.state) }));
   paths.push(r.town.path);
 }
 
@@ -95,4 +103,5 @@ await write(
 );
 
 const counts = results.reduce((a, r) => ((a[r.today.verdict] = (a[r.today.verdict] ?? 0) + 1), a), {});
+console.log(`DPIRD station readings: ${observations.size} WA towns`);
 console.log(`Built ${paths.length} pages for ${date}${fixture ? " (FIXTURE DATA)" : ""}:`, counts);

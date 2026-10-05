@@ -46,7 +46,7 @@ ${body}
 <p class="disclaimer">${esc(DISCLAIMER)}${updated ? ` Forecast updated ${esc(updated)}.` : ""}</p>
 </div></main>
 <footer class="site"><div class="wrap">
-  Spray Window is a free tool from <a href="${esc(primaryAppUrl("footer"))}">Chaser</a>, the spray record and farm operations app for Australian growers and contractors. Weather data: <a href="https://open-meteo.com/">Open-Meteo</a> (CC BY 4.0).
+  Spray Window is a free tool from <a href="${esc(primaryAppUrl("footer"))}">Chaser</a>, the spray record and farm operations app for Australian growers and contractors. Weather data: <a href="https://open-meteo.com/">Open-Meteo</a> (CC BY 4.0). WA station readings: <a href="https://www.dpird.wa.gov.au/online-tools/apis/">DPIRD</a>, Department of Primary Industries and Regional Development, Western Australia.
 </div></footer>
 </body>
 </html>`;
@@ -148,7 +148,29 @@ function dayCard(label, town, day) {
 </div>`;
 }
 
-export function renderTown({ town, today, tomorrow, nearby, updated }) {
+// Live DPIRD station reading (WA only). Measured, so it says so plainly.
+function observationBlock(obs) {
+  if (!obs) return "";
+  const r = obs.reading;
+  const time = new Date(r.at).toLocaleTimeString("en-AU", { timeZone: "Australia/Perth", hour: "numeric", minute: "2-digit" });
+  const n = (v, d = 0) => (v == null ? "–" : Number(v).toFixed(d));
+  const dtNote =
+    r.delta_t == null ? "" : r.delta_t > 10 ? "above 10" : r.delta_t > 8 ? "in the 8–10 marginal range" : r.delta_t < 2 ? "below 2" : "in the 2–8 range";
+  return `<section class="card obs">
+  <div class="muted">Measured at ${esc(time)} (Perth time) · DPIRD ${esc(obs.station)} station, ${Math.round(obs.km)} km away</div>
+  <div class="stats obs-stats">
+    <span>Delta T <b>${n(r.delta_t, 1)}</b></span>
+    <span>Wind <b>${n(r.wind_kmh)} km/h ${esc(r.wind_dir)}</b>${r.wind_height_m ? ` <span class="muted">at ${r.wind_height_m} m</span>` : ""}</span>
+    <span>Gusts <b>${n(r.gust_kmh)}</b></span>
+    ${r.wind3_kmh != null ? `<span>Wind at 3 m <b>${n(r.wind3_kmh)} km/h</b></span>` : ""}
+    <span>Temp <b>${n(r.temp_c)}°</b></span>
+    <span>RH <b>${n(r.rh)}%</b></span>
+  </div>
+  ${dtNote ? `<p class="muted" style="margin:8px 0 0">Measured Delta T is ${dtNote}. Conditions in your paddock can still differ, so check on site.</p>` : ""}
+</section>`;
+}
+
+export function renderTown({ town, today, tomorrow, nearby, updated, obs }) {
   const stateName = STATES[town.state];
   const title = `Can I spray in ${town.name} today? Delta T & spray conditions | Spray Window`;
   const description = `${verdictSentence(town, today)} Hourly Delta T, wind, gusts and inversion risk for ${town.name}, ${town.state}. Updated daily.`;
@@ -194,6 +216,7 @@ export function renderTown({ town, today, tomorrow, nearby, updated }) {
 ${dayCard("Today", town, today)}
 ${dayCard("Tomorrow", town, tomorrow)}
 </div>
+${obs ? `<h2>Right now near ${esc(town.name)}</h2>\n${observationBlock(obs)}` : ""}
 
 <h2>Hourly spray conditions today: ${esc(town.name)}, ${esc(town.state)}</h2>
 ${hourTable(today)}
