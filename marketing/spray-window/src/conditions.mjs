@@ -1,13 +1,17 @@
-// Spray-condition rating. Thresholds mirror Chaser's DEFAULT_THRESHOLDS in
-// frontend/src/lib/weather-intel.ts and the Delta T formula in
-// frontend/src/lib/calculators.ts, so the public site and the app agree.
+// Spray-condition rating. Delta T uses the same formula as the app
+// (frontend/src/lib/calculators.ts), and most limits match Chaser's
+// DEFAULT_THRESHOLDS (frontend/src/lib/weather-intel.ts). Wind and gusts are
+// deliberately looser than the app's defaults: these are 10 m model forecasts,
+// and forecast gusts typically run 1.5-2x the mean wind, so the app's
+// 15 km/h wind / 20 km/h gust limits marked ~3 in 4 daytime hours "poor"
+// (calibrated against live forecasts for all towns, Oct 2026).
 
 export const THRESHOLDS = {
   wind_min_kmh: 3,
-  wind_max_kmh: 15,
-  wind_marginal_kmh: 11,
-  gust_max_kmh: 20,
-  gust_marginal_kmh: 15,
+  wind_max_kmh: 20,
+  wind_marginal_kmh: 15,
+  gust_max_kmh: 30,
+  gust_marginal_kmh: 25,
   temp_max_c: 30,
   delta_t_max: 10,
   delta_t_marginal: 8,

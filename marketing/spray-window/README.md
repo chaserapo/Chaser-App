@@ -7,7 +7,7 @@ A free daily "Can I spray today?" forecast site that markets Chaser. It runs its
 - **Auto-posting.** The morning run posts all state cards to the Chaser Facebook Page when `FB_PAGE_ID` / `FB_PAGE_TOKEN` are set.
 - **Post kit.** `<site>/social/` holds every card and caption with copy and download buttons, for sharing in farming Facebook groups. The Graph API can't post to groups.
 
-Spray ratings use the same thresholds as Chaser's `DEFAULT_THRESHOLDS` (`frontend/src/lib/weather-intel.ts`) and the same Delta T formula (`frontend/src/lib/calculators.ts`). On top of those, the site flags likely inversions: within 1h of sunrise or sunset, wind under 11 km/h and cloud under 40%.
+Spray ratings use the app's Delta T formula (`frontend/src/lib/calculators.ts`) and mostly the same limits as Chaser's `DEFAULT_THRESHOLDS` (`frontend/src/lib/weather-intel.ts`). Wind and gusts are looser: wind is marginal above 15 km/h and poor above 20, and gusts are marginal above 25 and poor above 30. That's because these are 10 m forecasts and forecast gusts run well above the mean wind; the app's 20 km/h gust limit marked about three in four daytime hours poor. The site also flags likely inversions: within 1h of sunrise or sunset, wind under 11 km/h and cloud under 40%.
 
 ## Run locally
 
