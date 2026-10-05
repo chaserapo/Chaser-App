@@ -5,6 +5,7 @@ import { supabase } from "./supabase";
 import { setBackend } from "./backend";
 import { isMigrated, localBackupBelongsToAnotherAccount, runMigration, MigrationProgress } from "./migrate";
 import { acceptPendingInvitations } from "./members";
+import { SAMPLE_MODE, SAMPLE_BUSINESS, SAMPLE_SESSION } from "./sample-mode";
 
 export type ActiveBusiness = { id: string; name: string; role: "owner" | "manager" | "operator"; created_at: string };
 export type MigrationState =
@@ -39,6 +40,28 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // SAMPLE_MODE is a build-time constant, so this never switches at runtime.
+  return SAMPLE_MODE ? <SampleAuthProvider>{children}</SampleAuthProvider> : <RealAuthProvider>{children}</RealAuthProvider>;
+}
+
+// Test builds only: a fixed sample business and user, no Supabase calls.
+function SampleAuthProvider({ children }: { children: React.ReactNode }) {
+  const value = useMemo<Ctx>(() => {
+    const noop = async () => {};
+    return {
+      loading: false,
+      session: SAMPLE_SESSION,
+      user: SAMPLE_SESSION.user,
+      business: SAMPLE_BUSINESS,
+      migration: { kind: "idle" },
+      signIn: noop, signUp: noop, requestPasswordReset: noop, confirmPasswordReset: noop, signOut: noop,
+      retryMigration: noop, clearMigrationSuccess: () => {}, renameBusiness: noop, deleteAccount: noop,
+    };
+  }, []);
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+}
+
+function RealAuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [business, setBusiness] = useState<ActiveBusiness | null>(null);

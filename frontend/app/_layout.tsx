@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
-import { LogBox, View, ActivityIndicator, AppState } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { LogBox, View, Text, ActivityIndicator, AppState } from "react-native";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useEffect, useState } from "react";
 
@@ -19,6 +19,7 @@ import { useOnboarding } from "@/src/lib/onboarding";
 import DiscoveryScreen, { useDiscoveryGate } from "@/src/features/onboarding/DiscoveryScreen";
 import { configurePurchases, useEntitlement } from "@/src/lib/purchases";
 import { PaywallScreen } from "@/src/features/subscription/PaywallScreen";
+import { SAMPLE_MODE, seedSampleData } from "@/src/lib/sample-mode";
 
 LogBox.ignoreAllLogs(true);
 
@@ -57,11 +58,26 @@ function AuthGate() {
       </View>
     );
   }
+  if (SAMPLE_MODE) return <SampleShell />;
   if (!session) return <AuthScreen />;
   if (migration.kind === "running" || migration.kind === "error" || migration.kind === "success" || !business) {
     return <MigrationScreen />;
   }
   return <PostAuthShell />;
+}
+
+// Test builds with EXPO_PUBLIC_SAMPLE_MODE=1: straight into the app on local
+// sample data, skipping discovery, onboarding and the paywall.
+function SampleShell() {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }} />
+      <View pointerEvents="none" style={{ position: "absolute", top: insets.top + 2, alignSelf: "center", backgroundColor: "#B45309", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 }} testID="sample-mode-banner">
+        <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>SAMPLE DATA · TEST BUILD</Text>
+      </View>
+    </View>
+  );
 }
 
 function DeferredOnboarding() {
@@ -101,6 +117,7 @@ function RootLayout() {
     (async () => {
       try {
         await seedIfNeeded();
+        await seedSampleData();
       } catch (e) {
         console.warn("seed error", e);
       } finally {
