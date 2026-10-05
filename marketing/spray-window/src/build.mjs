@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { TOWNS, STATES, nearbyTowns } from "./towns.mjs";
 import { fetchForecasts, fixtureForecasts } from "./forecast.mjs";
 import { fetchObservations, fixtureObservations } from "./observations.mjs";
-import { rateHours, summariseDay } from "./conditions.mjs";
+import { rateHours, summariseDay, THRESHOLDS } from "./conditions.mjs";
 import { renderTown, renderState, renderIndex, renderSitemap } from "./render.mjs";
 import { CONFIG, BASE_PATH, siteDir } from "./config.mjs";
 
@@ -52,6 +52,32 @@ const results = TOWNS.map((town) => {
   return { town, today: summariseDay(rated, f.days[0], from), tomorrow: summariseDay(rated, f.days[1], from) };
 });
 const byKey = new Map(results.map((r) => [r.town.slug + r.town.state, r]));
+
+// --- Calibration diagnostics (temporary) -----------------------------------
+// Logs why hours are marked down, and tomorrow's verdicts under a candidate
+// threshold set, so the rating can be tuned against real forecasts.
+{
+  const CANDIDATE = { ...THRESHOLDS, wind_max_kmh: 20, wind_marginal_kmh: 15, gust_max_kmh: 30, gust_marginal_kmh: 25 };
+  const reasons = {};
+  const verdicts = { current: {}, candidate: {} };
+  let hours = 0;
+  for (const town of TOWNS) {
+    const f = forecasts.get(town.slug + town.state);
+    for (const [name, t] of [["current", THRESHOLDS], ["candidate", CANDIDATE]]) {
+      const day = summariseDay(rateHours(f.hours, f.sun, t), f.days[1]);
+      verdicts[name][day.verdict] = (verdicts[name][day.verdict] ?? 0) + 1;
+      if (name === "current") {
+        for (const h of day.hours) {
+          hours++;
+          for (const r of h.reasons) reasons[`${h.status}:${r}`] = (reasons[`${h.status}:${r}`] ?? 0) + 1;
+        }
+      }
+    }
+  }
+  console.log(`Calibration, tomorrow 5am-9pm, ${hours} town-hours. Reasons (status:reason count):`);
+  console.log(Object.entries(reasons).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" | "));
+  console.log("Calibration, tomorrow verdicts current:", verdicts.current, "candidate:", verdicts.candidate);
+}
 
 const updated = new Date().toLocaleString("en-AU", {
   timeZone: "Australia/Sydney",
