@@ -6,6 +6,7 @@ import Icon from "@react-native-vector-icons/material-design-icons";
 import { Button, StatusBadge } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { fetchWeather, WeatherSnapshot } from "@/src/lib/weather";
+import { fetchNearestDpird, formatReadingTime, type DpirdReading, type DpirdStation } from "@/src/lib/dpird";
 import { repo, maintenanceStatus } from "@/src/lib/storage";
 import { useRealtime } from "@/src/lib/realtime";
 import { useAuth } from "@/src/lib/auth-context";
@@ -39,6 +40,7 @@ export default function Home() {
   const { session, business } = useAuth();
   const { percent: onboardingPercent, profile: onboardingProfile, reload: reloadOnboarding, userId: onboardingUserId } = useOnboarding();
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
+  const [station, setStation] = useState<{ station: DpirdStation; reading: DpirdReading } | null>(null);
   const [loadingWeather, setLoadingWeather] = useState(true);
   const [locationLabel, setLocationLabel] = useState("Your location");
   const [jobs, setJobs] = useState<SprayJob[]>([]);
@@ -106,6 +108,8 @@ export default function Home() {
       const w = await fetchWeather();
       setWeather(w);
       if (w.lat && w.lon) setLocationLabel(`Your location · ${w.lat.toFixed(2)}, ${w.lon.toFixed(2)}`);
+      // Measured reading from the nearest DPIRD station (WA only); loads after the forecast.
+      if (w.lat && w.lon) fetchNearestDpird(w.lat, w.lon).then(setStation);
     } catch (e) {
       console.warn(e);
     } finally {
@@ -178,6 +182,17 @@ export default function Home() {
             {loadingWeather ? <ActivityIndicator size="small" color={colors.brandPrimary} /> : <Icon name="refresh" size={16} color={colors.muted} />}
           </Pressable>
         </View>
+
+        {station ? (
+          <View style={styles.stationRow} testID="dpird-station">
+            <Icon name="access-point" size={14} color={colors.brandPrimary} />
+            <Text style={styles.stationText} numberOfLines={2}>
+              <Text style={styles.stationName}>DPIRD {station.station.name}</Text> ({Math.round(station.station.km)} km) at {formatReadingTime(station.reading.at)}:{" "}
+              ΔT {station.reading.delta_t?.toFixed(1) ?? "–"} · Wind {station.reading.wind_kmh?.toFixed(0) ?? "–"} km/h {station.reading.wind_dir}
+              {station.reading.wind3_kmh != null ? ` (3 m: ${station.reading.wind3_kmh.toFixed(0)})` : ""} · Gust {station.reading.gust_kmh?.toFixed(0) ?? "–"}
+            </Text>
+          </View>
+        ) : null}
 
         {onboardingProfile && onboardingProfile.onboarding_completed_at && onboardingPercent > 0 && onboardingPercent < 100 ? (
           <Pressable
@@ -391,6 +406,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   conditionsMetaText: { color: colors.muted, fontSize: 11, flex: 1 },
+  stationRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6, paddingHorizontal: 2 },
+  stationText: { color: colors.muted, fontSize: 11, flex: 1, lineHeight: 15 },
+  stationName: { color: colors.onSurface, fontWeight: "700" },
   secondaryRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   secondaryBtn: {
     flex: 1,

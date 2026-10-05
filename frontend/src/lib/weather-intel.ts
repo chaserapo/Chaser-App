@@ -98,10 +98,14 @@ export type SprayThresholds = {
   rain_free_hours_after: number;
 };
 
+// Wind and gust limits are for 10 m model forecasts, where gusts typically run
+// 1.5-2x the mean wind; a 20 km/h gust limit ruled out ~3 in 4 daytime hours.
+// Kept in step with backend/routes/weather_alerts_cron.py and the Spray Window
+// site (marketing/spray-window/src/conditions.mjs).
 export const DEFAULT_THRESHOLDS: SprayThresholds = {
   wind_min_kmh: 3,
-  wind_max_kmh: 15,
-  gust_max_kmh: 20,
+  wind_max_kmh: 20,
+  gust_max_kmh: 30,
   humidity_min_pct: 40,
   humidity_max_pct: 95,
   temp_max_c: 30,
