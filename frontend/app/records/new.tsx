@@ -9,6 +9,7 @@ import { Button, Card, Input, Chip } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { fetchWeather } from "@/src/lib/weather";
+import { fetchNearestDpird, formatReadingTime, type DpirdReading, type DpirdStation } from "@/src/lib/dpird";
 import { deltaT, nozzleFlowLpm, numNozzles, fmt, productTotalForJob, productPerTank } from "@/src/lib/calculators";
 import { stagesForCrop, stageLabel } from "@/src/lib/crop-stages";
 import type { Farm, Paddock, Machinery, Chemical, RateUnit, SprayJob, SprayJobProduct, SprayJobStatus, Operator } from "@/src/lib/types";
@@ -44,6 +45,8 @@ export default function NewSprayJob() {
   const [weatherAt, setWeatherAt] = useState<string | undefined>();
   const [autoWeather, setAutoWeather] = useState<{ t?: number; h?: number; dt?: number; ws?: number; wd?: string }>({});
   const [weatherEdited, setWeatherEdited] = useState(false);
+  const [dpird, setDpird] = useState<{ station: DpirdStation; reading: DpirdReading } | null>(null);
+  const [dpirdApplied, setDpirdApplied] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
   const [showMissing, setShowMissing] = useState<Record<string, boolean>>({});
@@ -128,8 +131,28 @@ export default function NewSprayJob() {
       setWeatherEdited(false);
       setGps({ lat: w.lat, lon: w.lon });
       setWeatherAt(w.captured_at);
+      setDpirdApplied(false);
+      if (w.lat && w.lon) fetchNearestDpird(w.lat, w.lon).then(setDpird);
     } catch (e) { console.warn(e); }
     finally { setLoadingWeather(false); }
+  }
+
+  // Swap the forecast values for the nearest DPIRD station's measured reading.
+  // The forecast values stay in the *_auto fields for the audit trail, and the
+  // record is flagged as edited.
+  function applyStationReading() {
+    if (!dpird) return;
+    const r = dpird.reading;
+    setF((s) => ({
+      ...s,
+      temperature_c: r.temp_c != null ? r.temp_c.toFixed(1) : s.temperature_c,
+      humidity: r.rh != null ? r.rh.toFixed(0) : s.humidity,
+      delta_t: r.delta_t != null ? r.delta_t.toFixed(1) : s.delta_t,
+      wind_speed: r.wind_kmh != null ? r.wind_kmh.toFixed(0) : s.wind_speed,
+      wind_direction: r.wind_dir || s.wind_direction,
+    }));
+    setWeatherEdited(true);
+    setDpirdApplied(true);
   }
 
   function editWeather<K extends "temperature_c" | "humidity" | "wind_speed" | "wind_direction" | "delta_t">(field: K, val: string) {
@@ -143,6 +166,7 @@ export default function NewSprayJob() {
       return next;
     });
     setWeatherEdited(true);
+    setDpirdApplied(false);
   }
 
   function pickFarm(farm: Farm) {
@@ -503,7 +527,7 @@ export default function NewSprayJob() {
               <View style={styles.wxMeta} testID="wx-meta">
                 <Icon name="clock-outline" size={13} color={colors.muted} />
                 <Text style={styles.wxMetaText}>Captured at {new Date(weatherAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{gps.lat ? ` · GPS ${gps.lat.toFixed(3)}, ${gps.lon!.toFixed(3)}` : ""}</Text>
-                {weatherEdited ? <View style={styles.editedBadge}><Text style={styles.editedBadgeText}>Edited</Text></View> : null}
+                {weatherEdited ? <View style={styles.editedBadge}><Text style={styles.editedBadgeText}>{dpirdApplied ? "DPIRD station" : "Edited"}</Text></View> : null}
               </View>
             ) : null}
             <View style={{ flexDirection: "row", gap: 8 }}>
@@ -515,6 +539,19 @@ export default function NewSprayJob() {
               <View style={{ flex: 1 }}><Input label="Wind" value={f.wind_speed} onChangeText={(v) => editWeather("wind_speed", v)} keyboardType="decimal-pad" suffix="km/h" testID="input-wind" /></View>
               <View style={{ flex: 1 }}><Input label="Direction" value={f.wind_direction} onChangeText={(v) => editWeather("wind_direction", v)} testID="input-wind-dir" /></View>
             </View>
+            {dpird ? (
+              <View style={styles.dpirdBox} testID="dpird-box">
+                <Text style={styles.dpirdText}>
+                  <Text style={{ fontWeight: "700", color: colors.onSurface }}>Measured at DPIRD {dpird.station.name}</Text> ({Math.round(dpird.station.km)} km away, {formatReadingTime(dpird.reading.at)}): ΔT {dpird.reading.delta_t?.toFixed(1) ?? "–"}, {dpird.reading.temp_c?.toFixed(1) ?? "–"}°C, RH {dpird.reading.rh?.toFixed(0) ?? "–"}%, wind {dpird.reading.wind_kmh?.toFixed(0) ?? "–"} km/h {dpird.reading.wind_dir}
+                  {dpird.reading.wind3_kmh != null ? ` (3 m: ${dpird.reading.wind3_kmh.toFixed(0)} km/h)` : ""}, gusts {dpird.reading.gust_kmh?.toFixed(0) ?? "–"} km/h
+                </Text>
+                {!dpirdApplied ? (
+                  <Pressable onPress={applyStationReading} hitSlop={8} testID="use-dpird-btn">
+                    <Text style={styles.link}>Use station reading</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
             <Text style={styles.discl}>Original automatic values are saved alongside any manual edits for the audit trail. Check current product label, weather conditions and local spraying requirements before application.</Text>
           </Card>
 
@@ -728,6 +765,8 @@ const styles = StyleSheet.create({
   editedBadge: { backgroundColor: "#FEF3C7", paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill },
   editedBadgeText: { fontSize: 10, color: colors.warning, fontWeight: "800", textTransform: "uppercase" },
   discl: { fontSize: 11, color: colors.muted, marginTop: 6, lineHeight: 15 },
+  dpirdBox: { borderLeftWidth: 3, borderLeftColor: colors.brandPrimary, paddingLeft: 10, paddingVertical: 4, marginTop: 4, gap: 6 },
+  dpirdText: { fontSize: 12, color: colors.muted, lineHeight: 17 },
   searchWrap: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, height: 48 },
   searchInput: { flex: 1, fontSize: 15, color: colors.onSurface },
   pickerRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
