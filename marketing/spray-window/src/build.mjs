@@ -53,6 +53,7 @@ const results = TOWNS.map((town) => {
 });
 const byKey = new Map(results.map((r) => [r.town.slug + r.town.state, r]));
 
+
 const updated = new Date().toLocaleString("en-AU", {
   timeZone: "Australia/Sydney",
   dateStyle: "medium",
