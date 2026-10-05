@@ -216,3 +216,14 @@ Once your first production build finishes:
   active spray job resumes offline, and the paddock map renders
 
 You're now fully independent of Emergent for the build & release path.
+
+---
+
+## Sample-data test build
+
+`eas build --profile sample --platform android` builds the preview APK with
+`EXPO_PUBLIC_SAMPLE_MODE=1`. It opens straight into the app, with no sign-in,
+onboarding or paywall, on a small local sample farm near Merredin WA. Use it
+for screenshots and for checking features like the DPIRD station readings. An
+orange "SAMPLE DATA · TEST BUILD" banner is always shown. Nothing is written to
+Supabase. Never set `EXPO_PUBLIC_SAMPLE_MODE` on the `production` profile.

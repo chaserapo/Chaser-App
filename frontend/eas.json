@@ -29,6 +29,13 @@
         "EXPO_PUBLIC_BACKEND_URL": "https://chaser-app-production.up.railway.app"
       }
     },
+    "sample": {
+      "extends": "preview",
+      "channel": "sample",
+      "env": {
+        "EXPO_PUBLIC_SAMPLE_MODE": "1"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "channel": "production",
