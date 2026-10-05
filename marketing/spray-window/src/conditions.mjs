@@ -93,9 +93,15 @@ export function rateHours(hours, sun, t = THRESHOLDS) {
   });
 }
 
-// Summarise one local day between 5am and 9pm.
-export function summariseDay(rated, date) {
-  const hrs = rated.filter((h) => h.time.startsWith(date) && minutesOf(h.time) >= 5 * 60 && minutesOf(h.time) <= 21 * 60);
+// Summarise one local day between 5am and 9pm. `fromHour` is the town's
+// current local hour ("YYYY-MM-DDTHH:00"): earlier hours stay in `hours`
+// (flagged `past`, for the table and strip) but don't count towards the
+// verdict, window or reasons.
+export function summariseDay(rated, date, fromHour = null) {
+  const hrs = rated
+    .filter((h) => h.time.startsWith(date) && minutesOf(h.time) >= 5 * 60 && minutesOf(h.time) <= 21 * 60)
+    .map((h) => ({ ...h, past: fromHour != null && h.time < fromHour }));
+  const ahead = hrs.filter((h) => !h.past);
 
   // Longest run of usable (good or marginal) hours, ranked by good-hour count.
   let best = null;
@@ -109,7 +115,7 @@ export function summariseDay(rated, date) {
     }
     cur = [];
   };
-  for (const h of hrs) {
+  for (const h of ahead) {
     if (h.status !== "no") cur.push(h);
     else flush();
   }
@@ -121,7 +127,7 @@ export function summariseDay(rated, date) {
 
   // Most common blocking reason, to explain a poor day.
   const counts = {};
-  for (const h of hrs) for (const r of h.reasons) counts[r] = (counts[r] ?? 0) + 1;
+  for (const h of ahead) for (const r of h.reasons) counts[r] = (counts[r] ?? 0) + 1;
   const topReasons = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([r]) => r);
 
   const window = best
@@ -146,7 +152,15 @@ export function summariseDay(rated, date) {
       })()
     : null;
 
-  return { date, verdict, window, topReasons, hours: hrs };
+  return {
+    date,
+    verdict,
+    window,
+    topReasons,
+    hours: hrs,
+    partial: ahead.length < hrs.length, // some of the day has already gone
+    over: hrs.length > 0 && ahead.length === 0,
+  };
 }
 
 export function fmtHour(iso) {

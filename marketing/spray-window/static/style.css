@@ -99,3 +99,5 @@ footer.site { border-top: 1px solid var(--border); padding: 24px 0; font-size: .
 .callout { border-left: 4px solid var(--brand); background: var(--brand-soft); color: var(--on-brand-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; }
 .obs { border-left: 4px solid var(--brand); }
 .obs-stats { font-size: 1rem; }
+.strip .past { opacity: .2; }
+tr.past td { opacity: .45; }

@@ -33,10 +33,23 @@ const observations = fixture
       return new Map();
     });
 
+// The town's current local hour, e.g. "2026-10-05T10:00", so "today" only
+// counts the hours still to come (matters for the midday rebuild).
+const NOW = new Date();
+function localHour(timeZone) {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" })
+      .formatToParts(NOW)
+      .map((x) => [x.type, x.value]),
+  );
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:00`;
+}
+
 const results = TOWNS.map((town) => {
   const f = forecasts.get(town.slug + town.state);
   const rated = rateHours(f.hours, f.sun);
-  return { town, today: summariseDay(rated, f.days[0]), tomorrow: summariseDay(rated, f.days[1]) };
+  const from = localHour(f.timezone || "Australia/Sydney");
+  return { town, today: summariseDay(rated, f.days[0], from), tomorrow: summariseDay(rated, f.days[1], from) };
 });
 const byKey = new Map(results.map((r) => [r.town.slug + r.town.state, r]));
 
