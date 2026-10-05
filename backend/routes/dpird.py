@@ -2,7 +2,10 @@
 Nearest DPIRD weather station reading for a point in WA.
 
 GET /api/dpird/nearest?lat=..&lon=.. returns the latest 15-minute reading from
-the nearest open DPIRD station within 30 km, or {"station": null}.
+the nearest open DPIRD station within 30 km, or {"station": null, "reason": ...}
+where reason is one of: no_key, outside_wa, no_stations, no_station_nearby
+(with nearest_km), no_recent_reading. Reasons carry no secrets and make a
+misconfigured deploy easy to diagnose from a browser.
 
 The DPIRD key stays on the server (DPIRD_API_KEY) and responses are cached:
 the station list for a day and each station's reading for 10 minutes. DPIRD
@@ -31,6 +34,7 @@ MAX_STATION_KM = 30.0
 MAX_AGE = timedelta(hours=6)
 STATIONS_TTL = 24 * 3600
 READING_TTL = 10 * 60
+EMPTY_TTL = 2 * 60  # retry sooner when DPIRD returned nothing usable
 PERTH = timezone(timedelta(hours=8))  # WA has no daylight saving
 
 _stations: Tuple[float, List[Dict[str, Any]]] = (0.0, [])
@@ -53,7 +57,7 @@ async def _get(client: httpx.AsyncClient, path: str, params: Dict[str, str], key
 async def _station_list(client: httpx.AsyncClient, key: str) -> List[Dict[str, Any]]:
     global _stations
     fetched, stations = _stations
-    if stations and time.time() - fetched < STATIONS_TTL:
+    if time.time() - fetched < (STATIONS_TTL if stations else EMPTY_TTL):
         return stations
     data = await _get(
         client,
@@ -100,7 +104,7 @@ def _parse_reading(data: Dict[str, Any], now: datetime) -> Optional[Dict[str, An
 
 async def _reading(client: httpx.AsyncClient, code: str, key: str) -> Optional[Dict[str, Any]]:
     cached = _readings.get(code)
-    if cached and time.time() - cached[0] < READING_TTL:
+    if cached and time.time() - cached[0] < (READING_TTL if cached[1] else EMPTY_TTL):
         return cached[1]
     now = datetime.now(timezone.utc)
     perth_today = now.astimezone(PERTH).date()
@@ -122,21 +126,26 @@ async def _reading(client: httpx.AsyncClient, code: str, key: str) -> Optional[D
 
 @router.get("/nearest")
 async def nearest(lat: float = Query(..., ge=-90, le=90), lon: float = Query(..., ge=-180, le=180)):
-    key = os.getenv("DPIRD_API_KEY")
+    key = (os.getenv("DPIRD_API_KEY") or "").strip()
+    if not key:
+        return {"station": None, "reason": "no_key"}
     # DPIRD only covers WA; skip the round trip for everywhere else.
-    if not key or not (-36.0 <= lat <= -13.0 and 112.0 <= lon <= 129.5):
-        return {"station": None}
+    if not (-36.0 <= lat <= -13.0 and 112.0 <= lon <= 129.5):
+        return {"station": None, "reason": "outside_wa"}
     try:
         async with _lock:
             async with httpx.AsyncClient() as client:
                 stations = await _station_list(client, key)
-                ranked = sorted(((_km(lat, lon, s["lat"], s["lon"]), s) for s in stations), key=lambda x: x[0])
-                if not ranked or ranked[0][0] > MAX_STATION_KM:
-                    return {"station": None}
-                km, s = ranked[0]
+                if not stations:
+                    return {"station": None, "reason": "no_stations"}
+                km, s = min(((_km(lat, lon, st["lat"], st["lon"]), st) for st in stations), key=lambda x: x[0])
+                if km > MAX_STATION_KM:
+                    return {"station": None, "reason": "no_station_nearby", "nearest_km": round(km, 1)}
                 reading = await _reading(client, s["code"], key)
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"DPIRD returned HTTP {e.response.status_code}")
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"DPIRD unavailable: {e.__class__.__name__}")
     if not reading:
-        return {"station": None}
+        return {"station": None, "reason": "no_recent_reading", "station_name": s["name"]}
     return {"station": {"code": s["code"], "name": s["name"], "km": round(km, 1)}, "reading": reading}

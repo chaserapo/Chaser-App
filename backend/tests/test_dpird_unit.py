@@ -90,15 +90,39 @@ def test_cached(client):
 
 def test_stale_reading_hidden(client):
     r = client.get("/api/dpird/nearest", params={"lat": -32.93, "lon": 117.18})
-    assert r.json() == {"station": None}
+    assert r.json() == {"station": None, "reason": "no_recent_reading", "station_name": "Stale"}
 
 
-@pytest.mark.parametrize("lat,lon", [(-33.87, 151.21), (-29.0, 125.0)])
-def test_outside_wa_or_too_far(client, lat, lon):
-    assert client.get("/api/dpird/nearest", params={"lat": lat, "lon": lon}).json() == {"station": None}
+def test_outside_wa(client):
+    assert client.get("/api/dpird/nearest", params={"lat": -33.87, "lon": 151.21}).json() == {"station": None, "reason": "outside_wa"}
+
+
+def test_too_far(client):
+    body = client.get("/api/dpird/nearest", params={"lat": -29.0, "lon": 125.0}).json()
+    assert body["station"] is None and body["reason"] == "no_station_nearby" and body["nearest_km"] > 30
 
 
 def test_no_key(client, monkeypatch):
-    monkeypatch.delenv("DPIRD_API_KEY")
-    assert client.get("/api/dpird/nearest", params={"lat": -31.48, "lon": 118.27}).json() == {"station": None}
+    monkeypatch.setenv("DPIRD_API_KEY", "  ")
+    assert client.get("/api/dpird/nearest", params={"lat": -31.48, "lon": 118.27}).json() == {"station": None, "reason": "no_key"}
     assert client.calls == []
+
+
+def test_empty_station_list_not_cached_for_a_day(client, monkeypatch):
+    real = dpird._get
+    async def empty(c, path, params, key):
+        return {"collection": []} if path == "" else await real(c, path, params, key)
+    monkeypatch.setattr(dpird, "_get", empty)
+    assert client.get("/api/dpird/nearest", params={"lat": -31.48, "lon": 118.27}).json()["reason"] == "no_stations"
+    monkeypatch.setattr(dpird, "_get", real)
+    fetched, _ = dpird._stations
+    monkeypatch.setattr(dpird, "_stations", (fetched - dpird.EMPTY_TTL - 1, []))  # empty cache has expired
+    assert client.get("/api/dpird/nearest", params={"lat": -31.48, "lon": 118.27}).json()["station"]["code"] == "ME"
+
+
+def test_dpird_auth_error_is_502(client, monkeypatch):
+    async def denied(c, path, params, key):
+        raise httpx.HTTPStatusError("401", request=httpx.Request("GET", "https://x"), response=httpx.Response(401))
+    monkeypatch.setattr(dpird, "_get", denied)
+    r = client.get("/api/dpird/nearest", params={"lat": -31.48, "lon": 118.27})
+    assert r.status_code == 502 and "401" in r.json()["detail"]
