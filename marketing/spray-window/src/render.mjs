@@ -101,7 +101,7 @@ function nozzleBlock(day) {
 function hourTable(day) {
   const rows = day.hours
     .map(
-      (h) => `<tr>
+      (h) => `<tr${h.past ? ' class="past"' : ""}>
 <td>${fmtHour(h.time)}</td>
 <td><span class="pill ${h.status}">${h.status === "good" ? "Good" : h.status === "marginal" ? "Marginal" : "Poor"}</span></td>
 <td>${h.delta_t == null ? "–" : h.delta_t.toFixed(1)}</td>
@@ -120,12 +120,13 @@ function hourTable(day) {
 }
 
 function strip(day) {
-  return `<div class="strip" aria-hidden="true">${day.hours.map((h) => `<div class="${h.status}" title="${fmtHour(h.time)}: ${h.status}"></div>`).join("")}</div>
+  return `<div class="strip" aria-hidden="true">${day.hours.map((h) => `<div class="${h.status}${h.past ? " past" : ""}" title="${fmtHour(h.time)}: ${h.past ? "passed" : h.status}"></div>`).join("")}</div>
 <div class="strip-labels"><span>5am</span><span>9am</span><span>1pm</span><span>5pm</span><span>9pm</span></div>`;
 }
 
 export function verdictSentence(town, day) {
   const w = day.window;
+  if (day.over) return `Today's 5am–9pm spray hours in ${town.name} are over. See tomorrow's forecast.`;
   if (day.verdict === "favourable")
     return `Forecast spray conditions in ${town.name} are favourable from ${windowText(w)}, with Delta T ${rangeDt(w.delta_t)} and wind ${range(w.wind, " km/h")}.`;
   if (day.verdict === "marginal")
@@ -136,8 +137,8 @@ export function verdictSentence(town, day) {
 function dayCard(label, town, day) {
   const w = day.window;
   return `<div class="card">
-  <div class="muted">${esc(label)} · ${esc(fmtDate(day.date))}</div>
-  <div class="big">${w ? esc(windowText(w)) : "No spray window"}</div>
+  <div class="muted">${esc(day.partial && !day.over ? "Rest of today" : label)} · ${esc(fmtDate(day.date))}</div>
+  <div class="big">${w ? esc(windowText(w)) : day.over ? "Day's spray hours are over" : day.partial ? "No window left today" : "No spray window"}</div>
   <span class="pill ${day.verdict}">${VERDICT_LABEL[day.verdict]}</span>
   ${
     w
