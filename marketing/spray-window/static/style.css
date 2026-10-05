@@ -97,3 +97,5 @@ footer.site { border-top: 1px solid var(--border); padding: 24px 0; font-size: .
 .nozzle ul { padding-left: 1.2rem; margin: 0; }
 .nozzle li { margin-bottom: .4rem; }
 .callout { border-left: 4px solid var(--brand); background: var(--brand-soft); color: var(--on-brand-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; }
+.obs { border-left: 4px solid var(--brand); }
+.obs-stats { font-size: 1rem; }
