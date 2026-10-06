@@ -227,3 +227,14 @@ onboarding or paywall, on a small local sample farm near Merredin WA. Use it
 for screenshots and for checking features like the DPIRD station readings. An
 orange "SAMPLE DATA · TEST BUILD" banner is always shown. Nothing is written to
 Supabase. Never set `EXPO_PUBLIC_SAMPLE_MODE` on the `production` profile.
+
+---
+
+## Build numbers
+
+`eas.json` uses `"appVersionSource": "remote"`: EAS stores the iOS build
+number and Android versionCode on its servers and bumps them on every
+production build (`autoIncrement`). Builds run in CI never commit the bump
+back, so local numbers would repeat and the stores would reject the upload.
+The remote values started from app.json (iOS build 29, Android versionCode 1).
+To check or set them, run `eas build:version:get` / `eas build:version:set`.
