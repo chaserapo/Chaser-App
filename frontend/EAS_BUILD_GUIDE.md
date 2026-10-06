@@ -236,5 +236,5 @@ Supabase. Never set `EXPO_PUBLIC_SAMPLE_MODE` on the `production` profile.
 number and Android versionCode on its servers and bumps them on every
 production build (`autoIncrement`). Builds run in CI never commit the bump
 back, so local numbers would repeat and the stores would reject the upload.
-The remote values started from app.json (iOS build 29, Android versionCode 1).
+The remote values started from app.json (iOS build 50, set above the 38 already used in App Store Connect; Android versionCode 1).
 To check or set them, run `eas build:version:get` / `eas build:version:set`.
