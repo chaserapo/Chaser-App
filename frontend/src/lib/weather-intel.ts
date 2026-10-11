@@ -17,6 +17,7 @@
 
 import { supabase } from "./supabase";
 import { getActiveBusinessId } from "./backend";
+import { openMeteoUrl } from "./open-meteo";
 
 export type ModelId =
   | "ecmwf_ifs025"
@@ -108,10 +109,14 @@ export type SprayThresholds = {
   rain_free_hours_after: number;
 };
 
+// Wind and gust limits are for 10 m model forecasts, where gusts typically run
+// 1.5-2x the mean wind; a 20 km/h gust limit ruled out ~3 in 4 daytime hours.
+// Kept in step with backend/routes/weather_alerts_cron.py and the Spray Window
+// site (marketing/spray-window/src/conditions.mjs).
 export const DEFAULT_THRESHOLDS: SprayThresholds = {
   wind_min_kmh: 3,
-  wind_max_kmh: 15,
-  gust_max_kmh: 20,
+  wind_max_kmh: 20,
+  gust_max_kmh: 30,
   humidity_min_pct: 40,
   humidity_max_pct: 95,
   temp_max_c: 30,
@@ -170,11 +175,13 @@ const MAP: Record<string, keyof HourlyVars> = {
 // for every hour; bom_access_global did the same on /v1/bom). Confirmed
 // live against the API: /v1/forecast is the actively-maintained endpoint.
 async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: number, timeoutMs: number): Promise<ModelHour[]> {
-  const url =
-    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    `&hourly=${HOURLY_VARS}` +
-    `&wind_speed_unit=kmh&timezone=auto&forecast_days=${days}` +
-    `&models=${model}`;
+  const url = openMeteoUrl(
+    "api",
+    `/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&hourly=${HOURLY_VARS}` +
+      `&wind_speed_unit=kmh&timezone=auto&forecast_days=${days}` +
+      `&models=${model}`,
+  );
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -731,11 +738,13 @@ async function fetchArchiveObservations(lat: number, lon: number, startISO: stri
   // waste a query on unavailable hours.
   const yday = new Date(Date.now() - 24 * 3600_000).toISOString().slice(0, 10);
   const end = endISO > yday ? yday : endISO;
-  const url =
-    `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}` +
-    `&start_date=${startISO}&end_date=${end}` +
-    `&hourly=${Object.values(ARCHIVE_VAR).join(",")}` +
-    `&wind_speed_unit=kmh&timezone=auto`;
+  const url = openMeteoUrl(
+    "archive-api",
+    `/v1/archive?latitude=${lat}&longitude=${lon}` +
+      `&start_date=${startISO}&end_date=${end}` +
+      `&hourly=${Object.values(ARCHIVE_VAR).join(",")}` +
+      `&wind_speed_unit=kmh&timezone=auto`,
+  );
   const out = new Map<string, Record<AccuracyVariable, number>>();
   try {
     const controller = new AbortController();

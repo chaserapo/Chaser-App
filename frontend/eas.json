@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 12.0.0",
-    "appVersionSource": "local"
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -51,6 +51,13 @@
         "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_gvcgItFmaVNzdgkwhNQHlAiIPSi",
         "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_AmAPfvwpttQrSXufLdKkoDgTAIq",
         "EXPO_PUBLIC_MAPTILER_KEY": "6qkxb2dUUrIaEbN85nuC"
+      }
+    },
+    "sample": {
+      "extends": "preview",
+      "channel": "sample",
+      "env": {
+        "EXPO_PUBLIC_SAMPLE_MODE": "1"
       }
     },
     "production": {

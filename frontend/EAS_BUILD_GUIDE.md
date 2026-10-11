@@ -132,6 +132,16 @@ eas secret:create --scope project --name EXPO_PUBLIC_BACKEND_URL --value 'https:
 ```
 …then delete the `env` block from `eas.json`. EAS Secrets take precedence.
 
+**Open-Meteo (weather).** The free Open-Meteo API is for non-commercial use
+only. Once you have a commercial API key, add it as a secret so it stays out
+of the repo. The app then switches to the `customer-*` endpoints
+automatically:
+```bash
+eas secret:create --scope project --name EXPO_PUBLIC_OPEN_METEO_API_KEY --value '<your key>'
+```
+Set the same key as `OPEN_METEO_API_KEY` on the backend host (weather cron
+jobs) and as a GitHub Actions secret (Spray Window site).
+
 ---
 
 ## 7. Submit to the stores
@@ -206,3 +216,25 @@ Once your first production build finishes:
   active spray job resumes offline, and the paddock map renders
 
 You're now fully independent of Emergent for the build & release path.
+
+---
+
+## Sample-data test build
+
+`eas build --profile sample --platform android` builds the preview APK with
+`EXPO_PUBLIC_SAMPLE_MODE=1`. It opens straight into the app, with no sign-in,
+onboarding or paywall, on a small local sample farm near Merredin WA. Use it
+for screenshots and for checking features like the DPIRD station readings. An
+orange "SAMPLE DATA · TEST BUILD" banner is always shown. Nothing is written to
+Supabase. Never set `EXPO_PUBLIC_SAMPLE_MODE` on the `production` profile.
+
+---
+
+## Build numbers
+
+`eas.json` uses `"appVersionSource": "remote"`: EAS stores the iOS build
+number and Android versionCode on its servers and bumps them on every
+production build (`autoIncrement`). Builds run in CI never commit the bump
+back, so local numbers would repeat and the stores would reject the upload.
+The remote values started from app.json (iOS build 50, set above the 38 already used in App Store Connect; Android versionCode 1).
+To check or set them, run `eas build:version:get` / `eas build:version:set`.

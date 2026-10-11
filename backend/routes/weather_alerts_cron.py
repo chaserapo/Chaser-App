@@ -49,8 +49,8 @@ EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 # Mirrors DEFAULT_THRESHOLDS in frontend/src/lib/weather-intel.ts.
 DEFAULT_THRESHOLDS: Dict[str, float] = {
     "wind_min_kmh": 3,
-    "wind_max_kmh": 15,
-    "gust_max_kmh": 20,
+    "wind_max_kmh": 20,
+    "gust_max_kmh": 30,
     "humidity_min_pct": 40,
     "humidity_max_pct": 95,
     "temp_max_c": 30,
