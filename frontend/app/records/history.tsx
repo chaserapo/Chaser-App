@@ -5,8 +5,11 @@ import { useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
 import { Card, Chip } from "@/src/components/ui";
-import { colors, radius, spacing } from "@/src/theme";
+import { colors, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
+import { exportJobsPdf } from "@/src/lib/pdf-report";
+import { productCost } from "@/src/lib/calculators";
+import { useAuth } from "@/src/lib/auth-context";
 import type { SprayJob, Farm, Paddock } from "@/src/lib/types";
 
 const UNASSIGNED = "__unassigned__";
@@ -24,6 +27,7 @@ function monthYearLabel(key: string): string {
 export default function SprayHistory() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { business } = useAuth();
   const [jobs, setJobs] = useState<SprayJob[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [paddocks, setPaddocks] = useState<Paddock[]>([]);
@@ -68,15 +72,33 @@ export default function SprayHistory() {
       byMonth.set(key, arr);
     }
     const keys = Array.from(byMonth.keys()).sort((a, b) => (a < b ? 1 : -1));
-    return keys.map((k) => ({
-      title: monthYearLabel(k),
-      data: byMonth.get(k)!.sort((a, b) => (a.date < b.date ? 1 : -1)),
-    }));
+    return keys.map((k) => {
+      const data = byMonth.get(k)!.sort((a, b) => (a.date < b.date ? 1 : -1));
+      const costs = data.flatMap((j) => j.products.map(productCost)).filter((n): n is number => n != null);
+      return {
+        title: monthYearLabel(k),
+        data,
+        totalCost: costs.length > 0 ? costs.reduce((s, n) => s + n, 0) : undefined,
+      };
+    });
   }, [filtered]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
-      <ScreenHeader title="Spray History" back />
+      <ScreenHeader
+        title="Spray History"
+        back
+        right={
+          <Pressable
+            onPress={() => { if (filtered.length > 0) exportJobsPdf(filtered, business?.name ?? "Chaser"); }}
+            disabled={filtered.length === 0}
+            hitSlop={8}
+            testID="history-export-pdf-btn"
+          >
+            <Icon name="file-pdf-box" size={22} color={filtered.length > 0 ? colors.brandPrimary : colors.muted} />
+          </Pressable>
+        }
+      />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
         {farms.map((f) => (
@@ -110,7 +132,10 @@ export default function SprayHistory() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}
           renderSectionHeader={({ section }) => (
-            <Text style={styles.monthHeader}>{section.title} · {section.data.length} job{section.data.length === 1 ? "" : "s"}</Text>
+            <Text style={styles.monthHeader}>
+              {section.title} · {section.data.length} job{section.data.length === 1 ? "" : "s"}
+              {section.totalCost != null ? ` · $${section.totalCost.toFixed(2)}` : ""}
+            </Text>
           )}
           renderItem={({ item }) => (
             <Card style={{ marginBottom: spacing.sm }} onPress={() => router.push({ pathname: "/records/[id]", params: { id: item.id } })} testID={`history-record-${item.id}`}>

@@ -66,6 +66,9 @@ async function saveSprayJob(job: SprayJob) {
       spray_job_id: jobWithBiz.id,
       chemical_id: p.chemical_id,
       chemical_name: p.chemical_name,
+      chemical_group: p.chemical_group ?? null,
+      cost_per_unit: p.cost_per_unit ?? null,
+      cost_unit: p.cost_unit ?? null,
       rate: p.rate,
       unit: p.unit,
       custom_unit_label: p.custom_unit_label ?? null,
@@ -107,6 +110,9 @@ async function hydrateJobs(jobs: any[]): Promise<SprayJob[]> {
       id: p.id,
       chemical_id: p.chemical_id,
       chemical_name: p.chemical_name ?? "",
+      chemical_group: p.chemical_group ?? undefined,
+      cost_per_unit: p.cost_per_unit ?? undefined,
+      cost_unit: p.cost_unit ?? undefined,
       rate: p.rate ?? 0,
       unit: p.unit,
       custom_unit_label: p.custom_unit_label ?? undefined,
@@ -320,6 +326,10 @@ export const cloudRepo = {
     completed: async () => {
       try { return await hydrateJobs(await listRows<any>("spray_jobs", { extraEq: [["status", "completed"]] })); }
       catch (e) { console.warn("sprayJobs.completed cloud fail", e); return []; }
+    },
+    planned: async () => {
+      try { return await hydrateJobs(await listRows<any>("spray_jobs", { extraEq: [["status", "planned"]] })); }
+      catch (e) { console.warn("sprayJobs.planned cloud fail", e); return []; }
     },
     save: saveSprayJob,
     remove: (id: string) => softDelete("spray_jobs", id),

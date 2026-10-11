@@ -11,7 +11,7 @@ export type PaddockOnMap = {
   boundary_geojson: { type: "Polygon"; coordinates: number[][][] } | null;
 };
 
-export type FarmPin = { id: string; name: string; lat: number; lon: number };
+export type FarmPin = { id: string; name: string; lat: number; lon: number; farm_id?: string };
 export type IssuePin = { id: string; lat: number; lon: number; icon: string; severity: string };
 
 export type PaddockMapHandle = {
@@ -25,6 +25,7 @@ export type PaddockMapHandle = {
   flyTo: (lat: number, lon: number, zoom?: number) => void;
   setReportPin: (lat: number, lon: number) => void;
   clearReportPin: () => void;
+  resize: () => void;
 };
 
 type Props = {
@@ -38,6 +39,7 @@ type Props = {
   onPointsUpdate?: (count: number, areaHa: number) => void;
   onSaveGeometry?: (geojson: { type: "Polygon"; coordinates: number[][][] }, areaHa: number) => void;
   onReady?: () => void;
+  onLoadTimeout?: () => void;
   style?: any;
 };
 
@@ -46,7 +48,7 @@ type Props = {
 // map works in the preview and in Expo Web. Native builds keep using WebView.
 // -----------------------------------------------------------------------------
 const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
-  { paddocks, farmPins, issuePins, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady, style }, ref
+  { paddocks, farmPins, issuePins, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady, onLoadTimeout, style }, ref
 ) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
@@ -73,6 +75,7 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
     flyTo: (lat, lon, zoom) => send({ type: "flyTo", lat, lon, zoom }),
     setReportPin: (lat, lon) => send({ type: "setReportPin", lat, lon }),
     clearReportPin: () => send({ type: "clearReportPin" }),
+    resize: () => send({ type: "resize" }),
   }), [send]);
 
   useEffect(() => {
@@ -94,11 +97,12 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
         case "pinPlaced": onPinPlaced?.(msg.lat, msg.lon); break;
         case "points": onPointsUpdate?.(msg.count ?? 0, msg.areaHa ?? 0); break;
         case "save": if (msg.geojson) onSaveGeometry?.(msg.geojson, msg.areaHa ?? 0); break;
+        case "loadTimeout": onLoadTimeout?.(); break;
       }
     }
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [send, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady]);
+  }, [send, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady, onLoadTimeout]);
 
   const paddocksStr = useMemo(() => JSON.stringify(paddocks), [paddocks]);
   const lastStr = useRef(paddocksStr);
@@ -130,7 +134,7 @@ const WebMap = forwardRef<PaddockMapHandle, Props>(function WebMap(
 // Native (iOS/Android): uses react-native-webview.
 // -----------------------------------------------------------------------------
 const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
-  { paddocks, farmPins, issuePins, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady, style }, ref
+  { paddocks, farmPins, issuePins, onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady, onLoadTimeout, style }, ref
 ) {
   const webviewRef = useRef<WebView>(null);
   const readyRef = useRef(false);
@@ -158,6 +162,7 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
     flyTo: (lat, lon, zoom) => send({ type: "flyTo", lat, lon, zoom }),
     setReportPin: (lat, lon) => send({ type: "setReportPin", lat, lon }),
     clearReportPin: () => send({ type: "clearReportPin" }),
+    resize: () => send({ type: "resize" }),
   }), [send]);
 
   const onMessage = useCallback((e: WebViewMessageEvent) => {
@@ -177,9 +182,10 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
         case "pinPlaced": onPinPlaced?.(msg.lat, msg.lon); break;
         case "points": onPointsUpdate?.(msg.count ?? 0, msg.areaHa ?? 0); break;
         case "save": if (msg.geojson) onSaveGeometry?.(msg.geojson, msg.areaHa ?? 0); break;
+        case "loadTimeout": onLoadTimeout?.(); break;
       }
     } catch { /* ignore */ }
-  }, [onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady, send]);
+  }, [onSelect, onFarmSelect, onIssueSelect, onPinPlaced, onPointsUpdate, onSaveGeometry, onReady, onLoadTimeout, send]);
 
   const paddocksStr = useMemo(() => JSON.stringify(paddocks), [paddocks]);
   const paddocksStrRef = useRef(paddocksStr);
@@ -207,6 +213,8 @@ const NativeMap = forwardRef<PaddockMapHandle, Props>(function NativeMap(
         originWhitelist={["*"]}
         source={{ html: MAP_HTML }}
         onMessage={onMessage}
+        onError={() => onLoadTimeout?.()}
+        onHttpError={() => onLoadTimeout?.()}
         javaScriptEnabled
         domStorageEnabled
         allowFileAccess

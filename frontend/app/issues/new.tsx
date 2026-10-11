@@ -47,7 +47,12 @@ export default function NewIssueScreen() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => { mapRef.current?.setMode("pin"); }, []);
+  // setMode sends a postMessage into the map's WebView — a no-op if sent before
+  // the page has loaded and registered its listener, which is exactly what an
+  // effect firing on mount races against. onReady fires once the WebView has
+  // actually confirmed it's live (same pattern as paddock-new.tsx), so pin mode
+  // reliably takes effect instead of silently falling back to view/select mode.
+  function onMapReady() { mapRef.current?.setMode("pin"); }
 
   const shownPaddocks = useMemo(() => farmId ? paddocks.filter((p) => p.farm_id === farmId) : paddocks, [paddocks, farmId]);
   const mapPaddocks = useMemo(
@@ -140,7 +145,7 @@ export default function NewIssueScreen() {
           <Card>
             <Text style={styles.label}>Tap the map to drop a pin</Text>
             <View style={styles.mapWrap}>
-              <PaddockMap ref={mapRef} paddocks={mapPaddocks} onPinPlaced={onPinPlaced} style={styles.map} />
+              <PaddockMap ref={mapRef} paddocks={mapPaddocks} onPinPlaced={onPinPlaced} onReady={onMapReady} style={styles.map} />
             </View>
             <View style={{ height: spacing.sm }} />
             <Button title={coords ? "GPS Captured" : "Or use my GPS location"} icon={coords ? "map-marker-check-outline" : "crosshairs-gps"} onPress={captureLocation} loading={locating} variant="outline" testID="issue-gps-btn" />

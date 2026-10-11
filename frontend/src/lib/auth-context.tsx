@@ -5,6 +5,7 @@ import { supabase } from "./supabase";
 import { setBackend } from "./backend";
 import { isMigrated, localBackupBelongsToAnotherAccount, runMigration, MigrationProgress } from "./migrate";
 import { acceptPendingInvitations } from "./members";
+import { logOutPurchases } from "./purchases";
 import { SAMPLE_MODE, SAMPLE_BUSINESS, SAMPLE_SESSION } from "./sample-mode";
 
 export type ActiveBusiness = { id: string; name: string; role: "owner" | "manager" | "operator"; created_at: string };
@@ -182,10 +183,8 @@ function RealAuthProvider({ children }: { children: React.ReactNode }) {
     const suffix = Math.random().toString(36).slice(2, 10);
     const channel = supabase.channel(`biz-${business.id}-${suffix}`);
     channel.on(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       "postgres_changes" as any,
       { event: "UPDATE", schema: "public", table: "businesses", filter: `id=eq.${business.id}` },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (payload: any) => {
         const next = payload?.new;
         if (next?.name && next.name !== business.name) {
@@ -195,7 +194,6 @@ function RealAuthProvider({ children }: { children: React.ReactNode }) {
     );
     if (session?.user) {
       channel.on(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "postgres_changes" as any,
         { event: "*", schema: "public", table: "business_members", filter: `business_id=eq.${business.id}` },
         async () => {
@@ -208,6 +206,7 @@ function RealAuthProvider({ children }: { children: React.ReactNode }) {
             .maybeSingle();
           if (!mem) {
             // We've been removed — sign out to force a clean state.
+            await logOutPurchases();
             await supabase.auth.signOut();
             return;
           }
@@ -261,6 +260,7 @@ function RealAuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    await logOutPurchases();
     await supabase.auth.signOut();
   }, []);
 
@@ -292,6 +292,7 @@ function RealAuthProvider({ children }: { children: React.ReactNode }) {
       const body = await r.json().catch(() => null);
       throw new Error(body?.detail ?? `Account deletion failed (${r.status})`);
     }
+    await logOutPurchases();
     await supabase.auth.signOut();
   }, [session]);
 

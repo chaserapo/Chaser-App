@@ -23,7 +23,7 @@ try {
 }
 
 export type ChaserNotificationData = {
-  type: "overdue_maintenance" | "open_fault" | "spray_window" | "frost" | "wind_max" | "rain_change" | "rain_after_spray";
+  type: "overdue_maintenance" | "open_fault" | "spray_window" | "frost" | "wind_max" | "rain_change" | "rain_after_spray" | "job_due_today";
   machineryId?: string;
   farmId?: string;
   jobId?: string;
@@ -71,6 +71,8 @@ export function useNotificationRouting() {
           router.push({ pathname: "/machinery/[id]", params: { id: data.machineryId } });
         } else if (data?.type === "rain_after_spray" && data.jobId) {
           router.push({ pathname: "/records/[id]", params: { id: data.jobId } });
+        } else if (data?.type === "job_due_today" && data.jobId) {
+          router.push({ pathname: "/records/new", params: { plannedId: data.jobId } });
         } else if (data?.type && ["spray_window", "frost", "wind_max", "rain_change"].includes(data.type)) {
           router.push("/(tabs)/weather");
         }

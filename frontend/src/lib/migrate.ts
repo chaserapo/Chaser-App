@@ -48,14 +48,34 @@ async function markMigrated(userId: string, businessId: string) {
   await AsyncStorage.setItem(markerKey(userId, businessId), "true");
 }
 
+// The business + business_members rows that farms/paddocks/etc. depend on for
+// RLS are created moments earlier in the same signup flow (see bootstrapBusiness
+// in auth-context.tsx). Very occasionally the just-committed membership row isn't
+// yet visible to the very next request — observed in practice as this table's
+// insert (always whichever runs first) failing with a row-level security
+// violation, then succeeding immediately on an identical retry. Rather than
+// surface that as an error to a brand-new user, retry a few times with backoff
+// before giving up; any other kind of error still fails immediately.
+function isTransientRlsError(error: { code?: string; message?: string }): boolean {
+  return error.code === "42501" || /row-level security policy/i.test(error.message ?? "");
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function upsertBatch(table: string, rows: any[]) {
   if (rows.length === 0) return;
   for (let i = 0; i < rows.length; i += 250) {
     const chunk = rows.slice(i, i + 250);
-    // defaultToNull:false tells PostgREST to use column defaults for missing fields
-    // instead of substituting nulls when batch rows have different key sets.
-    const { error } = await supabase.from(table).upsert(chunk, { onConflict: "id", defaultToNull: false });
-    if (error) throw new Error(`${table}: ${error.message}`);
+    let attempt = 0;
+    for (;;) {
+      // defaultToNull:false tells PostgREST to use column defaults for missing fields
+      // instead of substituting nulls when batch rows have different key sets.
+      const { error } = await supabase.from(table).upsert(chunk, { onConflict: "id", defaultToNull: false });
+      if (!error) break;
+      attempt += 1;
+      if (!isTransientRlsError(error) || attempt >= 4) throw new Error(`${table}: ${error.message}`);
+      await sleep(400 * attempt);
+    }
   }
 }
 

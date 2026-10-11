@@ -11,11 +11,13 @@ import { CHEMICAL_CATEGORIES, ChemicalCategory, RATE_UNITS, RateUnit } from "@/s
 import type { Chemical, ChemicalStockLine } from "@/src/lib/types";
 import { confirm } from "@/src/lib/confirm";
 import { parsePackSize } from "@/src/lib/stock";
+import { groupOptionsFor, groupLabel } from "@/src/lib/chemical-groups";
 
 export default function ChemicalDetail() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [now] = useState(() => Date.now());
   const [c, setC] = useState<Chemical | null>(null);
   const [batches, setBatches] = useState<import("@/src/lib/types").ChemicalBatch[]>([]);
   const [movements, setMovements] = useState<import("@/src/lib/types").StockMovement[]>([]);
@@ -25,17 +27,30 @@ export default function ChemicalDetail() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [type, setType] = useState<ChemicalCategory>("Herbicide");
   const [rateUnit, setRateUnit] = useState<RateUnit>("L/ha");
+  const [groupKey, setGroupKey] = useState<string | null>(null);
   const [f, setF] = useState({
     product_name: "", active_ingredient: "", formulation: "",
     apvma_number: "", chemical_group: "", manufacturer: "",
     pack_size: "", default_rate: "",
-    stock_qty: "", stock_unit: "", low_stock_threshold: "", storage_location: "",
+    stock_qty: "", stock_unit: "", cost_per_unit: "", low_stock_threshold: "", storage_location: "",
     label_url: "", sds_url: "", notes: "",
   });
+
+  // Group options are category-specific (groupOptionsFor(type)) — a group
+  // chip picked under one product type can be meaningless or outright wrong
+  // under another (e.g. an HRAC herbicide group saved on a record later
+  // switched to Fungicide), which would also corrupt resistance-rotation
+  // matching against that group later. Clear the selection whenever it's no
+  // longer one of the new type's own options.
+  function changeType(next: ChemicalCategory) {
+    setType(next);
+    setGroupKey((gk) => (gk && groupOptionsFor(next).some((g) => g.key === gk) ? gk : null));
+  }
 
   const loadState = (chem: Chemical) => {
     setType(chem.product_type ?? "Herbicide");
     setRateUnit(chem.default_unit ?? "L/ha");
+    setGroupKey(chem.chemical_group_key ?? null);
     setF({
       product_name: chem.product_name,
       active_ingredient: chem.active_ingredient ?? "",
@@ -47,6 +62,7 @@ export default function ChemicalDetail() {
       default_rate: chem.default_rate != null ? chem.default_rate.toString() : "",
       stock_qty: chem.stock_qty != null ? chem.stock_qty.toString() : "",
       stock_unit: chem.stock_unit ?? "",
+      cost_per_unit: chem.cost_per_unit != null ? chem.cost_per_unit.toString() : "",
       low_stock_threshold: chem.low_stock_threshold != null ? chem.low_stock_threshold.toString() : "",
       storage_location: chem.storage_location ?? "",
       label_url: chem.label_url ?? "",
@@ -91,13 +107,14 @@ export default function ChemicalDetail() {
       active_ingredient: f.active_ingredient.trim() || undefined,
       formulation: f.formulation.trim() || undefined,
       apvma_number: f.apvma_number.trim() || undefined,
-      chemical_group: f.chemical_group.trim() || undefined,
+      chemical_group_key: groupKey ?? undefined,
       manufacturer: f.manufacturer.trim() || undefined,
       pack_size: f.pack_size.trim() || undefined,
       default_rate: f.default_rate ? parseFloat(f.default_rate) : undefined,
       default_unit: f.default_rate ? rateUnit : undefined,
       stock_qty: f.stock_qty ? parseFloat(f.stock_qty) : undefined,
       stock_unit: f.stock_unit.trim() || undefined,
+      cost_per_unit: f.cost_per_unit ? parseFloat(f.cost_per_unit) : undefined,
       low_stock_threshold: f.low_stock_threshold ? parseFloat(f.low_stock_threshold) : undefined,
       storage_location: f.storage_location.trim() || undefined,
       label_url: f.label_url.trim() || undefined,
@@ -161,7 +178,7 @@ export default function ChemicalDetail() {
               <Text style={styles.chipLabel}>Product type</Text>
               <View style={styles.typeGrid}>
                 {CHEMICAL_CATEGORIES.map((cc) => (
-                  <Pressable key={cc} onPress={() => setType(cc)} style={[styles.typeChip, type === cc && styles.typeChipActive]} testID={`edit-type-${cc}`}>
+                  <Pressable key={cc} onPress={() => changeType(cc)} style={[styles.typeChip, type === cc && styles.typeChipActive]} testID={`edit-type-${cc}`}>
                     <Text style={[styles.typeText, type === cc && { color: colors.onBrandPrimary }]}>{cc}</Text>
                   </Pressable>
                 ))}
@@ -169,7 +186,20 @@ export default function ChemicalDetail() {
               <Input label="Active ingredient" value={f.active_ingredient} onChangeText={(v) => setF({ ...f, active_ingredient: v })} testID="edit-ai" />
               <Input label="Concentration / formulation" value={f.formulation} onChangeText={(v) => setF({ ...f, formulation: v })} testID="edit-form" />
               <Input label="APVMA registration number" value={f.apvma_number} onChangeText={(v) => setF({ ...f, apvma_number: v })} testID="edit-apvma" />
-              <Input label="Mode of action / group" value={f.chemical_group} onChangeText={(v) => setF({ ...f, chemical_group: v })} testID="edit-group" />
+
+              <Text style={styles.chipLabel}>Mode of action / group</Text>
+              {f.chemical_group && !groupKey ? (
+                <Text style={styles.groupLegacy}>Existing group on file: &quot;{f.chemical_group}&quot; — not yet matched to a group below.</Text>
+              ) : null}
+              <View style={styles.typeGrid}>
+                {groupOptionsFor(type).map((g) => (
+                  <Pressable key={g.key} onPress={() => setGroupKey(g.key)} style={[styles.groupChip, groupKey === g.key && styles.typeChipActive]} testID={`edit-group-chip-${g.key}`}>
+                    <Text style={[styles.typeText, groupKey === g.key && { color: colors.onBrandPrimary }]}>{g.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.groupCaveat}>Group numbers are a general guide, assembled from HRAC/FRAC/IRAC references — check your product label if unsure. Used to warn you if you repeat a group on the same paddock across seasons.</Text>
+
               <Input label="Manufacturer" value={f.manufacturer} onChangeText={(v) => setF({ ...f, manufacturer: v })} testID="edit-manufacturer" />
             </Card>
 
@@ -197,6 +227,7 @@ export default function ChemicalDetail() {
                 <View style={{ flex: 1 }}><Input label="Stock quantity" value={f.stock_qty} onChangeText={(v) => setF({ ...f, stock_qty: v })} keyboardType="decimal-pad" testID="edit-stock-qty" /></View>
                 <View style={{ flex: 1 }}><Input label="Stock unit" value={f.stock_unit} onChangeText={(v) => setF({ ...f, stock_unit: v })} testID="edit-stock-unit" /></View>
               </View>
+              <Input label="Cost per unit (optional)" value={f.cost_per_unit} onChangeText={(v) => setF({ ...f, cost_per_unit: v })} keyboardType="decimal-pad" suffix={`AUD / ${f.stock_unit.trim() || "unit"}`} placeholder="e.g. 12.50" testID="edit-cost-per-unit" />
               <Input label="Low stock warning (optional)" value={f.low_stock_threshold} onChangeText={(v) => setF({ ...f, low_stock_threshold: v })} keyboardType="decimal-pad" placeholder="Leave blank to use your default" testID="edit-low-stock" />
               <Input label="Storage location" value={f.storage_location} onChangeText={(v) => setF({ ...f, storage_location: v })} testID="edit-storage" />
             </Card>
@@ -250,7 +281,7 @@ export default function ChemicalDetail() {
         <Text style={styles.section}>Identification</Text>
         <Card>
           <Field label="APVMA registration" value={c.apvma_number} />
-          <Field label="Chemical group / MoA" value={c.chemical_group} />
+          <Field label="Chemical group / MoA" value={c.chemical_group_key ? groupLabel(c.chemical_group_key) : c.chemical_group} />
           <Field label="Manufacturer" value={c.manufacturer} />
         </Card>
 
@@ -264,6 +295,7 @@ export default function ChemicalDetail() {
         <Card>
           <Field label="Pack size" value={c.pack_size} />
           <Field label="Current stock" value={c.stock_qty != null ? `${c.stock_qty} ${c.stock_unit ?? c.pack_size ?? ""}` : undefined} />
+          <Field label="Cost per unit" value={c.cost_per_unit != null ? `$${c.cost_per_unit.toFixed(2)} / ${c.stock_unit ?? "unit"}` : undefined} />
           <Field label="Low stock warning" value={c.low_stock_threshold != null ? `${c.low_stock_threshold} ${c.stock_unit ?? ""}`.trim() : "Using your default"} />
           <Field label="Storage location" value={c.storage_location} />
           <Text style={styles.hint}>This single total drives low-stock alerts and spray-job deductions. Use &quot;Adjust Stock&quot; below to change it.</Text>
@@ -337,7 +369,7 @@ export default function ChemicalDetail() {
           <Card><Text style={styles.hint}>No batches recorded. Add lot numbers and expiry dates to enable expiry alerts.</Text></Card>
         ) : (
           batches.map((b) => {
-            const daysToExpiry = b.expiry_date ? Math.floor((new Date(b.expiry_date).getTime() - Date.now()) / 86400000) : null;
+            const daysToExpiry = b.expiry_date ? Math.floor((new Date(b.expiry_date).getTime() - now) / 86400000) : null;
             const expiring = daysToExpiry != null && daysToExpiry <= 30 && daysToExpiry >= 0;
             const expired = daysToExpiry != null && daysToExpiry < 0;
             return (
@@ -427,6 +459,9 @@ const styles = StyleSheet.create({
   typeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
   typeChip: { paddingHorizontal: 12, height: 36, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, alignItems: "center", justifyContent: "center" },
   typeChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
+  groupChip: { paddingHorizontal: 12, paddingVertical: 8, maxWidth: "100%", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary },
+  groupCaveat: { fontSize: 11, color: colors.muted, fontStyle: "italic", marginBottom: spacing.md, lineHeight: 15 },
+  groupLegacy: { fontSize: 12, color: colors.warning, fontStyle: "italic", marginBottom: 6 },
   typeText: { fontSize: 12, fontWeight: "700", color: colors.onSurfaceTertiary },
   unitChip: { paddingHorizontal: 12, height: 40, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, alignItems: "center", justifyContent: "center" },
   unitChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },

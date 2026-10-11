@@ -10,8 +10,13 @@ import { LINK_CATEGORIES } from "@/src/lib/links";
 import { useAuth } from "@/src/lib/auth-context";
 import { confirm } from "@/src/lib/confirm";
 import { profileRepo, useOnboarding } from "@/src/lib/onboarding";
-import { useEntitlement, purchasesConfigured } from "@/src/lib/purchases";
+import { useEntitlement, purchasesConfigured, presentCustomerCenter } from "@/src/lib/purchases";
 import type { ExternalLink } from "@/src/lib/types";
+
+/** Days left until an ISO date, for display only — the store owns the real trial/billing clock. */
+function trialDaysLeft(periodEndsAt: string): number {
+  return Math.max(0, Math.ceil((new Date(periodEndsAt).getTime() - Date.now()) / 86_400_000));
+}
 
 const TOOLS = [
   { title: "Faults & Risks", icon: "alert-outline", route: "/issues" },
@@ -29,7 +34,7 @@ export default function More() {
   const router = useRouter();
   const { user, business, signOut, renameBusiness, deleteAccount } = useAuth();
   const { percent, reload: reloadOnboarding, userId } = useOnboarding();
-  const entitlement = useEntitlement(business?.created_at ?? null);
+  const entitlement = useEntitlement();
   const [links, setLinks] = useState<ExternalLink[]>([]);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
@@ -186,16 +191,16 @@ export default function More() {
           <>
             <Text style={styles.sectionTitle}>Subscription</Text>
             <Card style={{ padding: 0, overflow: "hidden" }}>
-              <Pressable onPress={() => router.push("/paywall")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-subscription-btn">
-                <Icon name={entitlement.isPro ? "star" : "star-outline"} size={22} color={colors.brandPrimary} />
+              <Pressable onPress={() => (entitlement.isPro ? presentCustomerCenter() : router.push("/paywall"))} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-subscription-btn">
+                <Icon name={entitlement.isTrialing ? "star-outline" : "star"} size={22} color={colors.brandPrimary} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.rowText}>{entitlement.isPro ? "Chaser Pro" : "Free trial"}</Text>
+                  <Text style={styles.rowText}>{entitlement.isTrialing ? "Free trial" : "Chaser Pro"}</Text>
                   <Text style={styles.rowSub}>
-                    {entitlement.isPro
+                    {entitlement.isTrialing && entitlement.periodEndsAt
+                      ? `${trialDaysLeft(entitlement.periodEndsAt)} day${trialDaysLeft(entitlement.periodEndsAt) === 1 ? "" : "s"} left in your free trial`
+                      : entitlement.isPro
                       ? "Your subscription is active"
-                      : entitlement.isTrialActive
-                      ? `${entitlement.trialDaysLeft} day${entitlement.trialDaysLeft === 1 ? "" : "s"} left in your free trial`
-                      : "Your trial has ended — subscribe to keep using Chaser"}
+                      : "Subscribe to unlock Chaser"}
                   </Text>
                 </View>
                 <Icon name="chevron-right" size={22} color={colors.muted} />
@@ -354,7 +359,7 @@ const styles = StyleSheet.create({
   setupBadgeText: { color: colors.brandPrimary, fontSize: 11, fontWeight: "800" },
   linkSectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   manage: { fontSize: 13, fontWeight: "700", color: colors.brandPrimary, marginTop: spacing.lg },
-  row: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, minHeight: 56, gap: 12 },
+  row: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingVertical: spacing.md, minHeight: 48, gap: 12 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   rowText: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.onSurface },
   rowSub: { fontSize: 12, color: colors.muted, marginTop: 2 },

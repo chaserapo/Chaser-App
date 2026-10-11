@@ -19,6 +19,14 @@ import type { Paddock, PaddockBoundary, Farm, FarmIssue } from "@/src/lib/types"
 type Mode = "view" | "draw";
 type ViewKind = "map" | "list";
 
+function boundaryCentroid(boundary: PaddockBoundary): { lat: number; lon: number } | null {
+  const ring = boundary?.coordinates?.[0];
+  if (!ring || ring.length === 0) return null;
+  let sumLon = 0, sumLat = 0;
+  for (const [lon, lat] of ring) { sumLon += lon; sumLat += lat; }
+  return { lat: sumLat / ring.length, lon: sumLon / ring.length };
+}
+
 export default function PaddocksTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -41,6 +49,8 @@ export default function PaddocksTab() {
   const [gpsOn, setGpsOn] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [searching, setSearching] = useState(false);
+  const [mapLoadTimedOut, setMapLoadTimedOut] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
   const mapRef = useRef<PaddockMapHandle>(null);
   const gpsWatch = useRef<Location.LocationSubscription | null>(null);
   const driveWatch = useRef<Location.LocationSubscription | null>(null);
@@ -55,31 +65,62 @@ export default function PaddocksTab() {
   // re-apply it instead of relying on that racy synchronous call.
   const modeRef = useRef(mode);
   useEffect(() => { modeRef.current = mode; }, [mode]);
+  // The map's container gets display:none while List is showing. On iOS that
+  // can lay the WebView's canvas out at zero size, so MapLibre needs a nudge
+  // to re-measure once it's actually visible again — otherwise it can come
+  // back blank even though its data (paddocks/pins) never went anywhere.
+  useEffect(() => {
+    if (mode === "view" && viewKind === "map") mapRef.current?.resize();
+  }, [viewKind, mode]);
+  // Switching from List to Map re-shows the WebView, which reloads and re-fires
+  // onReady — same race as the draw-mode remount above. Hold the target we
+  // want focused so onReady can apply it once the map is actually live.
+  const pendingFocusRef = useRef<{ paddockId: string } | { lat: number; lon: number } | null>(null);
 
   const load = useCallback(async () => {
     const [pList, fList, iList] = await Promise.all([repo.paddocks.active(), repo.farms.active(), repo.farmIssues.list()]);
     setPaddocks(pList);
     setFarms(fList);
     setIssues(iList);
+
+    const nameByFarm = new Map(fList.map((f) => [f.id, f.name]));
+    // Farm pins that already have a farm_id are covered — everything else falls
+    // back to a centroid of that farm's own paddock boundaries below, so a
+    // farm shows up on the map as soon as it has a drawn paddock, without
+    // requiring anyone to have opened the Weather tab for it first.
+    const farmIdsWithPin = new Set<string>();
+    let weatherLocationPins: FarmPin[] = [];
     // Load farm pins from weather_locations so operators can see all their
     // properties on the map even before drawing paddock boundaries. Silent
     // fail-safe if the SQL migration hasn't been run yet.
     try {
       const businessId = business?.id;
-      if (!businessId) return;
-      const { data, error } = await supabase
-        .from("weather_locations")
-        .select("id, lat, lon, label, farm_id")
-        .eq("business_id", businessId)
-        .eq("is_active", true);
-      if (error || !data) return;
-      const nameByFarm = new Map(fList.map((f) => [f.id, f.name]));
-      setFarmPins(
-        data
-          .filter((r: any) => typeof r.lat === "number" && typeof r.lon === "number")
-          .map((r: any) => ({ id: r.id, lat: r.lat, lon: r.lon, name: r.label || (r.farm_id ? nameByFarm.get(r.farm_id) : "Farm") || "Farm" }))
-      );
+      if (businessId) {
+        const { data, error } = await supabase
+          .from("weather_locations")
+          .select("id, lat, lon, label, farm_id")
+          .eq("business_id", businessId)
+          .eq("is_active", true);
+        if (!error && data) {
+          weatherLocationPins = data
+            .filter((r: any) => typeof r.lat === "number" && typeof r.lon === "number")
+            .map((r: any) => {
+              if (r.farm_id) farmIdsWithPin.add(r.farm_id);
+              return { id: r.id, lat: r.lat, lon: r.lon, name: r.label || (r.farm_id ? nameByFarm.get(r.farm_id) : "Farm") || "Farm", farm_id: r.farm_id ?? undefined };
+            });
+        }
+      }
     } catch { /* fail-safe */ }
+
+    const boundaryPins: FarmPin[] = [];
+    for (const f of fList) {
+      if (farmIdsWithPin.has(f.id)) continue;
+      const withBoundary = pList.find((p) => p.farm_id === f.id && p.boundary);
+      const centroid = withBoundary?.boundary ? boundaryCentroid(withBoundary.boundary) : null;
+      if (centroid) boundaryPins.push({ id: `farm-${f.id}`, lat: centroid.lat, lon: centroid.lon, name: f.name, farm_id: f.id });
+    }
+
+    setFarmPins([...weatherLocationPins, ...boundaryPins]);
   }, [business]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useRealtime(["paddocks", "farms", "farm_issues"], load, [load]);
@@ -214,6 +255,27 @@ export default function PaddocksTab() {
   }
   function requestSaveGeometry() { mapRef.current?.save(); }
 
+  function viewPaddockOnMap(id: string) {
+    setSelectedIssueId(null);
+    setSelectedId(id);
+    setViewKind("map");
+    const paddock = paddocks.find((p) => p.id === id);
+    if (paddock?.boundary) {
+      pendingFocusRef.current = { paddockId: id };
+      // Covers the case where the map is already visible/ready (no remount,
+      // so onReady won't fire again) — harmless no-op otherwise.
+      mapRef.current?.focusPaddock(id);
+    } else {
+      // No boundary drawn yet, so there's nothing to fit to — fly toward its
+      // farm's pin instead of leaving the map wherever it happened to be.
+      const pin = paddock?.farm_id ? farmPins.find((fp) => fp.farm_id === paddock.farm_id) : null;
+      if (pin) {
+        pendingFocusRef.current = { lat: pin.lat, lon: pin.lon };
+        mapRef.current?.flyTo(pin.lat, pin.lon, 14);
+      }
+    }
+  }
+
   async function persistPaddock(geojson: PaddockBoundary, areaHa: number) {
     if (!business) return;
     if (!name.trim()) { alert("Please give the paddock a name before saving."); return; }
@@ -238,6 +300,8 @@ export default function PaddocksTab() {
   }
 
   const selectedPaddock = selectedId ? paddocks.find((p) => p.id === selectedId) : null;
+  const showList = viewKind === "list" && mode === "view";
+  function retryMapLoad() { setMapLoadTimedOut(false); setMapKey((k) => k + 1); }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}>
@@ -276,11 +340,24 @@ export default function PaddocksTab() {
         </View>
       ) : null}
 
-      {viewKind === "list" && mode === "view" ? (
-        <ScrollView
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xxl }}
-          testID="paddock-list-scroll"
-        >
+      {/*
+        List and Map are stacked with absolute positioning and swapped via
+        opacity/pointerEvents rather than display:none. display:none collapses
+        the WebView's native layout to 0x0, and MapLibre only re-measures its
+        container on an explicit resize() — so a fresh WebView had to race that
+        resize against RN's own (async) native layout pass to repaint anything,
+        and losing that race meant paddocks/pins came back invisible even
+        though the map's internal camera state was already correct. Keeping
+        both layers permanently laid out at full size means the WebView's
+        frame never collapses, so there's nothing to race.
+      */}
+      <View style={{ flex: 1 }}>
+      <ScrollView
+        style={[styles.stackedLayer, { opacity: showList ? 1 : 0 }]}
+        pointerEvents={showList ? "auto" : "none"}
+        contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xxl }}
+        testID="paddock-list-scroll"
+      >
           {grouped.length === 0 ? (
             <Card>
               <Text style={styles.emptyTitle}>No paddocks yet</Text>
@@ -325,7 +402,7 @@ export default function PaddocksTab() {
                   ? g.paddocks.map((p) => (
                       <Pressable
                         key={p.id}
-                        onPress={() => router.push({ pathname: "/paddocks/[id]", params: { id: p.id } })}
+                        onPress={() => viewPaddockOnMap(p.id)}
                         style={({ pressed }) => [styles.paddockRow, pressed && { backgroundColor: colors.surface }]}
                         testID={`paddock-row-${p.id}`}
                       >
@@ -353,9 +430,13 @@ export default function PaddocksTab() {
             );
           })}
         </ScrollView>
-      ) : (
-        <View style={{ flex: 1 }}>
+
+      <View
+        style={[styles.stackedLayer, { opacity: showList ? 0 : 1 }]}
+        pointerEvents={showList ? "none" : "auto"}
+      >
         <PaddockMap
+          key={mapKey}
           ref={mapRef}
           paddocks={paddocks.map((p) => ({
             id: p.id, name: p.name, area_ha: p.area_ha, crop: p.crop, boundary_geojson: p.boundary ?? null,
@@ -366,8 +447,29 @@ export default function PaddocksTab() {
           onIssueSelect={(id) => { if (mode === "view") { setSelectedId(null); setSelectedIssueId(id); } }}
           onPointsUpdate={(count, areaHa) => setDrawInfo({ count, areaHa })}
           onSaveGeometry={persistPaddock}
-          onReady={() => { if (modeRef.current === "draw") mapRef.current?.setMode("draw"); }}
+          onReady={() => {
+            setMapLoadTimedOut(false);
+            if (modeRef.current === "draw") mapRef.current?.setMode("draw");
+            const target = pendingFocusRef.current;
+            if (target) {
+              if ("paddockId" in target) mapRef.current?.focusPaddock(target.paddockId);
+              else mapRef.current?.flyTo(target.lat, target.lon, 14);
+              pendingFocusRef.current = null;
+            }
+          }}
+          onLoadTimeout={() => setMapLoadTimedOut(true)}
         />
+
+        {mapLoadTimedOut ? (
+          <View style={styles.loadTimeoutOverlay} testID="map-load-timeout">
+            <Card>
+              <Text style={styles.emptyTitle}>Map is taking a while to load</Text>
+              <Text style={styles.emptyBody}>Check your connection, then try again.</Text>
+              <View style={{ height: spacing.md }} />
+              <Button title="Retry" icon="refresh" onPress={retryMapLoad} testID="map-retry-btn" />
+            </Card>
+          </View>
+        ) : null}
 
         {/* GPS toggle */}
         <Pressable onPress={toggleGps} style={[styles.gpsBtn, gpsOn && styles.gpsBtnOn]} testID="gps-toggle-btn">
@@ -531,12 +633,13 @@ export default function PaddocksTab() {
           </View>
         ) : null}
       </View>
-      )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  stackedLayer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md, gap: spacing.md },
   title: { fontSize: 26, fontWeight: "800", color: colors.onSurface },
   sub: { color: colors.muted, fontSize: 13, marginTop: 2 },
@@ -570,6 +673,7 @@ const styles = StyleSheet.create({
   summaryName: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
   summaryMeta: { fontSize: 13, color: colors.muted, marginTop: 2 },
   emptyOverlay: { position: "absolute", left: 12, right: 12, bottom: 0 },
+  loadTimeoutOverlay: { position: "absolute", left: 12, right: 12, top: "40%" },
   emptyTitle: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
   emptyBody: { color: colors.muted, marginTop: 4, fontSize: 13, lineHeight: 18 },
   savingOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.4)" },

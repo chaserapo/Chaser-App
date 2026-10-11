@@ -9,6 +9,9 @@ import { Button, Card, Input, Chip } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { stageLabel } from "@/src/lib/crop-stages";
+import { useAuth } from "@/src/lib/auth-context";
+import { exportJobsPdf } from "@/src/lib/pdf-report";
+import { productCost } from "@/src/lib/calculators";
 import type { SprayJob, Operator, Machinery } from "@/src/lib/types";
 
 function buildSignOffPayload(j: SprayJob) {
@@ -102,6 +105,7 @@ function num(s: string): number | undefined {
 
 export default function RecordDetail() {
   const insets = useSafeAreaInsets();
+  const { business } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [j, setJ] = useState<SprayJob | null>(null);
   const [showQR, setShowQR] = useState(false);
@@ -212,6 +216,15 @@ export default function RecordDetail() {
 
         {isCompleted && !editing && (
           <>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <Button title="Share" icon="share-variant-outline" variant="outline" onPress={shareRecord} testID="share-record-btn" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button title="Export PDF" icon="file-pdf-box" variant="outline" onPress={() => exportJobsPdf([j], business?.name ?? "Chaser")} testID="export-record-pdf-btn" />
+              </View>
+            </View>
+
             <View style={styles.sectionRow}>
               <Text style={styles.section}>Sign-Off QR</Text>
               <Pressable onPress={() => setShowQR((v) => !v)} testID="toggle-qr-btn">
@@ -225,8 +238,6 @@ export default function RecordDetail() {
                 </View>
                 <Text style={styles.qrCaption}>Scan to verify this spray job at the paddock gate.</Text>
                 <Text style={styles.qrId}>Record ID: {j.id.slice(0, 8)}</Text>
-                <View style={{ height: spacing.md, alignSelf: "stretch" }} />
-                <Button title="Share Record" icon="share-variant-outline" variant="outline" onPress={shareRecord} testID="share-record-btn" />
               </Card>
             ) : (
               <Card onPress={() => setShowQR(true)} testID="qr-preview-card">
@@ -363,13 +374,33 @@ export default function RecordDetail() {
         {j.products.length === 0 ? (
           <Card><Text style={styles.empty}>No chemicals recorded.</Text></Card>
         ) : (
-          j.products.map((p) => (
-            <Card key={p.id} style={{ marginBottom: spacing.sm }}>
-              <Text style={styles.prodName}>{p.chemical_name}</Text>
-              <Text style={styles.prodMeta}>Rate: {p.rate} {p.unit}</Text>
-              {p.total_qty != null ? <Text style={styles.prodMeta}>Total: {p.total_qty.toFixed(2)} {p.total_qty_unit ?? (p.unit === "%v/v" ? "L water" : p.unit.replace("/ha", ""))}</Text> : null}
-            </Card>
-          ))
+          <>
+            {j.products.map((p) => {
+              const cost = productCost(p);
+              return (
+                <Card key={p.id} style={{ marginBottom: spacing.sm }}>
+                  <Text style={styles.prodName}>{p.chemical_name}</Text>
+                  <Text style={styles.prodMeta}>Rate: {p.rate} {p.unit}</Text>
+                  {p.total_qty != null ? <Text style={styles.prodMeta}>Total: {p.total_qty.toFixed(2)} {p.total_qty_unit ?? (p.unit === "%v/v" ? "L water" : p.unit.replace("/ha", ""))}</Text> : null}
+                  {cost != null ? <Text style={styles.prodMeta}>Cost: ${cost.toFixed(2)}</Text> : null}
+                </Card>
+              );
+            })}
+            {(() => {
+              const costs = j.products.map(productCost).filter((n): n is number => n != null);
+              if (costs.length === 0) return null;
+              const total = costs.reduce((s, n) => s + n, 0);
+              return (
+                <Card style={{ marginBottom: spacing.sm }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={styles.prodName}>Total product cost</Text>
+                    <Text style={styles.prodName}>${total.toFixed(2)}</Text>
+                  </View>
+                  {costs.length < j.products.length ? <Text style={styles.editNotice}>Some products don&apos;t have cost data yet, so this isn&apos;t the full job cost.</Text> : null}
+                </Card>
+              );
+            })()}
+          </>
         )}
         {editing ? <Text style={styles.editNotice}>Chemicals and weather readings aren&apos;t editable here — they&apos;re tied to stock records and the verified capture flow.</Text> : null}
 

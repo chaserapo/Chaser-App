@@ -10,7 +10,7 @@ import { useRealtime } from "@/src/lib/realtime";
 
 const HUB = [
   { key: "search", title: "Search Chemicals", subtitle: "Find products in your register", icon: "magnify", route: "/chemicals" },
-  { key: "my", title: "My Chemicals", subtitle: "Browse all saved products", icon: "flask-outline", route: "/chemicals" },
+  { key: "my", title: "My Chemical History", subtitle: "Seasonal trends & order history", icon: "chart-timeline-variant", route: "/chemicals/my-history" },
   { key: "inv", title: "Chemical Inventory", subtitle: "Current stock at a glance", icon: "warehouse", route: "/chemicals/inventory" },
   { key: "low", title: "Low Stock", subtitle: "Reorder before you run out", icon: "alert-decagram-outline", route: "/chemicals/low-stock" },
   { key: "docs", title: "Labels & SDS", subtitle: "Open product label & SDS URLs", icon: "file-document-multiple-outline", route: "/chemicals/documents" },

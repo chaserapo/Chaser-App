@@ -18,6 +18,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Now waits for the actual EAS build (was --no-wait) so this run's log
+    # streams live progress instead of just confirming the submit — cap it
+    # so a stuck build on EAS's side doesn't leave this job hanging.
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: frontend
@@ -37,4 +41,4 @@ jobs:
       - name: Build on EAS
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --platform android --profile ${{ inputs.profile }} --non-interactive --no-wait
+        run: eas build --platform android --profile ${{ inputs.profile }} --non-interactive

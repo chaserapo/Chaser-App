@@ -1,0 +1,60 @@
+name: EAS Update (OTA)
+
+# Manual trigger only — click "Run workflow" on this workflow's page in the
+# GitHub Actions tab. Publishes a JS-only over-the-air update to an existing
+# build's channel; it does NOT rebuild the native app, so it only works for
+# changes that don't touch native code/config (no new native deps, no
+# app.json plugin/permission changes). If the update's fingerprint doesn't
+# match a device's installed build, that device just won't pick it up — use
+# the EAS Build workflows instead when that's the case.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Channel to publish to — must match the channel the target build was made with"
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - preview
+          - development
+      message:
+        description: "Update message (shown in the EAS dashboard)"
+        required: false
+        default: "OTA update"
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install eas-cli
+        run: npm install --global eas-cli
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Publish OTA update
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          # Same values as the matching profile in eas.json — these are
+          # public client keys (Supabase publishable key, RevenueCat public
+          # iOS key), not secrets, and need to be present at publish time so
+          # the update bundle embeds the same values the native build did.
+          EXPO_PUBLIC_SUPABASE_URL: https://vcbwhlfbmqmwzntpnsjs.supabase.co
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_AzSbKiXPpLpv3ha7429AfA_X2eoLWO4
+          EXPO_PUBLIC_BACKEND_URL: https://chaser-app-production.up.railway.app
+          EXPO_PUBLIC_REVENUECAT_IOS_KEY: appl_gvcgItFmaVNzdgkwhNQHlAiIPSi
+          EXPO_PUBLIC_REVENUECAT_ANDROID_KEY: goog_AmAPfvwpttQrSXufLdKkoDgTAIq
+          EXPO_PUBLIC_MAPTILER_KEY: 6qkxb2dUUrIaEbN85nuC
+        run: eas update --channel ${{ inputs.channel }} --message "${{ inputs.message }}" --non-interactive

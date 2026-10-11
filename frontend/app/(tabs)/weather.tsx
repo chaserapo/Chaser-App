@@ -18,7 +18,6 @@ import {
   MODELS,
   MODEL_META,
   type ForecastBundle,
-  type ModelId,
   type SprayThresholds,
   DEFAULT_THRESHOLDS,
 } from "@/src/lib/weather-intel";
@@ -65,6 +64,7 @@ export default function WeatherScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedModelsHour, setExpandedModelsHour] = useState<string | null>(null);
+  const [fetchedForTargetId, setFetchedForTargetId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [fs, ps] = await Promise.all([repo.farms.active(), repo.paddocks.active()]);
@@ -95,6 +95,7 @@ export default function WeatherScreen() {
       const locationId = loc?.id ?? null;
       const b = await runForecast({ locationId, lat: target.lat, lon: target.lon, source: "client" });
       setBundle(b);
+      setFetchedForTargetId(target.id);
     } catch (e) {
       console.warn("weather fetch failed", e);
     } finally {
@@ -106,14 +107,27 @@ export default function WeatherScreen() {
   // Auto-fetch when target changes or the previous fetch is stale.
   useEffect(() => {
     if (!target) return;
-    const stale = !bundle || Date.now() - new Date(bundle.retrieved_at).getTime() > STALE_MS || bundle.location_id !== target.id;
+    const stale = !bundle || Date.now() - new Date(bundle.retrieved_at).getTime() > STALE_MS || fetchedForTargetId !== target.id;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- runFetch is also called directly by the manual-refresh handler.
     if (stale) runFetch();
-  }, [target, bundle, runFetch]);
+  }, [target, bundle, fetchedForTargetId, runFetch]);
 
-  const daily = bundle?.daily ?? [];
-  const consensus = bundle?.consensus ?? [];
-  const nextHours = useMemo(() => consensus.slice(0, 24), [consensus]);
-  const currentHour = consensus[0];
+  const daily = useMemo(() => bundle?.daily ?? [], [bundle]);
+  const consensus = useMemo(() => bundle?.consensus ?? [], [bundle]);
+  // consensus spans the full multi-day forecast starting at the location's
+  // local midnight, not "now" — index 0 is this morning's midnight, not the
+  // current hour. Find the latest hour that isn't in the future yet (ties
+  // broken toward the most recent), and slice "next hours" from there.
+  // Not memoized (reads Date.now(), impure) — cheap enough (<=168 entries)
+  // to recompute every render.
+  let currentIndex = 0;
+  for (let i = 0; i < consensus.length; i++) {
+    // eslint-disable-next-line react-hooks/purity -- reading "now" to find which forecast hour is current is the whole point here, same tradeoff as the staleness check above.
+    if (new Date(consensus[i].valid_time).getTime() <= Date.now()) currentIndex = i;
+    else break;
+  }
+  const nextHours = useMemo(() => consensus.slice(currentIndex, currentIndex + 24), [consensus, currentIndex]);
+  const currentHour = consensus[currentIndex];
   const sprayWindows = useMemo(() => findSprayWindows(consensus, thresholds), [consensus, thresholds]);
   const frost = useMemo(() => frostRiskNext48(consensus), [consensus]);
   const heat = useMemo(() => heatRiskNext48(consensus), [consensus]);
@@ -171,7 +185,7 @@ export default function WeatherScreen() {
 
         {/* Consensus header */}
         {loading && !bundle ? (
-          <View style={styles.loading}><ActivityIndicator color={colors.brandPrimary} /><Text style={styles.loadingText}>Fetching four independent models…</Text></View>
+          <View style={styles.loading}><ActivityIndicator color={colors.brandPrimary} /><Text style={styles.loadingText}>Fetching six independent models…</Text></View>
         ) : currentHour ? (
           <View style={styles.heroCard}>
             <View style={styles.heroTopRow}>
@@ -200,7 +214,7 @@ export default function WeatherScreen() {
           <View style={styles.modelWarning} testID="weather-model-warning">
             <Icon name="alert-outline" size={16} color={colors.warning} />
             <Text style={styles.modelWarningText}>
-              {bundle.models_failed.length} of {MODELS.length} weather sources didn't respond this time ({bundle.models_failed.map((f) => MODEL_META[f.model].short).join(", ")}) — showing a consensus from the rest.
+              {bundle.models_failed.length} of {MODELS.length} weather sources didn&apos;t respond this time ({bundle.models_failed.map((f) => MODEL_META[f.model].short).join(", ")}) — showing a consensus from the rest.
             </Text>
           </View>
         ) : null}

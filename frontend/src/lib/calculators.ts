@@ -140,6 +140,18 @@ export function productPerTank(
   }
 }
 
+// Cost of one product line in a job, in AUD — or undefined if there's not
+// enough to go on. Deliberately omits rather than guesses: total_qty_unit
+// (derived from the rate unit, and possibly rescaled by normalise() above —
+// e.g. mL -> L past 1000) must match cost_unit (the chemical's stock_unit at
+// the moment this product's cost was snapshotted) exactly, or the number
+// would silently be off by a unit-conversion factor.
+export function productCost(p: { cost_per_unit?: number; total_qty?: number; total_qty_unit?: string; cost_unit?: string }): number | undefined {
+  if (p.cost_per_unit == null || p.total_qty == null) return undefined;
+  if (p.cost_unit && p.total_qty_unit && p.total_qty_unit !== p.cost_unit) return undefined;
+  return p.cost_per_unit * p.total_qty;
+}
+
 export function fmt(n: number, decimals = 2): string {
   if (n == null || isNaN(n) || !isFinite(n)) return "0";
   return Number(n.toFixed(decimals)).toString();

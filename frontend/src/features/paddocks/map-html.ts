@@ -21,12 +21,27 @@
 //                    { type: "save", geojson, areaHa } |
 //                    { type: "log", msg }
 
+// Base map tiles: MapTiler when a key is configured, otherwise the OSM
+// Foundation's own free tile servers as a fallback so the map still works
+// with zero setup. That OSM fallback is for development only — its Tile
+// Usage Policy (operations.osmfoundation.org/policies/tiles) explicitly
+// disallows production/commercial use, so a real build should always have
+// EXPO_PUBLIC_MAPTILER_KEY set (see eas.json, same pattern as the Supabase
+// and RevenueCat keys).
+const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY;
+const TILE_URLS = MAPTILER_KEY
+  ? [`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`]
+  : ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png', 'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png'];
+const TILE_ATTRIBUTION = MAPTILER_KEY
+  ? '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; OpenStreetMap contributors'
+  : '&copy; OpenStreetMap contributors';
+
 export const MAP_HTML = `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet" />
   <style>
     html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; touch-action: none; background: #E8ECE9; }
@@ -73,8 +88,8 @@ export const MAP_HTML = `<!doctype html>
 </head>
 <body>
   <div id="map"></div>
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="https://unpkg.com/@turf/turf@7.1.0/turf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/turf.min.js"></script>
   <script>
     const isRN = !!(window.ReactNativeWebView && window.ReactNativeWebView.postMessage);
     const post = (obj) => { try { (isRN ? window.ReactNativeWebView : window.parent).postMessage(JSON.stringify(obj), '*'); } catch(e) {} };
@@ -84,12 +99,13 @@ export const MAP_HTML = `<!doctype html>
       container: 'map',
       style: {
         version: 8,
+        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
         sources: {
           osm: {
             type: 'raster',
-            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png','https://b.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tiles: ${JSON.stringify(TILE_URLS)},
             tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '${TILE_ATTRIBUTION}'
           }
         },
         layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
@@ -102,6 +118,29 @@ export const MAP_HTML = `<!doctype html>
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
+
+    // If the map's 'load' event (fired once the style + initial tiles are
+    // ready) hasn't happened within LOAD_TIMEOUT_MS — usually a stalled CDN
+    // fetch on a weak connection — tell React Native so it can show a retry
+    // affordance instead of leaving the user staring at a blank map forever.
+    const LOAD_TIMEOUT_MS = 12000;
+    let mapLoaded = false;
+    setTimeout(() => { if (!mapLoaded) post({ type: 'loadTimeout' }); }, LOAD_TIMEOUT_MS);
+    map.on('error', (e) => log((e && e.error && e.error.message) || e));
+    // Toggling to List view sets this WebView's container to display:none.
+    // On iOS that can lay the canvas out at zero size (and on some devices
+    // lose the WebGL context outright) — coming back to Map view leaves a
+    // blank map until something tells MapLibre to re-measure and repaint.
+    // The 'resize' message (sent once the container is visible again) covers
+    // that; the context-loss listeners are belt-and-braces for the rarer case.
+    const canvas = map.getCanvas();
+    canvas.addEventListener('webglcontextlost', () => log('webgl context lost'));
+    canvas.addEventListener('webglcontextrestored', () => { map.resize(); map.triggerRepaint(); });
+
+    // Zoom threshold where the map switches from one broad farm-name bubble
+    // per property to individual paddock-name labels once zoomed in close
+    // enough to actually distinguish paddocks.
+    const PADDOCK_LABEL_MIN_ZOOM = 13;
 
     let paddocks = [];
     let farmPins = [];      // [{ id, name, lat, lon }]
@@ -167,6 +206,15 @@ export const MAP_HTML = `<!doctype html>
           .setLngLat([p.lon, p.lat])
           .addTo(map);
       });
+      updateFarmPinVisibility();
+    }
+
+    // Broad view: show the farm-name bubble. Zoomed in past
+    // PADDOCK_LABEL_MIN_ZOOM: hide it in favour of the individual paddock
+    // name labels (a native symbol layer, so it fades in/out on its own).
+    function updateFarmPinVisibility() {
+      const show = map.getZoom() < PADDOCK_LABEL_MIN_ZOOM;
+      farmMarkers.forEach(m => { m.getElement().style.display = show ? '' : 'none'; });
     }
     // Renders one small colored marker per fault/risk report, using the same
     // MDI icon name shown for that category in the native app (loaded via
@@ -264,11 +312,20 @@ export const MAP_HTML = `<!doctype html>
     }
 
     map.on('load', () => {
+      mapLoaded = true;
       map.addSource('paddocks', { type: 'geojson', data: paddockGeoJSON() });
       map.addLayer({ id: 'paddocks-fill', type: 'fill', source: 'paddocks',
         paint: { 'fill-color': '#3B6E3B', 'fill-opacity': 0.22 } });
       map.addLayer({ id: 'paddocks-line', type: 'line', source: 'paddocks',
         paint: { 'line-color': '#3B6E3B', 'line-width': 2 } });
+      // Individual paddock name labels — only kick in once zoomed in close
+      // enough to tell paddocks apart; see PADDOCK_LABEL_MIN_ZOOM above.
+      map.addLayer({ id: 'paddocks-label', type: 'symbol', source: 'paddocks',
+        minzoom: PADDOCK_LABEL_MIN_ZOOM,
+        layout: { 'text-field': ['get', 'name'], 'text-size': 12, 'text-font': ['Open Sans Bold'] },
+        paint: { 'text-color': '#1F2937', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 } });
+
+      map.on('zoom', updateFarmPinVisibility);
 
       map.addSource('draw-fill', { type: 'geojson', data: drawingGeoJSON().fill });
       map.addLayer({ id: 'draw-fill', type: 'fill', source: 'draw-fill',
@@ -294,9 +351,25 @@ export const MAP_HTML = `<!doctype html>
       fitToPaddocks();
     });
 
+    // Every outgoing message from React Native is delivered through two
+    // channels at once (the WebView bridge's own postMessage, which on iOS
+    // dispatches on document, plus a manually injected window.postMessage
+    // for platforms where that alone isn't reliable) — see the 'message'
+    // listeners registered on both document and window below. That means
+    // handleMessage would otherwise run twice per command; harmless for an
+    // idempotent one like setMode, but case 'save' posts a response back
+    // that React turns into an insert, so a duplicate delivery meant every
+    // saved paddock was written twice. Drop an exact repeat of the very
+    // last payload arriving within the same tick.
+    let lastRaw = null;
+    let lastRawAt = 0;
     function handleMessage(raw) {
+      const now = Date.now();
+      if (raw === lastRaw && now - lastRawAt < 250) return;
+      lastRaw = raw; lastRawAt = now;
       let msg; try { msg = JSON.parse(raw); } catch (e) { return; }
       switch (msg.type) {
+        case 'resize': if (map.loaded()) { map.resize(); map.triggerRepaint(); } break;
         case 'setPaddocks': paddocks = msg.paddocks || []; if (map.loaded()) { renderPaddocks(); fitToPaddocks(); } break;
         case 'setFarmPins': farmPins = msg.pins || []; if (map.loaded()) { renderFarmPins(); fitToPaddocks(); } break;
         case 'setIssuePins': issuePins = msg.pins || []; if (map.loaded()) renderIssuePins(); break;

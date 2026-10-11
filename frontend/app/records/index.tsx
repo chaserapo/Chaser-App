@@ -1,8 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, Pressable, FlatList } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { Button, Card, Chip } from "@/src/components/ui";
 import { colors, spacing } from "@/src/theme";
@@ -10,7 +9,7 @@ import { repo } from "@/src/lib/storage";
 import { exportJobsCsv } from "@/src/lib/csv";
 import { exportJobsPdf } from "@/src/lib/pdf-report";
 import { useAuth } from "@/src/lib/auth-context";
-import type { SprayJob, Farm, Paddock } from "@/src/lib/types";
+import type { SprayJob, Farm } from "@/src/lib/types";
 
 export default function Records() {
   const insets = useSafeAreaInsets();
@@ -18,16 +17,14 @@ export default function Records() {
   const { business } = useAuth();
   const [jobs, setJobs] = useState<SprayJob[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
-  const [paddocks, setPaddocks] = useState<Paddock[]>([]);
   const [farmFilter, setFarmFilter] = useState<string | null>(null);
   const [chemQuery, setChemQuery] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [j, f, p] = await Promise.all([repo.sprayJobs.completed(), repo.farms.list(), repo.paddocks.list()]);
+      const [j, f] = await Promise.all([repo.sprayJobs.completed(), repo.farms.list()]);
       setJobs(j.sort((a, b) => (a.date < b.date ? 1 : -1)));
       setFarms(f);
-      setPaddocks(p);
     })();
   }, []));
 

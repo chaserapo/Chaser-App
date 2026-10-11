@@ -44,7 +44,6 @@ export function useRealtime(tables: Table[], onChange: () => void, extraDeps: un
     const channel = supabase.channel(`rt-${tables.join("_")}-${businessId}-${suffix}`);
     tables.forEach((t) => {
       channel.on(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "postgres_changes" as any,
         { event: "*", schema: "public", table: t, filter: `business_id=eq.${businessId}` },
         () => onChange(),

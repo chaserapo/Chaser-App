@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable, StyleSheet, ViewStyle, TextStyle, StyleProp, KeyboardTypeOptions } from "react-native";
+import { View, Text, Pressable, StyleSheet, ViewStyle, TextStyle, StyleProp, KeyboardTypeOptions, TextInput } from "react-native";
 import * as Haptics from "expo-haptics";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { colors, radius, spacing } from "../theme";
@@ -121,7 +121,6 @@ export function Input({
   secureTextEntry?: boolean;
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
 }) {
-  const { TextInput } = require("react-native");
   return (
     <View style={styles.inputWrap}>
       {label ? <Text style={[styles.inputLabel, error && { color: colors.error }]}>{label}{error ? " *" : ""}</Text> : null}

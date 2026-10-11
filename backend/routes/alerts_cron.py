@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -123,6 +124,26 @@ async def _cron_tick() -> None:
             "status": "in.(open,assigned,in_progress)",
         }) or []
 
+        # spray_jobs.date is the grower's own local calendar date — there's
+        # no per-business timezone stored to convert it properly. Every
+        # Australian zone is ahead of UTC (WA UTC+8 through AEDT UTC+11), so
+        # comparing against the server's raw UTC date lags behind a user's
+        # actual local "today" by up to ~11 hours after their local
+        # midnight — a job due locally today gets excluded from this tick
+        # (date > today-in-UTC) until UTC catches up, by which point it's
+        # mislabelled "overdue" below instead of "due today". Shifting by
+        # the latest AU offset (AEDT, +11h) before taking the date is a safe
+        # upper bound: it can only make "today" land a few hours early for
+        # WA users (harmless — it's still their actual local date), never
+        # late for anyone.
+        today = (datetime.now(timezone.utc) + timedelta(hours=11)).date().isoformat()
+        due_jobs = await _sb_get(client, conf, "spray_jobs", {
+            "select": "id,business_id,paddock_name,farm_name,date",
+            "deleted_at": "is.null",
+            "status": "eq.planned",
+            "date": f"lte.{today}",
+        }) or []
+
         new_maint = await _sb_insert_new(
             client, conf, "notification_log",
             [{"business_id": m["business_id"], "kind": "overdue_maintenance", "ref_id": m["id"]} for m in overdue_maint],
@@ -133,9 +154,15 @@ async def _cron_tick() -> None:
             [{"business_id": i["business_id"], "kind": "open_fault", "ref_id": i["id"]} for i in open_issues],
             on_conflict="kind,ref_id",
         )
+        new_jobs = await _sb_insert_new(
+            client, conf, "notification_log",
+            [{"business_id": j["business_id"], "kind": "job_due_today", "ref_id": j["id"]} for j in due_jobs],
+            on_conflict="kind,ref_id",
+        )
         new_maint_ids = {r["ref_id"] for r in (new_maint or [])}
         new_issue_ids = {r["ref_id"] for r in (new_issues or [])}
-        if not new_maint_ids and not new_issue_ids:
+        new_job_ids = {r["ref_id"] for r in (new_jobs or [])}
+        if not new_maint_ids and not new_issue_ids and not new_job_ids:
             logger.info("alerts cron: nothing new to alert on")
             return
 
@@ -169,11 +196,25 @@ async def _cron_tick() -> None:
                     "data": {"type": "open_fault", "machineryId": i.get("machinery_id")},
                 })
 
+        for j in due_jobs:
+            if j["id"] not in new_job_ids:
+                continue
+            tokens = tokens_by_business.get(j["business_id"]) or []
+            paddock_name = j.get("paddock_name") or j.get("farm_name") or "A paddock"
+            overdue = j["date"] < today
+            for t in tokens:
+                messages.append({
+                    "to": t,
+                    "title": "Spray job due" if not overdue else "Spray job overdue",
+                    "body": f"{paddock_name} is scheduled for spraying{' — overdue' if overdue else ' today'}.",
+                    "data": {"type": "job_due_today", "jobId": j["id"]},
+                })
+
         if messages:
             await _send_push(client, messages)
         logger.info(
-            "alerts cron: %d new maintenance alert(s), %d new fault alert(s), %d push message(s) sent",
-            len(new_maint_ids), len(new_issue_ids), len(messages),
+            "alerts cron: %d new maintenance alert(s), %d new fault alert(s), %d new job reminder(s), %d push message(s) sent",
+            len(new_maint_ids), len(new_issue_ids), len(new_job_ids), len(messages),
         )
 
 

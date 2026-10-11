@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
 
 import { ScreenHeader } from "@/src/components/header";
@@ -15,18 +14,17 @@ const VARS: AccuracyVariable[] = ["temperature_c", "precip_mm", "wind_speed_kmh"
 
 export default function AccuracyScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [reports, setReports] = useState<Record<string, FarmAccuracyReport>>({});
   const [busyFarm, setBusyFarm] = useState<string | null>(null);
   const [openFarm, setOpenFarm] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    const fs = await repo.farms.active();
-    setFarms(fs);
-    if (fs.length > 0 && !openFarm) setOpenFarm(fs[0].id);
+  useEffect(() => {
+    repo.farms.active().then((fs) => {
+      setFarms(fs);
+      if (fs.length > 0 && !openFarm) setOpenFarm(fs[0].id);
+    });
   }, [openFarm]);
-  useEffect(() => { load(); }, [load]);
 
   async function refresh(farm: Farm) {
     setBusyFarm(farm.id);
@@ -89,7 +87,7 @@ export default function AccuracyScreen() {
                     <View style={styles.warnBox}>
                       <Icon name="clock-outline" size={16} color={colors.warning} />
                       <Text style={styles.warnText}>
-                        Not enough history yet. Chaser needs a few days of forecast runs stored before there's anything to score. Check back after your first week.
+                        Not enough history yet. Chaser needs a few days of forecast runs stored before there&apos;s anything to score. Check back after your first week.
                       </Text>
                     </View>
                   ) : (
@@ -115,7 +113,7 @@ export default function AccuracyScreen() {
                             <Text key={v} style={[styles.th, { flex: 1, textAlign: "right" }]}>{variableLabel(v).split(" (")[0]}</Text>
                           ))}
                         </View>
-                        {(["ecmwf_ifs04", "ecmwf_aifs025", "bom_access_global", "gfs_seamless"] as ModelId[]).map((m) => (
+                        {(["ecmwf_ifs025", "ecmwf_aifs025_single", "bom_access_global", "gfs_seamless", "dwd_icon_global", "meteofrance_arpege_world"] as ModelId[]).map((m) => (
                           <View key={m} style={styles.tableRow}>
                             <Text style={[styles.tdBold, { flex: 1.6 }]} numberOfLines={1}>{MODEL_META[m].short}</Text>
                             {VARS.map((v) => {

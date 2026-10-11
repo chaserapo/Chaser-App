@@ -1,8 +1,9 @@
 // Chaser Weather Intelligence — client-side lib.
 //
 // Responsibilities:
-//   1. Fetch the same hourly forecast from four independent numeric weather
-//      models via Open-Meteo (ECMWF IFS, ECMWF AIFS, BOM ACCESS-G, NOAA GFS).
+//   1. Fetch the same hourly forecast from six independent numeric weather
+//      models via Open-Meteo (ECMWF IFS, ECMWF AIFS, BOM ACCESS-G, NOAA GFS,
+//      DWD ICON, Météo-France ARPEGE).
 //   2. Compute a Chaser Consensus Forecast — weighted mean + circular vector
 //      average for wind direction — and a confidence score based on
 //      inter-model agreement.
@@ -18,21 +19,31 @@ import { supabase } from "./supabase";
 import { getActiveBusinessId } from "./backend";
 import { openMeteoUrl } from "./open-meteo";
 
-export type ModelId = "ecmwf_ifs04" | "ecmwf_aifs025" | "bom_access_global" | "gfs_seamless";
+export type ModelId =
+  | "ecmwf_ifs025"
+  | "ecmwf_aifs025_single"
+  | "bom_access_global"
+  | "gfs_seamless"
+  | "dwd_icon_global"
+  | "meteofrance_arpege_world";
 
 export const MODELS: { id: ModelId; label: string; provider: string }[] = [
-  { id: "ecmwf_ifs04",       label: "ECMWF IFS",   provider: "ECMWF" },
-  { id: "ecmwf_aifs025",     label: "ECMWF AIFS",  provider: "ECMWF" },
+  { id: "ecmwf_ifs025",       label: "ECMWF IFS",   provider: "ECMWF" },
+  { id: "ecmwf_aifs025_single",     label: "ECMWF AIFS",  provider: "ECMWF" },
   { id: "bom_access_global", label: "BOM ACCESS-G", provider: "BOM" },
   { id: "gfs_seamless",      label: "NOAA GFS",    provider: "NOAA" },
+  { id: "dwd_icon_global",   label: "DWD ICON",    provider: "DWD" },
+  { id: "meteofrance_arpege_world", label: "Météo-France ARPEGE", provider: "Météo-France" },
 ];
 
 // Short + long labels for compact UI (accuracy scorecard, model chips).
 export const MODEL_META: Record<ModelId, { short: string; long: string; provider: string }> = {
-  ecmwf_ifs04:       { short: "ECMWF IFS",   long: "ECMWF Integrated Forecasting System", provider: "ECMWF" },
-  ecmwf_aifs025:     { short: "ECMWF AIFS",  long: "ECMWF AI Forecasting System",         provider: "ECMWF" },
+  ecmwf_ifs025:       { short: "ECMWF IFS",   long: "ECMWF Integrated Forecasting System", provider: "ECMWF" },
+  ecmwf_aifs025_single:     { short: "ECMWF AIFS",  long: "ECMWF AI Forecasting System",         provider: "ECMWF" },
   bom_access_global: { short: "BOM ACCESS-G", long: "Bureau of Meteorology ACCESS Global", provider: "BOM" },
   gfs_seamless:      { short: "NOAA GFS",    long: "NOAA Global Forecast System",          provider: "NOAA" },
+  dwd_icon_global:   { short: "DWD ICON",    long: "Deutscher Wetterdienst ICON Global",   provider: "DWD" },
+  meteofrance_arpege_world: { short: "Météo-France ARPEGE", long: "Météo-France ARPEGE World", provider: "Météo-France" },
 };
 
 export type HourlyVars = {
@@ -155,28 +166,18 @@ const MAP: Record<string, keyof HourlyVars> = {
 };
 
 // ─── Fetcher ───────────────────────────────────────────────────────────────
-// Open-Meteo doesn't serve every model off the general /v1/forecast endpoint
-// selected via &models= — ECMWF (IFS + AIFS) and BOM each have their own
-// dedicated endpoint (/v1/ecmwf, /v1/bom). Querying them through /v1/forecast
-// fails every time regardless of retries, which is exactly what was making
-// three of the four "independent models" silently never return data while
-// gfs_seamless (which *is* valid on /v1/forecast) always succeeded.
-const ENDPOINT: Record<ModelId, string> = {
-  ecmwf_ifs04: "ecmwf",
-  ecmwf_aifs025: "ecmwf",
-  bom_access_global: "bom",
-  gfs_seamless: "forecast",
-};
-
-// Each model's request pulls a full week of hourly data across 17 variables -
-// a sizeable payload. On a weak mobile connection, four of these fired in
-// parallel can easily have some finish well after the others; a short
-// timeout turns "slow" into "silently missing" for whichever models lose the
-// race. Give it real room, and retry once before giving up entirely.
+// Every model is queried through the general /v1/forecast endpoint with
+// &models=<id> — that's how Open-Meteo's own API docs document the `models`
+// parameter (a plain string array on /v1/forecast, default "auto"). An
+// earlier version of this code routed ECMWF and BOM to their own dedicated
+// /v1/ecmwf and /v1/bom subdomains instead, which turned out to serve a
+// stale model catalog (ecmwf_ifs04 accepted the request but returned null
+// for every hour; bom_access_global did the same on /v1/bom). Confirmed
+// live against the API: /v1/forecast is the actively-maintained endpoint.
 async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: number, timeoutMs: number): Promise<ModelHour[]> {
   const url = openMeteoUrl(
     "api",
-    `/v1/${ENDPOINT[model]}?latitude=${lat}&longitude=${lon}` +
+    `/v1/forecast?latitude=${lat}&longitude=${lon}` +
       `&hourly=${HOURLY_VARS}` +
       `&wind_speed_unit=kmh&timezone=auto&forecast_days=${days}` +
       `&models=${model}`,
@@ -190,9 +191,37 @@ async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: numb
     const hours: ModelHour[] = [];
     const times: string[] = j?.hourly?.time ?? [];
     const nowMs = Date.now();
+    // Open-Meteo's timezone=auto returns hourly timestamps as the location's
+    // own local wall-clock time with no offset in the string (e.g.
+    // "2026-09-20T14:00") — it never appends "Z". Naively doing
+    // `new Date(iso).getTime()` parses that string as the DEVICE's local
+    // time instead, silently mis-timing every row by the gap between the
+    // device's zone and the forecast location's zone (the backend's Python
+    // fetcher — routes/weather_fetch.py — hit the exact same bug and fixed
+    // it the same way). utc_offset_seconds is what converts it back to a
+    // real instant: treat the wall-clock numbers as if they were UTC, then
+    // subtract the location's offset.
+    const utcOffsetMs = Number(j?.utc_offset_seconds ?? 0) * 1000;
+
+    // The dedicated per-provider endpoints (/v1/ecmwf, /v1/bom) sometimes
+    // suffix hourly variable names with the model id (e.g.
+    // "temperature_2m_ecmwf_ifs025") instead of the flat name the general
+    // /v1/forecast endpoint uses. Resolve each variable to whatever key is
+    // actually present once per response, rather than assuming the flat
+    // name — otherwise these models "succeed" (non-empty time array) while
+    // every value silently comes back undefined.
+    const hourlyKeys: string[] = j?.hourly ? Object.keys(j.hourly) : [];
+    const resolvedKey: Record<string, string | undefined> = {};
+    for (const k of Object.keys(MAP)) {
+      resolvedKey[k] = hourlyKeys.includes(k) ? k : hourlyKeys.find((hk) => hk.startsWith(`${k}_`));
+    }
+
     for (let i = 0; i < times.length; i++) {
       const validIso = times[i];
-      const validMs = new Date(validIso).getTime();
+      // "Z" forces this to parse as literal UTC numbers (immune to device
+      // timezone), then subtract the location's own offset to land on the
+      // true instant — see the utcOffsetMs comment above.
+      const validMs = Date.parse(`${validIso}Z`) - utcOffsetMs;
       if (isNaN(validMs)) continue;
       const hour: ModelHour = {
         model,
@@ -200,10 +229,19 @@ async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: numb
         horizon_h: Math.round((validMs - nowMs) / 3_600_000),
       };
       for (const k of Object.keys(MAP)) {
-        const arr = j.hourly[k];
+        const rk = resolvedKey[k];
+        if (!rk) continue;
+        const arr = j.hourly[rk];
         if (Array.isArray(arr) && arr[i] != null) (hour as any)[MAP[k]] = arr[i] as number;
       }
       hours.push(hour);
+    }
+    // A response with times but every variable unresolved is effectively
+    // useless — treat it as a failure so it shows up in the "sources didn't
+    // respond" banner instead of silently rendering as dashes with no
+    // explanation of why.
+    if (hours.length > 0 && !Object.values(resolvedKey).some((v) => v != null)) {
+      throw new Error(`open-meteo ${model}: no recognized hourly variables in response`);
     }
     return hours;
   } finally {
@@ -793,7 +831,7 @@ export async function computeFarmAccuracy(farmId: string, farmName?: string, sin
   }
 
   const perModel: ModelAccuracy[] = [];
-  const models: ModelId[] = ["ecmwf_ifs04", "ecmwf_aifs025", "bom_access_global", "gfs_seamless"];
+  const models: ModelId[] = ["ecmwf_ifs025", "ecmwf_aifs025_single", "bom_access_global", "gfs_seamless", "dwd_icon_global", "meteofrance_arpege_world"];
   for (const m of models) {
     for (const v of ACCURACY_VARS) {
       const b = errorsByModelVar.get(`${m}::${v}`);
