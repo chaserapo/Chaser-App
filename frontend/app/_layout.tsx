@@ -74,11 +74,11 @@ function DeferredOnboarding() {
 }
 
 function PostAuthShell() {
-  const { session, business } = useAuth();
+  const { session } = useAuth();
   const userId = session?.user?.id ?? null;
   const { needsOnboarding, loading, profile } = useOnboarding();
   const discovery = useDiscoveryGate(userId);
-  const entitlement = useEntitlement(business?.created_at ?? null);
+  const entitlement = useEntitlement();
   useNotificationRouting();
 
   if ((loading && !profile) || discovery.isLoading || entitlement.loading) {
@@ -91,8 +91,12 @@ function PostAuthShell() {
 
   if (userId && !discovery.data?.completed) return <DiscoveryScreen userId={userId} />;
   if (needsOnboarding) return <DeferredOnboarding />;
-  // Trial/subscription gate comes last — after onboarding, so a brand-new
-  // signup always gets to set up their farm before ever seeing a paywall.
+  // Subscription gate comes last — after onboarding, so a brand-new signup
+  // always gets to set up their farm before ever seeing the paywall. The
+  // free trial itself is now store-managed (an introductory offer on the
+  // subscription product), so showPaywall is only true when there's no
+  // active entitlement at all — once they start the trial here, isPro is
+  // true straight through to the platform's own auto-billing at its end.
   if (entitlement.showPaywall) return <PaywallScreen />;
   return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }} />;
 }

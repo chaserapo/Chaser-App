@@ -114,31 +114,44 @@ export async function presentCustomerCenter(): Promise<void> {
   }
 }
 
-function trialDaysLeft(businessCreatedAt: string | null): number {
-  if (!businessCreatedAt) return TRIAL_DAYS;
-  const startMs = new Date(businessCreatedAt).getTime();
-  const elapsedDays = (Date.now() - startMs) / 86_400_000;
-  return Math.max(0, Math.ceil(TRIAL_DAYS - elapsedDays));
-}
-
 export type EntitlementState = {
   loading: boolean;
+  /** Has an active RevenueCat entitlement — covers both the platform-managed free trial and a paid period. */
   isPro: boolean;
-  trialDaysLeft: number;
-  isTrialActive: boolean;
+  /** isPro is true because of the platform's free-trial phase specifically, not a paid period yet. */
+  isTrialing: boolean;
+  /** ISO date the current trial/billing period ends, from the store — null when not known or not entitled. */
+  periodEndsAt: string | null;
   showPaywall: boolean;
 };
 
-/** Tracks the signed-in user's subscription state against the business's trial window. */
-export function useEntitlement(businessCreatedAt: string | null): EntitlementState {
-  const [isPro, setIsPro] = useState(false);
+type RawEntitlement = { isPro: boolean; isTrialing: boolean; periodEndsAt: string | null };
+
+const EMPTY_ENTITLEMENT: RawEntitlement = { isPro: false, isTrialing: false, periodEndsAt: null };
+
+function readEntitlement(info: any): RawEntitlement {
+  const ent = info?.entitlements?.active?.[PRO_ENTITLEMENT_ID];
+  if (!ent) return EMPTY_ENTITLEMENT;
+  return { isPro: true, isTrialing: ent.periodType === "trial", periodEndsAt: ent.expirationDate ?? null };
+}
+
+/**
+ * Tracks the signed-in user's subscription state via RevenueCat/the store,
+ * not a self-counted window — the 7-day free trial is configured as an
+ * actual introductory offer on the subscription product (Play Console /
+ * App Store Connect), so the platform starts billing automatically when it
+ * ends unless the user cancels. isPro is true for the whole trial, same as
+ * a paid period, since the store — not this app — owns that clock.
+ */
+export function useEntitlement(): EntitlementState {
+  const [{ isPro, isTrialing, periodEndsAt }, setEntitlement] = useState(EMPTY_ENTITLEMENT);
   const [loading, setLoading] = useState(purchasesConfigured());
   // Could not confirm entitlement status at all (e.g. flaky connection on
   // launch) — distinct from "confirmed not pro". Without this, a paying
-  // subscriber whose trial has elapsed would get locked out by a transient
-  // network error with no retry, since isPro's default is false. Keep the
-  // paywall off until we actually know, same "never lock someone out on an
-  // error" stance as purchasesConfigured()'s own safe-default gating.
+  // subscriber would get locked out by a transient network error with no
+  // retry, since isPro's default is false. Keep the paywall off until we
+  // actually know, same "never lock someone out on an error" stance as
+  // purchasesConfigured()'s own safe-default gating.
   const [fetchFailed, setFetchFailed] = useState(false);
 
   useEffect(() => {
@@ -168,7 +181,7 @@ export function useEntitlement(businessCreatedAt: string | null): EntitlementSta
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const info = await Purchases.getCustomerInfo();
-          if (mounted) { setIsPro(!!info.entitlements.active[PRO_ENTITLEMENT_ID]); setFetchFailed(false); }
+          if (mounted) { setEntitlement(readEntitlement(info)); setFetchFailed(false); }
           break;
         } catch (e) {
           if (attempt === 0) await new Promise((r) => setTimeout(r, 2000));
@@ -176,7 +189,7 @@ export function useEntitlement(businessCreatedAt: string | null): EntitlementSta
         }
       }
 
-      const listener = (info: any) => { setIsPro(!!info.entitlements.active[PRO_ENTITLEMENT_ID]); setFetchFailed(false); };
+      const listener = (info: any) => { setEntitlement(readEntitlement(info)); setFetchFailed(false); };
       listenerRef = listener;
       try {
         Purchases.addCustomerInfoUpdateListener(listener);
@@ -195,16 +208,14 @@ export function useEntitlement(businessCreatedAt: string | null): EntitlementSta
   }, []);
 
   if (!purchasesConfigured()) {
-    return { loading: false, isPro: true, trialDaysLeft: TRIAL_DAYS, isTrialActive: true, showPaywall: false };
+    return { loading: false, isPro: true, isTrialing: false, periodEndsAt: null, showPaywall: false };
   }
 
-  const daysLeft = trialDaysLeft(businessCreatedAt);
-  const isTrialActive = daysLeft > 0;
   return {
     loading,
     isPro,
-    trialDaysLeft: daysLeft,
-    isTrialActive,
-    showPaywall: !loading && !fetchFailed && !isPro && !isTrialActive,
+    isTrialing,
+    periodEndsAt,
+    showPaywall: !loading && !fetchFailed && !isPro,
   };
 }

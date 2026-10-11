@@ -68,8 +68,8 @@ export function PaywallScreen({ back }: { back?: boolean }) {
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}>
         <View style={styles.brand}>
           <Image source={ICON} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.title}>Your free trial has ended</Text>
-          <Text style={styles.sub}>Subscribe to keep using Chaser — behind every good operation.</Text>
+          <Text style={styles.title}>Start your free trial</Text>
+          <Text style={styles.sub}>{TRIAL_DAYS} days free, then continue for the price below — cancel anytime before the trial ends and you won&apos;t be charged.</Text>
         </View>
 
         <Card>
@@ -96,7 +96,7 @@ export function PaywallScreen({ back }: { back?: boolean }) {
           offering.availablePackages.map((pkg: any) => (
             <View key={pkg.identifier} style={{ marginBottom: spacing.sm }}>
               <Button
-                title={busy ? "Please wait…" : `Subscribe — ${pkg.product.priceString}${periodSuffix(pkg)}`}
+                title={busy ? "Please wait…" : `Start free trial — then ${pkg.product.priceString}${periodSuffix(pkg)}`}
                 icon="star-outline"
                 onPress={() => subscribe(pkg)}
                 loading={busy}
