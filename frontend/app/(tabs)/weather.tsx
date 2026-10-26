@@ -132,6 +132,8 @@ export default function WeatherScreen() {
   const frost = useMemo(() => frostRiskNext48(consensus), [consensus]);
   const heat = useMemo(() => heatRiskNext48(consensus), [consensus]);
   const rain = useMemo(() => rainRiskNext24(daily), [daily]);
+  // Every source failed: show a retry state instead of empty "Poor"/"None" tiles.
+  const noData = !loading && !!bundle && consensus.length === 0;
 
   // ─── Empty states ──────────────────────────────────────────────
   if (farms.length === 0) {
@@ -184,7 +186,7 @@ export default function WeatherScreen() {
         />
 
         {/* Consensus header */}
-        {loading && !bundle ? (
+        {loading && (!bundle || consensus.length === 0) ? (
           <View style={styles.loading}><ActivityIndicator color={colors.brandPrimary} /><Text style={styles.loadingText}>Fetching six independent models…</Text></View>
         ) : currentHour ? (
           <View style={styles.heroCard}>
@@ -210,7 +212,21 @@ export default function WeatherScreen() {
           </View>
         ) : null}
 
-        {bundle && bundle.models_failed.length > 0 ? (
+        {noData ? (
+          <View style={styles.emptyWrap} testID="weather-no-data">
+            <Icon name="cloud-off-outline" size={48} color={colors.muted} />
+            <Text style={styles.emptyTitle}>Couldn&apos;t load the forecast</Text>
+            <Text style={styles.emptyBody}>
+              None of the weather sources could be reached. This is usually a weak or dropped connection. Check your signal and try again.
+            </Text>
+            <Text style={[styles.emptyBody, { marginTop: 6, fontSize: 11 }]}>{bundle?.models_failed[0]?.reason}</Text>
+            <Pressable onPress={() => runFetch()} style={styles.primaryBtn} testID="weather-retry">
+              <Text style={styles.primaryBtnText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {!noData && bundle && bundle.models_failed.length > 0 ? (
           <View style={styles.modelWarning} testID="weather-model-warning">
             <Icon name="alert-outline" size={16} color={colors.warning} />
             <Text style={styles.modelWarningText}>
@@ -219,6 +235,7 @@ export default function WeatherScreen() {
           </View>
         ) : null}
 
+        {!noData && (<>
         {/* Operational conditions */}
         <SectionTitle>Operational Conditions</SectionTitle>
         <View style={styles.opGrid}>
@@ -298,6 +315,8 @@ export default function WeatherScreen() {
             />
           ))}
         </View>
+
+        </>)}
 
         {/* Alerts entry point */}
         <SectionTitle>Alerts & Accuracy</SectionTitle>
