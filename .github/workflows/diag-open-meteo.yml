@@ -1,0 +1,21 @@
+name: Diag Open-Meteo (temporary)
+on:
+  push:
+    branches: [diag/open-meteo-app]
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          KEY: ${{ secrets.OPEN_METEO_API_KEY }}
+        run: |
+          V="temperature_2m,apparent_temperature,precipitation,precipitation_probability,rain,showers,snowfall,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,dew_point_2m,cloud_cover,surface_pressure,soil_temperature_0cm,soil_moisture_0_to_1cm,et0_fao_evapotranspiration"
+          Q="/v1/forecast?latitude=-31.95&longitude=115.86&hourly=$V&wind_speed_unit=kmh&timezone=auto&forecast_days=7"
+          echo "key length: ${#KEY}"
+          for m in ecmwf_ifs025 ecmwf_aifs025_single bom_access_global gfs_seamless dwd_icon_global meteofrance_arpege_world; do
+            for host in customer-api api; do
+              url="https://$host.open-meteo.com$Q&models=$m"; [ "$host" = customer-api ] && url="$url&apikey=$KEY"
+              body=$(curl -s -w '\n%{http_code}' "$url"); code=$(echo "$body" | tail -1)
+              echo "$m $host -> $code $(echo "$body" | head -c 300 | grep -o '"reason":"[^"]*"')"
+            done
+          done
