@@ -324,7 +324,7 @@ export default function WeatherScreen() {
           <Icon name="bell-outline" size={22} color={colors.brandPrimary} />
           <View style={{ flex: 1 }}>
             <Text style={styles.alertsTitle}>Manage weather alerts</Text>
-            <Text style={styles.alertsSub}>Spray windows · rain · frost · wind — delivery via push once wired to devices</Text>
+            <Text style={styles.alertsSub}>Push notifications for spray windows, rain, frost and wind</Text>
           </View>
           <Icon name="chevron-right" size={22} color={colors.muted} />
         </Pressable>

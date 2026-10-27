@@ -8,7 +8,7 @@ import { ScreenHeader } from "@/src/components/header";
 import { Button, Card, Input, Chip } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
-import { fetchWeather } from "@/src/lib/weather";
+import { DEFAULT_RAINFAST_HOURS, fetchRainOutlook, fetchWeather, firstRainWithin, type RainHour } from "@/src/lib/weather";
 import { fetchNearestDpird, formatReadingTime, type DpirdReading, type DpirdStation } from "@/src/lib/dpird";
 import { deltaT, nozzleFlowLpm, fmt, productTotalForJob, productPerTank } from "@/src/lib/calculators";
 import { stagesForCrop } from "@/src/lib/crop-stages";
@@ -61,6 +61,7 @@ export default function NewSprayJob() {
   const [weatherEdited, setWeatherEdited] = useState(false);
   const [dpird, setDpird] = useState<{ station: DpirdStation; reading: DpirdReading } | null>(null);
   const [dpirdApplied, setDpirdApplied] = useState(false);
+  const [rainOutlook, setRainOutlook] = useState<RainHour[] | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
   const [showMissing, setShowMissing] = useState<Record<string, boolean>>({});
@@ -149,7 +150,10 @@ export default function NewSprayJob() {
       setGps({ lat: w.lat, lon: w.lon });
       setWeatherAt(w.captured_at);
       setDpirdApplied(false);
-      if (w.lat && w.lon) fetchNearestDpird(w.lat, w.lon).then(setDpird);
+      if (w.lat && w.lon) {
+        fetchNearestDpird(w.lat, w.lon).then(setDpird);
+        fetchRainOutlook(w.lat, w.lon).then(setRainOutlook);
+      }
     } catch (e) { console.warn(e); }
     finally { setLoadingWeather(false); }
   }
@@ -278,6 +282,20 @@ export default function NewSprayJob() {
   const uniqueFarms = uniqueByName(farms);
   const uniqueOperators = uniqueByName(operators);
   const uniqueMachs = uniqueByName(machs);
+  // Rain due before the tank mix is rainfast. The window is the longest
+  // rainfast period on the products' labels, or a cautious default when none
+  // of them has one saved.
+  const rainWarning = useMemo(() => {
+    if (!rainOutlook) return null;
+    const periods = products
+      .map((p) => chems.find((c) => c.id === p.chemical_id)?.rainfast_hours)
+      .filter((h): h is number => h != null && h > 0);
+    const fromLabels = periods.length > 0;
+    const windowH = fromLabels ? Math.max(...periods) : DEFAULT_RAINFAST_HOURS;
+    const rain = firstRainWithin(rainOutlook, windowH);
+    return rain ? { rain, windowH, fromLabels } : null;
+  }, [rainOutlook, products, chems]);
+
   const filteredChems = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
     if (!q) return chems;
@@ -341,6 +359,8 @@ export default function NewSprayJob() {
       wind_speed_auto: autoWeather.ws,
       wind_direction_auto: autoWeather.wd,
       weather_edited: weatherEdited,
+      weather_source: dpirdApplied ? "dpird" : weatherEdited ? "manual" : weatherAt ? "forecast" : undefined,
+      weather_station: dpirdApplied && dpird ? `${dpird.station.name} (${Math.round(dpird.station.km)} km)` : undefined,
       gps_lat: gps.lat, gps_lon: gps.lon,
       notes: f.notes || undefined,
       products: products.map((p) => {
@@ -601,6 +621,17 @@ export default function NewSprayJob() {
                     <Text style={styles.link}>Use station reading</Text>
                   </Pressable>
                 ) : null}
+              </View>
+            ) : null}
+            {rainWarning ? (
+              <View style={[styles.warnBanner, { marginTop: spacing.sm, marginBottom: 0 }]} testID="rain-warning">
+                <Icon name="weather-pouring" size={18} color={colors.warning} />
+                <Text style={styles.warnBannerText}>
+                  Rain forecast from about {new Date(new Date(rainWarning.rain.at).getTime() - 3600e3).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} ({rainWarning.rain.mm.toFixed(1)} mm{rainWarning.rain.prob != null ? `, ${rainWarning.rain.prob}% chance` : ""}).{" "}
+                  {rainWarning.fromLabels
+                    ? `Your tank mix needs ${rainWarning.windowH} h rain-free after spraying.`
+                    : `Most products need ${DEFAULT_RAINFAST_HOURS} h or so rain-free after spraying. Add rainfast periods to your chemicals for an exact check.`}
+                </Text>
               </View>
             ) : null}
             <Text style={styles.discl}>Original automatic values are saved alongside any manual edits for the audit trail. Check current product label, weather conditions and local spraying requirements before application.</Text>

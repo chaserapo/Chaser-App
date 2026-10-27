@@ -2,13 +2,14 @@ import { Platform } from "react-native";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import type { SprayJob } from "./types";
+import { weatherSourceLabel } from "./weather";
 
 const HEADERS = [
   "Date", "Start", "Finish", "Farm", "Paddock", "Crop", "Variety", "Target",
   "Operator", "Machine", "Area planned (ha)", "Area treated (ha)",
   "Water rate (L/ha)", "Speed (km/h)", "Boom width (m)", "Nozzle type", "Nozzle spacing (m)", "Pressure (bar)",
   "Temp (°C)", "RH (%)", "Delta T", "Wind (km/h)", "Wind dir",
-  "Weather edited",
+  "Weather edited", "Weather source",
   "Finish Temp", "Finish RH", "Finish Delta T", "Finish Wind", "Finish Wind dir",
   "GPS lat", "GPS lon",
   "Products",
@@ -34,7 +35,7 @@ export function jobsToCsv(jobs: SprayJob[]): string {
       j.operator, j.machinery_name, j.area_ha, j.actual_area_ha,
       j.water_rate, j.speed_kmh, j.boom_width_m, j.nozzle_type, j.nozzle_spacing_m, j.pressure,
       j.temperature_c, j.humidity, j.delta_t, j.wind_speed, j.wind_direction,
-      j.weather_edited ? "yes" : "no",
+      j.weather_edited ? "yes" : "no", weatherSourceLabel(j),
       j.finish_temperature_c, j.finish_humidity, j.finish_delta_t, j.finish_wind_speed, j.finish_wind_direction,
       j.gps_lat, j.gps_lon,
       products,

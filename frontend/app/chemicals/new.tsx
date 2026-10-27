@@ -24,7 +24,7 @@ export default function NewChemical() {
     product_name: "", active_ingredient: "", formulation: "",
     apvma_number: "", manufacturer: "",
     pack_size: "", default_rate: "",
-    stock_qty: "", stock_unit: "", cost_per_unit: "", low_stock_threshold: "", storage_location: "",
+    stock_qty: "", stock_unit: "", cost_per_unit: "", rainfast_hours: "", low_stock_threshold: "", storage_location: "",
     label_url: "", sds_url: "", notes: "",
   });
   const [saving, setSaving] = useState(false);
@@ -51,6 +51,7 @@ export default function NewChemical() {
       stock_qty: f.stock_qty ? parseFloat(f.stock_qty) : undefined,
       stock_unit: f.stock_unit.trim() || undefined,
       cost_per_unit: f.cost_per_unit ? parseFloat(f.cost_per_unit) : undefined,
+      rainfast_hours: f.rainfast_hours ? parseFloat(f.rainfast_hours) : undefined,
       low_stock_threshold: f.low_stock_threshold ? parseFloat(f.low_stock_threshold) : undefined,
       storage_location: f.storage_location.trim() || undefined,
       label_url: f.label_url.trim() || undefined,
@@ -144,6 +145,7 @@ export default function NewChemical() {
                 </ScrollView>
               </View>
             </View>
+            <Input label="Rainfast period (optional)" value={f.rainfast_hours} onChangeText={(v) => setF({ ...f, rainfast_hours: v })} keyboardType="decimal-pad" suffix="hours" placeholder="From the label, e.g. 1" testID="input-rainfast" />
           </Card>
 
           <Text style={styles.section}>Inventory</Text>
