@@ -5,7 +5,7 @@ import { ScreenHeader } from "@/src/components/header";
 import { Button, Card, Input } from "@/src/components/ui";
 import { colors, spacing } from "@/src/theme";
 import { deltaT, fmt } from "@/src/lib/calculators";
-import { fetchWeather } from "@/src/lib/weather";
+import { fetchWeather, WeatherCaptureError } from "@/src/lib/weather";
 
 export default function DeltaTCalc() {
   const insets = useSafeAreaInsets();
@@ -14,6 +14,7 @@ export default function DeltaTCalc() {
   const [wind, setWind] = useState("");
   const [dir, setDir] = useState("");
   const [loading, setLoading] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
 
   const dt = useMemo(() => deltaT(parseFloat(temp) || 0, parseFloat(rh) || 0), [temp, rh]);
 
@@ -25,6 +26,9 @@ export default function DeltaTCalc() {
       setRh(w.humidity.toFixed(0));
       setWind(w.wind_speed.toFixed(0));
       setDir(w.wind_direction);
+      setLiveError(null);
+    } catch (e) {
+      setLiveError(e instanceof WeatherCaptureError && e.reason === "no_location" ? "Couldn't get your location. Enter the values below." : "No signal. Enter the values below.");
     } finally { setLoading(false); }
   }
 
@@ -34,6 +38,7 @@ export default function DeltaTCalc() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }} keyboardShouldPersistTaps="handled">
           <Button title="Use live weather" icon="satellite-variant" variant="outline" onPress={useLive} loading={loading} testID="use-live-weather-btn" />
+          {liveError ? <Text style={{ color: colors.warning, marginTop: spacing.sm, fontSize: 13 }} testID="live-weather-error">{liveError}</Text> : null}
           <View style={{ height: spacing.md }} />
           <Card>
             <Input label="Temperature" value={temp} onChangeText={setTemp} keyboardType="decimal-pad" suffix="°C" testID="input-temp" />

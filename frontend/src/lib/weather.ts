@@ -21,6 +21,8 @@ export type WeatherSnapshot = {
   captured_at: string;
   lat?: number;
   lon?: number;
+  // Set when there was no GPS fix and the fallback location was used.
+  place?: string;
 };
 
 function degToCompass(deg: number): string {
@@ -71,14 +73,25 @@ export function firstRainWithin(outlook: RainHour[], windowH: number, now = Date
   return null;
 }
 
-export async function fetchWeather(): Promise<WeatherSnapshot> {
-  // Default to Wagga Wagga NSW if permission denied - central AU broadacre location.
-  let lat = -35.117;
-  let lon = 147.356;
+// Thrown when conditions can't be captured, so callers never record made-up
+// values: "no_location" when there's no GPS fix and no fallback location,
+// "offline" when the weather service can't be reached.
+export class WeatherCaptureError extends Error {
+  constructor(public reason: "no_location" | "offline") {
+    super(reason === "no_location" ? "No GPS location" : "Weather service unreachable");
+  }
+}
+
+export type WeatherPlace = { lat: number; lon: number; label: string };
+
+// Current conditions at the phone's GPS position. Without a GPS fix it uses
+// `fallback` (e.g. the paddock being sprayed) when given, else throws.
+export async function fetchWeather(fallback?: WeatherPlace | null): Promise<WeatherSnapshot> {
+  let place: { lat: number; lon: number; label?: string } | null = null;
 
   // Race the location lookup against a short timeout so a stalled GPS prompt
   // (e.g. web headless or a phone with location temporarily unavailable) never
-  // traps the caller — the app falls back to the default coordinates cleanly.
+  // traps the caller.
   try {
     const perm = await Promise.race([
       Location.requestForegroundPermissionsAsync(),
@@ -89,32 +102,31 @@ export async function fetchWeather(): Promise<WeatherSnapshot> {
         Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
       ]);
-      if (loc && (loc as any).coords) {
-        lat = (loc as any).coords.latitude;
-        lon = (loc as any).coords.longitude;
-      }
+      if (loc && (loc as any).coords) place = { lat: (loc as any).coords.latitude, lon: (loc as any).coords.longitude };
     }
   } catch {
-    // fall through with defaults
+    // no fix; fall through to the fallback
   }
+  if (!place && fallback) place = fallback;
+  if (!place) throw new WeatherCaptureError("no_location");
+  const { lat, lon } = place;
 
   const url = openMeteoUrl("api", `/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m&wind_speed_unit=kmh&timezone=auto`);
   // Time-box the fetch as well so an offline caller doesn't hang forever.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 6000);
-  let data: any = {};
+  let c: any;
   try {
     const res = await fetch(url, { signal: controller.signal });
-    data = await res.json();
+    if (res.ok) c = (await res.json())?.current;
   } catch {
-    // Return best-effort snapshot with zeros so calc doesn't NaN and the user
-    // can enter values manually.
+    // handled below
   } finally {
     clearTimeout(timer);
   }
-  const c = data.current ?? {};
-  const t = Number(c.temperature_2m ?? 0);
-  const rh = Number(c.relative_humidity_2m ?? 0);
+  if (c?.temperature_2m == null || c?.relative_humidity_2m == null) throw new WeatherCaptureError("offline");
+  const t = Number(c.temperature_2m);
+  const rh = Number(c.relative_humidity_2m);
   const ws = Number(c.wind_speed_10m ?? 0);
   const wd = Number(c.wind_direction_10m ?? 0);
 
@@ -127,5 +139,6 @@ export async function fetchWeather(): Promise<WeatherSnapshot> {
     captured_at: new Date().toISOString(),
     lat,
     lon,
+    place: place.label,
   };
 }

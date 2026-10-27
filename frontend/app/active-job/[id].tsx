@@ -7,7 +7,7 @@ import { ScreenHeader } from "@/src/components/header";
 import { Button, Card, Input } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
-import { fetchWeather } from "@/src/lib/weather";
+import { fetchWeather, WeatherCaptureError } from "@/src/lib/weather";
 import { previewDeductions, applyDeductions, DeductionPreview } from "@/src/lib/stock";
 import { productTotalForJob } from "@/src/lib/calculators";
 import { offlineQueue } from "@/src/lib/offline-queue";
@@ -36,6 +36,7 @@ export default function ActiveJob() {
   const [finishNotes, setFinishNotes] = useState("");
   const [finishWeather, setFinishWeather] = useState<{ t?: string; h?: string; dt?: string; ws?: string; wd?: string; at?: string }>({});
   const [capturingFinishWx, setCapturingFinishWx] = useState(false);
+  const [finishWxError, setFinishWxError] = useState<string | null>(null);
   const [deductStock, setDeductStock] = useState(true);
   const [previews, setPreviews] = useState<DeductionPreview[]>([]);
   const [offlinePending, setOfflinePending] = useState(false);
@@ -88,7 +89,10 @@ export default function ActiveJob() {
     // Kick off weather async (non-blocking)
     (async () => {
       try {
-        const w = await fetchWeather();
+        // Without a GPS fix, use where the job started rather than nothing.
+        const start = job?.gps_lat != null && job?.gps_lon != null ? { lat: job.gps_lat, lon: job.gps_lon, label: "start" } : null;
+        const w = await fetchWeather(start);
+        setFinishWxError(null);
         setFinishWeather({
           t: w.temperature_c.toFixed(1),
           h: w.humidity.toFixed(0),
@@ -97,7 +101,11 @@ export default function ActiveJob() {
           wd: w.wind_direction,
           at: w.captured_at,
         });
-      } catch (e) { console.warn("finish weather fetch failed", e); }
+      } catch (e) {
+        if (e instanceof WeatherCaptureError) {
+          setFinishWxError(e.reason === "offline" ? "No signal, so finish weather couldn't be captured. Enter the conditions below." : "Couldn't get your GPS location. Enter the finish conditions below.");
+        } else console.warn("finish weather fetch failed", e);
+      }
       finally { setCapturingFinishWx(false); }
     })();
     // Compute deduction preview based on current job products + actualHa (or planned area)
@@ -235,6 +243,12 @@ export default function ActiveJob() {
 
               <Text style={styles.section}>Finish weather</Text>
               <Card>
+                {finishWxError ? (
+                  <View style={styles.wxError} testID="finish-weather-error">
+                    <Icon name="alert-outline" size={16} color={colors.warning} />
+                    <Text style={styles.wxErrorText}>{finishWxError}</Text>
+                  </View>
+                ) : null}
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <View style={{ flex: 1 }}><Input label="Temp" value={finishWeather.t ?? ""} onChangeText={(v) => setFinishWeather({ ...finishWeather, t: v })} keyboardType="decimal-pad" suffix="°C" testID="finish-temp" /></View>
                   <View style={{ flex: 1 }}><Input label="RH" value={finishWeather.h ?? ""} onChangeText={(v) => setFinishWeather({ ...finishWeather, h: v })} keyboardType="decimal-pad" suffix="%" testID="finish-rh" /></View>
@@ -307,6 +321,8 @@ function Wx({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  wxError: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#FEF3C7", padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm },
+  wxErrorText: { color: "#92400E", fontWeight: "600", fontSize: 13, flex: 1, lineHeight: 18 },
   timerCard: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary, alignItems: "center", padding: spacing.xl },
   liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.onBrandPrimary, opacity: 0.9 },
   liveLabel: { color: colors.onBrandPrimary, fontSize: 12, fontWeight: "800", marginTop: 6, letterSpacing: 1.5 },

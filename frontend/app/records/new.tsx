@@ -8,7 +8,8 @@ import { ScreenHeader } from "@/src/components/header";
 import { Button, Card, Input, Chip } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
-import { DEFAULT_RAINFAST_HOURS, fetchRainOutlook, fetchWeather, firstRainWithin, type RainHour } from "@/src/lib/weather";
+import { DEFAULT_RAINFAST_HOURS, fetchRainOutlook, fetchWeather, firstRainWithin, WeatherCaptureError, type RainHour } from "@/src/lib/weather";
+import { coordsForFarm, coordsForPaddock } from "@/src/lib/paddock-coords";
 import { fetchNearestDpird, formatReadingTime, type DpirdReading, type DpirdStation } from "@/src/lib/dpird";
 import { deltaT, nozzleFlowLpm, fmt, productTotalForJob, productPerTank } from "@/src/lib/calculators";
 import { stagesForCrop } from "@/src/lib/crop-stages";
@@ -62,6 +63,8 @@ export default function NewSprayJob() {
   const [dpird, setDpird] = useState<{ station: DpirdStation; reading: DpirdReading } | null>(null);
   const [dpirdApplied, setDpirdApplied] = useState(false);
   const [rainOutlook, setRainOutlook] = useState<RainHour[] | null>(null);
+  const [weatherError, setWeatherError] = useState<WeatherCaptureError["reason"] | null>(null);
+  const [weatherPlace, setWeatherPlace] = useState<string | undefined>();
   const [showPicker, setShowPicker] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
   const [showMissing, setShowMissing] = useState<Record<string, boolean>>({});
@@ -131,12 +134,22 @@ export default function NewSprayJob() {
     })();
   }, [params.draft, params.plannedId]);
 
+  // Capture once on open; Recapture and paddock picks call it again.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { captureWeather(); }, []);
 
-  async function captureWeather() {
+  // Without a GPS fix, weather comes from the paddock's boundary (or the farm's
+  // paddocks), never a made-up location. `paddock` overrides the selection for
+  // calls made before state has updated.
+  async function captureWeather(paddock?: Paddock) {
+    const pad = paddock ?? paddocks.find((p) => p.id === f.paddock_id);
+    const padCoords = pad ? coordsForPaddock(pad) : null;
+    const farm = farms.find((x) => x.id === (pad?.farm_id ?? f.farm_id));
+    const farmCoords = !padCoords && farm ? coordsForFarm(farm, paddocks) : null;
+    const fallback = padCoords && pad ? { ...padCoords, label: pad.name } : farmCoords && farm ? { ...farmCoords, label: farm.name } : null;
     setLoadingWeather(true);
     try {
-      const w = await fetchWeather();
+      const w = await fetchWeather(fallback);
       setF((s) => ({
         ...s,
         temperature_c: w.temperature_c.toFixed(1),
@@ -147,14 +160,20 @@ export default function NewSprayJob() {
       }));
       setAutoWeather({ t: w.temperature_c, h: w.humidity, dt: w.delta_t, ws: w.wind_speed, wd: w.wind_direction });
       setWeatherEdited(false);
-      setGps({ lat: w.lat, lon: w.lon });
+      // Only a real GPS fix goes in the record's GPS fields.
+      setGps(w.place ? {} : { lat: w.lat, lon: w.lon });
+      setWeatherPlace(w.place);
+      setWeatherError(null);
       setWeatherAt(w.captured_at);
       setDpirdApplied(false);
       if (w.lat && w.lon) {
         fetchNearestDpird(w.lat, w.lon).then(setDpird);
         fetchRainOutlook(w.lat, w.lon).then(setRainOutlook);
       }
-    } catch (e) { console.warn(e); }
+    } catch (e) {
+      if (e instanceof WeatherCaptureError) setWeatherError(e.reason);
+      else console.warn(e);
+    }
     finally { setLoadingWeather(false); }
   }
 
@@ -201,6 +220,8 @@ export default function NewSprayJob() {
       variety: p.variety ?? s.variety,
       area_ha: p.area_ha != null ? p.area_ha.toString() : s.area_ha,
     }));
+    // No GPS fix earlier: now there's a paddock, use its location.
+    if (weatherError === "no_location") captureWeather(p);
     // Products can be added before a paddock is picked (chemicals sit above
     // farm/paddock on this form) — addProduct's own check only covers
     // products added AFTER a paddock is already selected, so re-run it here
@@ -591,13 +612,23 @@ export default function NewSprayJob() {
 
           <View style={styles.sectionRow}>
             <Text style={[styles.section, { marginTop: 0 }]}>Weather</Text>
-            <Pressable onPress={captureWeather} disabled={loadingWeather} testID="capture-weather-btn"><Text style={styles.link}>{loadingWeather ? "…" : "↻ Recapture"}</Text></Pressable>
+            <Pressable onPress={() => captureWeather()} disabled={loadingWeather} testID="capture-weather-btn"><Text style={styles.link}>{loadingWeather ? "…" : "↻ Recapture"}</Text></Pressable>
           </View>
           <Card>
+            {weatherError ? (
+              <View style={[styles.warnBanner, { marginBottom: spacing.sm }]} testID="weather-capture-error">
+                <Icon name={weatherError === "offline" ? "cloud-off-outline" : "crosshairs-off"} size={18} color={colors.warning} />
+                <Text style={styles.warnBannerText}>
+                  {weatherError === "offline"
+                    ? "No signal, so the weather couldn't be captured. Enter the conditions below, or tap Recapture when you're back in range."
+                    : "Couldn't get your GPS location. Pick a paddock with a drawn boundary to use its weather, or enter the conditions below."}
+                </Text>
+              </View>
+            ) : null}
             {weatherAt ? (
               <View style={styles.wxMeta} testID="wx-meta">
                 <Icon name="clock-outline" size={13} color={colors.muted} />
-                <Text style={styles.wxMetaText}>Captured at {new Date(weatherAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{gps.lat ? ` · GPS ${gps.lat.toFixed(3)}, ${gps.lon!.toFixed(3)}` : ""}</Text>
+                <Text style={styles.wxMetaText}>Captured at {new Date(weatherAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{gps.lat ? ` · GPS ${gps.lat.toFixed(3)}, ${gps.lon!.toFixed(3)}` : weatherPlace ? ` · No GPS, using ${weatherPlace} location` : ""}</Text>
                 {weatherEdited ? <View style={styles.editedBadge}><Text style={styles.editedBadgeText}>{dpirdApplied ? "DPIRD station" : "Edited"}</Text></View> : null}
               </View>
             ) : null}
