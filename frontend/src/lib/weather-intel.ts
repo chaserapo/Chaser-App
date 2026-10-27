@@ -614,7 +614,8 @@ export async function runForecast(params: { locationId: string | null; lat: numb
     consensus,
     daily,
   };
-  if (params.locationId) {
+  // Nothing came back (usually no signal), so there is nothing worth saving.
+  if (params.locationId && models.length > 0) {
     try { await persistRun(bundle, params.source ?? "client"); }
     catch (e) { console.warn("persistRun failed", e); }
   }
