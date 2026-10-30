@@ -11,6 +11,7 @@ import { repo } from "@/src/lib/storage";
 import { stageLabel } from "@/src/lib/crop-stages";
 import { useAuth } from "@/src/lib/auth-context";
 import { exportJobsPdf } from "@/src/lib/pdf-report";
+import { weatherSourceLabel } from "@/src/lib/weather";
 import { productCost } from "@/src/lib/calculators";
 import type { SprayJob, Operator, Machinery } from "@/src/lib/types";
 
@@ -326,7 +327,12 @@ export default function RecordDetail() {
 
         <View style={styles.wxHeaderRow}>
           <Text style={[styles.section, { marginTop: 0 }]}>Starting weather</Text>
-          {j.weather_edited ? (
+          {j.weather_source === "dpird" ? (
+            <View style={styles.autoBadge} testID="record-weather-dpird-badge">
+              <Icon name="access-point" size={11} color={colors.brandPrimary} />
+              <Text style={styles.autoBadgeText}>DPIRD station</Text>
+            </View>
+          ) : j.weather_edited ? (
             <View style={styles.editedBadge} testID="record-weather-edited-badge">
               <Icon name="pencil" size={11} color={colors.warning} />
               <Text style={styles.editedBadgeText}>Operator-edited</Text>
@@ -343,6 +349,7 @@ export default function RecordDetail() {
           <Field label="Relative humidity" value={j.humidity != null ? `${j.humidity} %` : undefined} />
           <Field label="Delta T" value={j.delta_t != null ? `${j.delta_t}` : undefined} />
           <Field label="Wind" value={j.wind_speed != null ? `${j.wind_speed} km/h ${j.wind_direction ?? ""}` : undefined} />
+          <Field label="Source" value={weatherSourceLabel(j)} />
           {j.weather_edited && (j.temperature_c_auto != null || j.wind_speed_auto != null) ? (
             <View style={styles.autoNote} testID="record-auto-original">
               <Text style={styles.autoNoteTitle}>Original auto-captured reading (audit)</Text>

@@ -47,6 +47,7 @@ export type Chemical = {
   chemical_group?: string;
   chemical_group_key?: string;
   cost_per_unit?: number;
+  rainfast_hours?: number; // from the product label; drives the rain warning on new spray jobs
   formulation?: string;
   manufacturer?: string;
   default_rate?: number;
@@ -281,6 +282,10 @@ export type SprayJob = {
   wind_speed_auto?: number;
   wind_direction_auto?: string;
   weather_edited?: boolean;
+  // Where the starting weather came from: the forecast captured automatically,
+  // a DPIRD station's measured reading, or values typed by the operator.
+  weather_source?: WeatherSource;
+  weather_station?: string; // e.g. "Merredin (3 km)" when weather_source is "dpird"
   gps_lat?: number;
   gps_lon?: number;
   finish_temperature_c?: number;
@@ -294,6 +299,8 @@ export type SprayJob = {
   products: SprayJobProduct[];
   created_at: string;
 };
+
+export type WeatherSource = "forecast" | "dpird" | "manual";
 
 export type IssueSeverity = "low" | "medium" | "high" | "critical";
 export type IssueStatus = "open" | "assigned" | "in_progress" | "resolved" | "closed";

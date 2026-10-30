@@ -5,7 +5,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { Button, StatusBadge } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
-import { fetchWeather, WeatherSnapshot } from "@/src/lib/weather";
+import { fetchWeather, WeatherCaptureError, WeatherSnapshot } from "@/src/lib/weather";
 import { fetchNearestDpird, formatReadingTime, type DpirdReading, type DpirdStation } from "@/src/lib/dpird";
 import { repo, maintenanceStatus } from "@/src/lib/storage";
 import { useRealtime } from "@/src/lib/realtime";
@@ -111,7 +111,8 @@ export default function Home() {
       // Measured reading from the nearest DPIRD station (WA only); loads after the forecast.
       if (w.lat && w.lon) fetchNearestDpird(w.lat, w.lon).then(setStation);
     } catch (e) {
-      console.warn(e);
+      if (e instanceof WeatherCaptureError) setLocationLabel(e.reason === "offline" ? "No signal" : "Location off, turn it on for local conditions");
+      else console.warn(e);
     } finally {
       setLoadingWeather(false);
     }

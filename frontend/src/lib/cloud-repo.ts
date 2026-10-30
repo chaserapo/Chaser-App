@@ -23,10 +23,21 @@ async function softDelete(table: string, id: string) {
   if (error) throw error;
 }
 
+// Columns added by migrations a Supabase project may not have run yet. If the
+// database rejects one as unknown (PGRST204), the save is retried without it so
+// records keep syncing until the migration is applied.
+const OPTIONAL_COLUMNS = ["weather_source", "weather_station", "rainfast_hours"];
+
 async function upsertRow<T extends { id: string }>(table: string, row: T) {
-  const payload: any = { ...row, business_id: bid(), deleted_at: null };
-  const { error } = await supabase.from(table).upsert(payload, { onConflict: "id", defaultToNull: false });
-  if (error) throw error;
+  let payload: any = { ...row, business_id: bid(), deleted_at: null };
+  for (;;) {
+    const { error } = await supabase.from(table).upsert(payload, { onConflict: "id", defaultToNull: false });
+    if (!error) return;
+    const missing = error.code === "PGRST204" ? OPTIONAL_COLUMNS.find((c) => c in payload && error.message?.includes(`'${c}'`)) : undefined;
+    if (!missing) throw error;
+    const { [missing]: _dropped, ...rest } = payload;
+    payload = rest;
+  }
 }
 
 async function listRows<T>(table: string, opts?: { activeOnly?: boolean; extraEq?: [string, any][] }): Promise<T[]> {
