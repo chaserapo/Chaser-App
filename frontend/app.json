@@ -36,7 +36,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "au.com.chaserag.chaser",
+      "package": "au.com.chaserag.app",
       "versionCode": 3,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
