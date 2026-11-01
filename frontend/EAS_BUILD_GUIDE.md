@@ -44,7 +44,7 @@ Already configured in `app.json` — check these match your Apple & Google conso
 | App name | **Chaser** |
 | Slug | **chaser** |
 | iOS bundle identifier | **`au.com.chaserag.chaser`** |
-| Android package name | **`au.com.chaserag.chaser`** |
+| Android package name | **`au.com.chaserag.app`** (the original `au.com.chaserag.chaser` is tied to a transferred Play listing that requires a 14-day closed test, so Android launched under a new package) |
 | iOS build number | 1 (auto-increments on production builds) |
 | Android versionCode | 1 (auto-increments on production builds) |
 | App version | 1.0.0 |

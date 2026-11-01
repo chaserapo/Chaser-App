@@ -21,37 +21,13 @@ import {
   type SprayThresholds,
   DEFAULT_THRESHOLDS,
 } from "@/src/lib/weather-intel";
-import type { Farm, Paddock, PaddockBoundary } from "@/src/lib/types";
+import type { Farm, Paddock } from "@/src/lib/types";
+import { coordsForFarm, coordsForPaddock } from "@/src/lib/paddock-coords";
 
 const STALE_MS = 45 * 60 * 1000; // 45 minutes — refresh if last fetch older than this
 
 type TargetKind = "farm" | "paddock";
 type Target = { kind: TargetKind; id: string; label: string; lat: number; lon: number; farm_id: string };
-
-// ─── Coordinate helpers ─────────────────────────────────────────────
-function polygonCentroid(b?: PaddockBoundary | null): { lat: number; lon: number } | null {
-  if (!b || b.type !== "Polygon" || !b.coordinates || b.coordinates.length === 0) return null;
-  const ring = b.coordinates[0]; // outer ring
-  if (!ring || ring.length === 0) return null;
-  let sx = 0, sy = 0, n = 0;
-  for (const [lng, lat] of ring) {
-    if (typeof lng === "number" && typeof lat === "number") { sx += lng; sy += lat; n += 1; }
-  }
-  if (n === 0) return null;
-  return { lat: sy / n, lon: sx / n };
-}
-
-function coordsForPaddock(p: Paddock): { lat: number; lon: number } | null {
-  return polygonCentroid(p.boundary ?? null);
-}
-
-function coordsForFarm(farm: Farm, paddocks: Paddock[]): { lat: number; lon: number } | null {
-  const own = paddocks.filter((p) => p.farm_id === farm.id).map(coordsForPaddock).filter((c): c is { lat: number; lon: number } => !!c);
-  if (own.length === 0) return null;
-  const lat = own.reduce((s, c) => s + c.lat, 0) / own.length;
-  const lon = own.reduce((s, c) => s + c.lon, 0) / own.length;
-  return { lat, lon };
-}
 
 export default function WeatherScreen() {
   const insets = useSafeAreaInsets();
@@ -132,6 +108,8 @@ export default function WeatherScreen() {
   const frost = useMemo(() => frostRiskNext48(consensus), [consensus]);
   const heat = useMemo(() => heatRiskNext48(consensus), [consensus]);
   const rain = useMemo(() => rainRiskNext24(daily), [daily]);
+  // Every source failed: show a retry state instead of empty "Poor"/"None" tiles.
+  const noData = !loading && !!bundle && consensus.length === 0;
 
   // ─── Empty states ──────────────────────────────────────────────
   if (farms.length === 0) {
@@ -184,7 +162,7 @@ export default function WeatherScreen() {
         />
 
         {/* Consensus header */}
-        {loading && !bundle ? (
+        {loading && (!bundle || consensus.length === 0) ? (
           <View style={styles.loading}><ActivityIndicator color={colors.brandPrimary} /><Text style={styles.loadingText}>Fetching six independent models…</Text></View>
         ) : currentHour ? (
           <View style={styles.heroCard}>
@@ -210,7 +188,21 @@ export default function WeatherScreen() {
           </View>
         ) : null}
 
-        {bundle && bundle.models_failed.length > 0 ? (
+        {noData ? (
+          <View style={styles.emptyWrap} testID="weather-no-data">
+            <Icon name="cloud-off-outline" size={48} color={colors.muted} />
+            <Text style={styles.emptyTitle}>Couldn&apos;t load the forecast</Text>
+            <Text style={styles.emptyBody}>
+              None of the weather sources could be reached. This is usually a weak or dropped connection. Check your signal and try again.
+            </Text>
+            <Text style={[styles.emptyBody, { marginTop: 6, fontSize: 11 }]}>{bundle?.models_failed[0]?.reason}</Text>
+            <Pressable onPress={() => runFetch()} style={styles.primaryBtn} testID="weather-retry">
+              <Text style={styles.primaryBtnText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {!noData && bundle && bundle.models_failed.length > 0 ? (
           <View style={styles.modelWarning} testID="weather-model-warning">
             <Icon name="alert-outline" size={16} color={colors.warning} />
             <Text style={styles.modelWarningText}>
@@ -219,6 +211,7 @@ export default function WeatherScreen() {
           </View>
         ) : null}
 
+        {!noData && (<>
         {/* Operational conditions */}
         <SectionTitle>Operational Conditions</SectionTitle>
         <View style={styles.opGrid}>
@@ -299,13 +292,15 @@ export default function WeatherScreen() {
           ))}
         </View>
 
+        </>)}
+
         {/* Alerts entry point */}
         <SectionTitle>Alerts & Accuracy</SectionTitle>
         <Pressable onPress={() => router.push({ pathname: "/weather/alerts", params: { farmId: target.farm_id } })} style={styles.alertsRow} testID="weather-alerts-btn">
           <Icon name="bell-outline" size={22} color={colors.brandPrimary} />
           <View style={{ flex: 1 }}>
             <Text style={styles.alertsTitle}>Manage weather alerts</Text>
-            <Text style={styles.alertsSub}>Spray windows · rain · frost · wind — delivery via push once wired to devices</Text>
+            <Text style={styles.alertsSub}>Push notifications for spray windows, rain, frost and wind</Text>
           </View>
           <Icon name="chevron-right" size={22} color={colors.muted} />
         </Pressable>

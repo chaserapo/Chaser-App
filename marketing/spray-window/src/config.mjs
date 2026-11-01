@@ -9,7 +9,7 @@ export const CONFIG = {
   siteName: "Spray Window by Chaser",
   // Store links; a missing one is hidden from the call-to-action.
   appStoreUrl: process.env.APP_STORE_URL || "",
-  playStoreUrl: process.env.PLAY_STORE_URL || "https://play.google.com/store/apps/details?id=au.com.chaserag.chaser",
+  playStoreUrl: process.env.PLAY_STORE_URL || "https://play.google.com/store/apps/details?id=au.com.chaserag.app",
   // Optional extra landing page (e.g. the Chaser marketing site).
   appSiteUrl: process.env.CHASER_SITE_URL || "",
   // Appended to every outbound app link so installs can be attributed.

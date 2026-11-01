@@ -32,7 +32,7 @@ export default function ChemicalDetail() {
     product_name: "", active_ingredient: "", formulation: "",
     apvma_number: "", chemical_group: "", manufacturer: "",
     pack_size: "", default_rate: "",
-    stock_qty: "", stock_unit: "", cost_per_unit: "", low_stock_threshold: "", storage_location: "",
+    stock_qty: "", stock_unit: "", cost_per_unit: "", rainfast_hours: "", low_stock_threshold: "", storage_location: "",
     label_url: "", sds_url: "", notes: "",
   });
 
@@ -63,6 +63,7 @@ export default function ChemicalDetail() {
       stock_qty: chem.stock_qty != null ? chem.stock_qty.toString() : "",
       stock_unit: chem.stock_unit ?? "",
       cost_per_unit: chem.cost_per_unit != null ? chem.cost_per_unit.toString() : "",
+      rainfast_hours: chem.rainfast_hours != null ? chem.rainfast_hours.toString() : "",
       low_stock_threshold: chem.low_stock_threshold != null ? chem.low_stock_threshold.toString() : "",
       storage_location: chem.storage_location ?? "",
       label_url: chem.label_url ?? "",
@@ -115,6 +116,7 @@ export default function ChemicalDetail() {
       stock_qty: f.stock_qty ? parseFloat(f.stock_qty) : undefined,
       stock_unit: f.stock_unit.trim() || undefined,
       cost_per_unit: f.cost_per_unit ? parseFloat(f.cost_per_unit) : undefined,
+      rainfast_hours: f.rainfast_hours ? parseFloat(f.rainfast_hours) : undefined,
       low_stock_threshold: f.low_stock_threshold ? parseFloat(f.low_stock_threshold) : undefined,
       storage_location: f.storage_location.trim() || undefined,
       label_url: f.label_url.trim() || undefined,
@@ -218,6 +220,7 @@ export default function ChemicalDetail() {
                   </ScrollView>
                 </View>
               </View>
+              <Input label="Rainfast period (optional)" value={f.rainfast_hours} onChangeText={(v) => setF({ ...f, rainfast_hours: v })} keyboardType="decimal-pad" suffix="hours" placeholder="From the label, e.g. 1" testID="edit-rainfast" />
             </Card>
 
             <Text style={styles.section}>Inventory</Text>
@@ -288,6 +291,7 @@ export default function ChemicalDetail() {
         <Text style={styles.section}>Default rate</Text>
         <Card>
           <Field label="Rate" value={c.default_rate != null ? `${c.default_rate} ${c.default_unit ?? ""}` : undefined} />
+          <Field label="Rainfast period" value={c.rainfast_hours != null ? `${c.rainfast_hours} h` : undefined} />
           <Text style={styles.hint}>Chaser never suggests application rates. This is your saved default.</Text>
         </Card>
 

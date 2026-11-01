@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import type { Chemical, SprayJob } from "./types";
+import { weatherSourceLabel } from "./weather";
 
 function esc(v: unknown): string {
   if (v == null || v === "") return "—";
@@ -15,7 +16,8 @@ function weatherLine(j: SprayJob): string {
   if (j.delta_t != null) parts.push(`ΔT ${j.delta_t}`);
   if (j.wind_speed != null) parts.push(`wind ${j.wind_speed} km/h${j.wind_direction ? ` ${j.wind_direction}` : ""}`);
   if (!parts.length) return "—";
-  return parts.join(" · ") + (j.weather_edited ? " <span class=\"muted\">(operator-edited)</span>" : "");
+  const source = weatherSourceLabel(j) ?? (j.weather_edited ? "operator-edited" : undefined);
+  return parts.join(" · ") + (source ? ` <span class="muted">(${esc(source)})</span>` : "");
 }
 
 function finishWeatherLine(j: SprayJob): string {
