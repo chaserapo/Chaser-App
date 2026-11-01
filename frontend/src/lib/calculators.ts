@@ -152,6 +152,65 @@ export function productCost(p: { cost_per_unit?: number; total_qty?: number; tot
   return p.cost_per_unit * p.total_qty;
 }
 
+// Seeding rate (kg/ha) from target plant density, thousand-seed weight (TSW, g per
+// 1000 seeds), germination (%) and establishment (%). Standard grains-industry formula:
+// rate = (target plants/m2 * TSW(g) * 100) / (germination% * establishment%)
+export function seedingRateKgHa(
+  target_plants_m2: number,
+  tsw_g: number,
+  germination_pct: number,
+  establishment_pct: number,
+): number {
+  if (!target_plants_m2 || !tsw_g || !germination_pct || !establishment_pct) return 0;
+  return (target_plants_m2 * tsw_g * 100) / (germination_pct * establishment_pct);
+}
+
+// Seeds actually sown per m2 at a given rate, before germination/establishment losses.
+export function seedsSownPerM2(rate_kg_ha: number, tsw_g: number): number {
+  if (!rate_kg_ha || !tsw_g) return 0;
+  return (rate_kg_ha * 100) / tsw_g;
+}
+
+export function totalSeedKg(rate_kg_ha: number, area_ha: number): number {
+  return (rate_kg_ha || 0) * (area_ha || 0);
+}
+
+export function bagsNeeded(total_seed_kg: number, bag_size_kg: number): number {
+  if (!bag_size_kg) return 0;
+  return Math.ceil(total_seed_kg / bag_size_kg);
+}
+
+// Starter fertiliser / seed-applied product total for the paddock, at a rate per hectare.
+// Unlike tankMix, this isn't scaled by a spray tank - seeding rigs meter straight off area.
+export type BlendUnit = "kg/ha" | "L/ha" | "g/ha" | "Custom";
+
+export function blendTotalForArea(
+  rate: number,
+  unit: BlendUnit,
+  area_ha: number,
+  custom_label?: string,
+): { amount: number; unit: string } {
+  const amount = (rate || 0) * (area_ha || 0);
+  switch (unit) {
+    case "kg/ha": return { amount, unit: "kg" };
+    case "L/ha": return { amount, unit: "L" };
+    case "g/ha": return { amount, unit: "g" };
+    case "Custom": return { amount, unit: custom_label ?? "unit" };
+  }
+}
+
+// Seed treatment / inoculant total, from a rate per tonne of seed.
+export type SeedTreatmentUnit = "mL/t" | "L/t" | "g/t" | "kg/t";
+
+export function seedTreatmentTotal(
+  rate: number,
+  unit: SeedTreatmentUnit,
+  seed_tonnes: number,
+): { amount: number; unit: string } {
+  const amount = (rate || 0) * (seed_tonnes || 0);
+  return { amount, unit: unit.split("/")[0] };
+}
+
 export function fmt(n: number, decimals = 2): string {
   if (n == null || isNaN(n) || !isFinite(n)) return "0";
   return Number(n.toFixed(decimals)).toString();

@@ -244,6 +244,14 @@ export default function Home() {
             <Text style={styles.secondaryBtnText}>Spray Tools</Text>
           </Pressable>
           <Pressable
+            onPress={() => router.push("/seeding-tools")}
+            style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
+            testID="seeding-tools-btn"
+          >
+            <Icon name="seed-outline" size={20} color={colors.brandPrimary} />
+            <Text style={styles.secondaryBtnText}>Seeding Tools</Text>
+          </Pressable>
+          <Pressable
             onPress={() => router.push("/jobs/new")}
             style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
             testID="new-job-btn"
@@ -411,21 +419,24 @@ const styles = StyleSheet.create({
   stationRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6, paddingHorizontal: 2 },
   stationText: { color: colors.muted, fontSize: 11, flex: 1, lineHeight: 15 },
   stationName: { color: colors.onSurface, fontWeight: "700" },
-  secondaryRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
+  secondaryRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
   secondaryBtn: {
     flex: 1,
+    minWidth: 100,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    height: 48,
+    minHeight: 48,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     borderRadius: radius.md,
     backgroundColor: colors.brandSecondary,
     borderWidth: 1,
     borderColor: colors.brandSecondary,
   },
   secondaryBtnPressed: { opacity: 0.7 },
-  secondaryBtnText: { color: colors.brandPrimary, fontWeight: "700", fontSize: 14 },
+  secondaryBtnText: { color: colors.brandPrimary, fontWeight: "700", fontSize: 13, textAlign: "center" },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
