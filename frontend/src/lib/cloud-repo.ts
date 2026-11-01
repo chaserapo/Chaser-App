@@ -5,10 +5,11 @@
 import { supabase } from "./supabase";
 import { getActiveBusinessId } from "./backend";
 import { offlineQueue } from "./offline-queue";
+import { seedingOfflineQueue } from "./seeding-offline-queue";
 import { issuesOfflineQueue } from "./issues-offline-queue";
 import type {
   Business, Farm, Paddock, Chemical, ChemicalBatch, ChemicalStockLine, Machinery, Maintenance,
-  MaintenanceCompletion, SprayJob, SprayJobProduct, ExternalLink, Operator, StockMovement,
+  MaintenanceCompletion, SprayJob, SprayJobProduct, SeedingJob, SeedingJobProduct, ExternalLink, Operator, StockMovement,
   FarmIssue,
 } from "./types";
 
@@ -122,6 +123,83 @@ async function hydrateJobs(jobs: any[]): Promise<SprayJob[]> {
     byJob.set(p.spray_job_id, list);
   }
   return jobs.map((j) => ({ ...j, products: byJob.get(j.id) ?? [] })) as SprayJob[];
+}
+
+// ---- Seeding jobs (job + products join) ----
+// Same shape as saveSprayJob/hydrateJobs above, scoped to seeding_jobs /
+// seeding_job_products and the seeding offline queue instead.
+function stripSeedingProducts(job: SeedingJob): Omit<SeedingJob, "products"> {
+  const { products, ...rest } = job;
+  return rest;
+}
+
+async function saveSeedingJob(job: SeedingJob) {
+  const businessId = bid();
+  const jobWithBiz: SeedingJob = { ...job, business_id: businessId };
+  try {
+    await seedingOfflineQueue.mirror(businessId, jobWithBiz);
+  } catch (e) {
+    console.warn("seeding offline mirror failed", e);
+  }
+
+  try {
+    await upsertRow("seeding_jobs", stripSeedingProducts(jobWithBiz) as any);
+    const productRows = (jobWithBiz.products ?? []).map((p) => ({
+      id: p.id,
+      business_id: businessId,
+      seeding_job_id: jobWithBiz.id,
+      chemical_id: p.chemical_id,
+      chemical_name: p.chemical_name,
+      chemical_group: p.chemical_group ?? null,
+      cost_per_unit: p.cost_per_unit ?? null,
+      cost_unit: p.cost_unit ?? null,
+      rate: p.rate,
+      unit: p.unit,
+      custom_unit_label: p.custom_unit_label ?? null,
+      total_qty: p.total_qty ?? null,
+      total_qty_unit: p.total_qty_unit ?? null,
+    }));
+    if (productRows.length > 0) {
+      const { error } = await supabase.from("seeding_job_products").upsert(productRows, { onConflict: "id", defaultToNull: false });
+      if (error) throw error;
+    }
+    const keepIds = productRows.map((p) => p.id);
+    let delQ = supabase.from("seeding_job_products").delete().eq("seeding_job_id", jobWithBiz.id).eq("business_id", businessId);
+    if (keepIds.length > 0) delQ = delQ.not("id", "in", `(${keepIds.map((i) => `"${i}"`).join(",")})`);
+    const { error: delErr } = await delQ;
+    if (delErr) throw delErr;
+
+    await seedingOfflineQueue.markSynced(businessId, jobWithBiz.id);
+  } catch (e) {
+    await seedingOfflineQueue.markFailed(businessId, jobWithBiz.id, e);
+    console.warn("seeding job cloud save failed — kept in offline queue", e);
+  }
+}
+
+async function hydrateSeedingJobs(jobs: any[]): Promise<SeedingJob[]> {
+  if (jobs.length === 0) return [];
+  const ids = jobs.map((j) => j.id);
+  const { data: products, error } = await supabase.from("seeding_job_products").select("*").in("seeding_job_id", ids);
+  if (error) throw error;
+  const byJob = new Map<string, SeedingJobProduct[]>();
+  for (const p of products ?? []) {
+    const list = byJob.get(p.seeding_job_id) ?? [];
+    list.push({
+      id: p.id,
+      chemical_id: p.chemical_id,
+      chemical_name: p.chemical_name ?? "",
+      chemical_group: p.chemical_group ?? undefined,
+      cost_per_unit: p.cost_per_unit ?? undefined,
+      cost_unit: p.cost_unit ?? undefined,
+      rate: p.rate ?? 0,
+      unit: p.unit,
+      custom_unit_label: p.custom_unit_label ?? undefined,
+      total_qty: p.total_qty ?? undefined,
+      total_qty_unit: p.total_qty_unit ?? undefined,
+    });
+    byJob.set(p.seeding_job_id, list);
+  }
+  return jobs.map((j) => ({ ...j, products: byJob.get(j.id) ?? [] })) as SeedingJob[];
 }
 
 // ---- Maintenance <-> DB field mapping (maintenance_id <-> schedule_id) ----
@@ -345,6 +423,45 @@ export const cloudRepo = {
       return await offlineQueue.getShadow(bid(), id);
     },
   },
+  seedingJobs: {
+    list: async () => {
+      try { return await hydrateSeedingJobs(await listRows<any>("seeding_jobs")); }
+      catch (e) {
+        console.warn("seedingJobs.list cloud fail, using shadow", e);
+        const local = await seedingOfflineQueue.findLocalActive(bid());
+        return local ? [local] : [];
+      }
+    },
+    active: async () => {
+      try {
+        const jobs = await hydrateSeedingJobs(await listRows<any>("seeding_jobs", { extraEq: [["status", "active"]] }));
+        if (jobs[0]) return jobs[0];
+      } catch (e) {
+        console.warn("seedingJobs.active cloud fail, using shadow", e);
+      }
+      return await seedingOfflineQueue.findLocalActive(bid());
+    },
+    completed: async () => {
+      try { return await hydrateSeedingJobs(await listRows<any>("seeding_jobs", { extraEq: [["status", "completed"]] })); }
+      catch (e) { console.warn("seedingJobs.completed cloud fail", e); return []; }
+    },
+    planned: async () => {
+      try { return await hydrateSeedingJobs(await listRows<any>("seeding_jobs", { extraEq: [["status", "planned"]] })); }
+      catch (e) { console.warn("seedingJobs.planned cloud fail", e); return []; }
+    },
+    save: saveSeedingJob,
+    remove: (id: string) => softDelete("seeding_jobs", id),
+    get: async (id: string) => {
+      try {
+        const rows = await listRows<any>("seeding_jobs", { extraEq: [["id", id]] });
+        const jobs = await hydrateSeedingJobs(rows);
+        if (jobs[0]) return jobs[0];
+      } catch (e) {
+        console.warn("seedingJobs.get cloud fail, using shadow", e);
+      }
+      return await seedingOfflineQueue.getShadow(bid(), id);
+    },
+  },
   operators: {
     list: () => listRows<Operator>("operators"),
     active: () => listRows<Operator>("operators", { activeOnly: true }),
@@ -415,6 +532,27 @@ export async function flushOfflineSprayJobs(): Promise<{ attempted: number; sync
       if (!(await offlineQueue.isPending(business_id, job.id))) synced += 1;
     } catch (e) {
       console.warn("flushOfflineSprayJobs retry failed", e);
+    }
+  }
+  return { attempted: pending.length, synced };
+}
+
+/**
+ * Retry any seeding jobs that failed to reach Supabase (offline / timeout).
+ * Safe to call on app focus / after sign-in. No-op when nothing pending.
+ */
+export async function flushOfflineSeedingJobs(): Promise<{ attempted: number; synced: number }> {
+  const businessId = getActiveBusinessId();
+  if (!businessId) return { attempted: 0, synced: 0 };
+  const pending = await seedingOfflineQueue.listPending();
+  let synced = 0;
+  for (const { business_id, job } of pending) {
+    if (business_id !== businessId) continue;
+    try {
+      await saveSeedingJob(job);
+      if (!(await seedingOfflineQueue.isPending(business_id, job.id))) synced += 1;
+    } catch (e) {
+      console.warn("flushOfflineSeedingJobs retry failed", e);
     }
   }
   return { attempted: pending.length, synced };

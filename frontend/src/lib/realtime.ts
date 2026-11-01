@@ -20,6 +20,8 @@ type Table =
   | "stock_movements"
   | "spray_jobs"
   | "spray_job_products"
+  | "seeding_jobs"
+  | "seeding_job_products"
   | "farms"
   | "paddocks"
   | "farm_issues"

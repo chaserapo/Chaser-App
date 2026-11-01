@@ -244,7 +244,7 @@ export default function Home() {
             <Text style={styles.secondaryBtnText}>Spray Tools</Text>
           </Pressable>
           <Pressable
-            onPress={() => router.push("/seeding-tools")}
+            onPress={() => router.push("/(tabs)/seeding")}
             style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
             testID="seeding-tools-btn"
           >

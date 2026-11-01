@@ -25,6 +25,7 @@ export default function TabLayout() {
       <Tabs.Screen name="machinery" options={{ title: "Machinery", tabBarIcon: ({ color, size }) => <Icon name="tractor-variant" size={size} color={color} /> }} />
       <Tabs.Screen name="more" options={{ title: "More", tabBarIcon: ({ color, size }) => <Icon name="dots-horizontal" size={size} color={color} /> }} />
       <Tabs.Screen name="spray" options={{ href: null }} />
+      <Tabs.Screen name="seeding" options={{ href: null }} />
       <Tabs.Screen name="team" options={{ href: null }} />
     </Tabs>
   );

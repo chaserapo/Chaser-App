@@ -295,6 +295,83 @@ export type SprayJob = {
   created_at: string;
 };
 
+// Seed, starter fertiliser and seed-treatment products on a seeding job —
+// same snapshot-at-add-time shape as SprayJobProduct, so a later edit to the
+// Chemical register never rewrites a past job's recorded rate/cost.
+export type SeedingJobProduct = {
+  id: ID;
+  chemical_id: ID;
+  chemical_name: string;
+  chemical_group?: string;
+  cost_per_unit?: number;
+  cost_unit?: string;
+  rate: number;
+  unit: RateUnit;
+  custom_unit_label?: string;
+  total_qty?: number;
+  total_qty_unit?: string;
+};
+
+export type SeedingJobStatus = "draft" | "planned" | "active" | "completed";
+
+export type SeedingJob = {
+  id: ID;
+  business_id: ID;
+  status: SeedingJobStatus;
+  farm_id?: ID;
+  farm_name?: string;
+  paddock_id?: ID;
+  paddock_name?: string;
+  crop?: string;
+  variety?: string;
+  date: string;
+  start_time?: string;
+  finish_time?: string;
+  operator_id?: ID;
+  operator?: string;
+  machinery_id?: ID;
+  machinery_name?: string;
+  area_ha?: number;
+  actual_area_ha?: number;
+  // Seeding rate inputs — same formula as the Seeding Rate Calculator, kept
+  // on the job so a completed record shows what was actually targeted.
+  target_plants_m2?: number;
+  tsw_g?: number;
+  germination_pct?: number;
+  establishment_pct?: number;
+  seed_rate_kg_ha?: number;
+  row_spacing_cm?: number;
+  sowing_depth_mm?: number;
+  // Starting conditions — soil temperature is the primary sowing signal,
+  // air temperature/wind kept alongside it. Same forecast-vs-measured audit
+  // pattern as SprayJob: *_auto always holds the original auto-captured
+  // reading, weather_edited flags when the operator has overridden it.
+  temperature_c?: number;
+  soil_temp_c?: number;
+  humidity?: number;
+  wind_speed?: number;
+  wind_direction?: string;
+  weather_captured_at?: string;
+  temperature_c_auto?: number;
+  soil_temp_c_auto?: number;
+  humidity_auto?: number;
+  wind_speed_auto?: number;
+  wind_direction_auto?: string;
+  weather_edited?: boolean;
+  gps_lat?: number;
+  gps_lon?: number;
+  finish_temperature_c?: number;
+  finish_soil_temp_c?: number;
+  finish_humidity?: number;
+  finish_wind_speed?: number;
+  finish_wind_direction?: string;
+  finish_weather_captured_at?: string;
+  notes?: string;
+  finish_notes?: string;
+  products: SeedingJobProduct[];
+  created_at: string;
+};
+
 export type IssueSeverity = "low" | "medium" | "high" | "critical";
 export type IssueStatus = "open" | "assigned" | "in_progress" | "resolved" | "closed";
 

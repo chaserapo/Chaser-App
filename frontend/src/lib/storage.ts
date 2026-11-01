@@ -12,6 +12,7 @@ import type {
   Maintenance,
   MaintenanceCompletion,
   SprayJob,
+  SeedingJob,
   ExternalLink,
   Operator,
   StockMovement,
@@ -30,6 +31,7 @@ const KEYS = {
   maintenance: "as.maintenance",
   maintenance_completions: "as.maintenance_completions",
   spray_jobs: "as.spray_jobs",
+  seeding_jobs: "as.seeding_jobs",
   farm_issues: "as.farm_issues",
   links: "as.links",
   operators: "as.operators",
@@ -210,6 +212,24 @@ export const localRepo = {
       await writeList(KEYS.spray_jobs, list);
     },
     get: async (id: string) => (await readList<SprayJob>(KEYS.spray_jobs)).find((j) => j.id === id) ?? null,
+  },
+  seedingJobs: {
+    list: () => readList<SeedingJob>(KEYS.seeding_jobs),
+    active: async () => (await readList<SeedingJob>(KEYS.seeding_jobs)).find((j) => j.status === "active") ?? null,
+    completed: async () => (await readList<SeedingJob>(KEYS.seeding_jobs)).filter((j) => j.status === "completed"),
+    planned: async () => (await readList<SeedingJob>(KEYS.seeding_jobs)).filter((j) => j.status === "planned"),
+    save: async (j: SeedingJob) => {
+      const list = await readList<SeedingJob>(KEYS.seeding_jobs);
+      const idx = list.findIndex((x) => x.id === j.id);
+      if (idx >= 0) list[idx] = j;
+      else list.push(j);
+      await writeList(KEYS.seeding_jobs, list);
+    },
+    remove: async (id: string) => {
+      const list = (await readList<SeedingJob>(KEYS.seeding_jobs)).filter((x) => x.id !== id);
+      await writeList(KEYS.seeding_jobs, list);
+    },
+    get: async (id: string) => (await readList<SeedingJob>(KEYS.seeding_jobs)).find((j) => j.id === id) ?? null,
   },
   farmIssues: {
     list: () => readList<FarmIssue>(KEYS.farm_issues),
