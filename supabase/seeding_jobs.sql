@@ -1,14 +1,19 @@
 -- Seeding jobs schema. Mirrors spray_jobs / spray_job_products exactly in
 -- shape (soft-delete on the parent, hard-delete on removed child rows,
--- business_id scoping on every row).
+-- business_id scoping on every row) and RLS policy, confirmed directly
+-- against the live spray_jobs policies:
+--   spray_jobs_select / _insert / _update: is_business_member(business_id)
+--   spray_jobs_delete: business_role(business_id) = ANY (ARRAY['owner','manager'])
+--     — only owners/managers can delete a job; any member can select/insert/update.
 --
--- IMPORTANT: this file was written without being able to read your live
--- spray_jobs RLS policies directly (no DB access from this environment) --
--- it assumes the common "member of business_members" ownership pattern.
--- Before running this, open the Supabase SQL editor, run:
---   select policyname, qual, with_check from pg_policies where tablename = 'spray_jobs';
--- and compare against the policies below. If your spray_jobs policies look
--- different, adjust the ones below to match rather than running as-is.
+-- seeding_job_products policies below use plain is_business_member() on all
+-- four actions, inferred (not confirmed against a live query) from how the
+-- app actually works: any member can create/edit a job's product list via
+-- saveSprayJob's cleanup step, so the same owner/manager-only restriction on
+-- spray_jobs_delete can't apply to spray_job_products or regular members
+-- could never edit products on their own jobs. Worth confirming with:
+--   select policyname, qual, with_check from pg_policies where tablename = 'spray_job_products';
+-- and adjusting below if it turns out different.
 
 create table if not exists public.seeding_jobs (
   id uuid primary key,
@@ -86,44 +91,44 @@ create index if not exists seeding_job_products_seeding_job_id_idx on public.see
 alter table public.seeding_jobs enable row level security;
 alter table public.seeding_job_products enable row level security;
 
-drop policy if exists "seeding_jobs_select_member" on public.seeding_jobs;
-drop policy if exists "seeding_jobs_insert_member" on public.seeding_jobs;
-drop policy if exists "seeding_jobs_update_member" on public.seeding_jobs;
-drop policy if exists "seeding_jobs_delete_member" on public.seeding_jobs;
+drop policy if exists "seeding_jobs_select" on public.seeding_jobs;
+drop policy if exists "seeding_jobs_insert" on public.seeding_jobs;
+drop policy if exists "seeding_jobs_update" on public.seeding_jobs;
+drop policy if exists "seeding_jobs_delete" on public.seeding_jobs;
 
-create policy "seeding_jobs_select_member" on public.seeding_jobs for select using (
-  exists (select 1 from public.business_members bm where bm.business_id = seeding_jobs.business_id and bm.user_id = auth.uid())
+create policy "seeding_jobs_select" on public.seeding_jobs for select using (
+  is_business_member(business_id)
 );
-create policy "seeding_jobs_insert_member" on public.seeding_jobs for insert with check (
-  exists (select 1 from public.business_members bm where bm.business_id = seeding_jobs.business_id and bm.user_id = auth.uid())
+create policy "seeding_jobs_insert" on public.seeding_jobs for insert with check (
+  is_business_member(business_id)
 );
-create policy "seeding_jobs_update_member" on public.seeding_jobs for update using (
-  exists (select 1 from public.business_members bm where bm.business_id = seeding_jobs.business_id and bm.user_id = auth.uid())
+create policy "seeding_jobs_update" on public.seeding_jobs for update using (
+  is_business_member(business_id)
 ) with check (
-  exists (select 1 from public.business_members bm where bm.business_id = seeding_jobs.business_id and bm.user_id = auth.uid())
+  is_business_member(business_id)
 );
-create policy "seeding_jobs_delete_member" on public.seeding_jobs for delete using (
-  exists (select 1 from public.business_members bm where bm.business_id = seeding_jobs.business_id and bm.user_id = auth.uid())
+create policy "seeding_jobs_delete" on public.seeding_jobs for delete using (
+  business_role(business_id) = ANY (ARRAY['owner'::member_role, 'manager'::member_role])
 );
 
-drop policy if exists "seeding_job_products_select_member" on public.seeding_job_products;
-drop policy if exists "seeding_job_products_insert_member" on public.seeding_job_products;
-drop policy if exists "seeding_job_products_update_member" on public.seeding_job_products;
-drop policy if exists "seeding_job_products_delete_member" on public.seeding_job_products;
+drop policy if exists "seeding_job_products_select" on public.seeding_job_products;
+drop policy if exists "seeding_job_products_insert" on public.seeding_job_products;
+drop policy if exists "seeding_job_products_update" on public.seeding_job_products;
+drop policy if exists "seeding_job_products_delete" on public.seeding_job_products;
 
-create policy "seeding_job_products_select_member" on public.seeding_job_products for select using (
-  exists (select 1 from public.business_members bm where bm.business_id = seeding_job_products.business_id and bm.user_id = auth.uid())
+create policy "seeding_job_products_select" on public.seeding_job_products for select using (
+  is_business_member(business_id)
 );
-create policy "seeding_job_products_insert_member" on public.seeding_job_products for insert with check (
-  exists (select 1 from public.business_members bm where bm.business_id = seeding_job_products.business_id and bm.user_id = auth.uid())
+create policy "seeding_job_products_insert" on public.seeding_job_products for insert with check (
+  is_business_member(business_id)
 );
-create policy "seeding_job_products_update_member" on public.seeding_job_products for update using (
-  exists (select 1 from public.business_members bm where bm.business_id = seeding_job_products.business_id and bm.user_id = auth.uid())
+create policy "seeding_job_products_update" on public.seeding_job_products for update using (
+  is_business_member(business_id)
 ) with check (
-  exists (select 1 from public.business_members bm where bm.business_id = seeding_job_products.business_id and bm.user_id = auth.uid())
+  is_business_member(business_id)
 );
-create policy "seeding_job_products_delete_member" on public.seeding_job_products for delete using (
-  exists (select 1 from public.business_members bm where bm.business_id = seeding_job_products.business_id and bm.user_id = auth.uid())
+create policy "seeding_job_products_delete" on public.seeding_job_products for delete using (
+  is_business_member(business_id)
 );
 
 -- Realtime: match spray_jobs/spray_job_products so useRealtime(["seeding_jobs", "seeding_job_products"], ...) works.
