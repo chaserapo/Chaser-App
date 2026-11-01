@@ -6,14 +6,13 @@
 --   spray_jobs_delete: business_role(business_id) = ANY (ARRAY['owner','manager'])
 --     — only owners/managers can delete a job; any member can select/insert/update.
 --
--- seeding_job_products policies below use plain is_business_member() on all
--- four actions, inferred (not confirmed against a live query) from how the
--- app actually works: any member can create/edit a job's product list via
--- saveSprayJob's cleanup step, so the same owner/manager-only restriction on
--- spray_jobs_delete can't apply to spray_job_products or regular members
--- could never edit products on their own jobs. Worth confirming with:
---   select policyname, qual, with_check from pg_policies where tablename = 'spray_job_products';
--- and adjusting below if it turns out different.
+-- seeding_job_products confirmed against the live spray_job_products
+-- policies too: is_business_member(business_id) for select/insert/update,
+-- and the SAME owner/manager-only restriction as the parent table for
+-- delete — any member can create/edit a job's products, but only an
+-- owner/manager can remove a product row (including the delete-orphaned-
+-- products cleanup in saveSprayJob/saveSeedingJob when a product is
+-- removed from the list and the job is saved).
 
 create table if not exists public.seeding_jobs (
   id uuid primary key,
@@ -128,7 +127,7 @@ create policy "seeding_job_products_update" on public.seeding_job_products for u
   is_business_member(business_id)
 );
 create policy "seeding_job_products_delete" on public.seeding_job_products for delete using (
-  is_business_member(business_id)
+  business_role(business_id) = ANY (ARRAY['owner'::member_role, 'manager'::member_role])
 );
 
 -- Realtime: match spray_jobs/spray_job_products so useRealtime(["seeding_jobs", "seeding_job_products"], ...) works.
