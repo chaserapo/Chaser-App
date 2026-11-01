@@ -7,6 +7,7 @@ import { Card } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
 
 const TOOLS = [
+  { key: "sowing-window", title: "Sowing Window", subtitle: "Soil temp, frost & rain risk — 6-model consensus", icon: "weather-partly-cloudy", route: "/seeding-calculators/sowing-window" },
   { key: "seed-rate", title: "Seeding Rate Calculator", subtitle: "Target density, TSW, germination & establishment", icon: "seed-outline", route: "/seeding-calculators/seed-rate" },
   { key: "fertiliser-blend", title: "Starter Fertiliser Blend", subtitle: "Multi-product rate & cost per paddock", icon: "beaker-outline", route: "/seeding-calculators/fertiliser-blend" },
   { key: "seed-treatment", title: "Seed Treatment / Inoculant", subtitle: "Rate per tonne of seed", icon: "flask-outline", route: "/seeding-calculators/seed-treatment" },
@@ -35,7 +36,7 @@ export default function SeedingTools() {
         ))}
 
         <Card style={{ marginTop: spacing.md, backgroundColor: colors.surfaceTertiary }}>
-          <Text style={styles.comingSoon}>Seeding job records and a sowing-window forecast are coming next — for now these calculators work standalone, nothing is saved.</Text>
+          <Text style={styles.comingSoon}>Seeding job records are coming next — for now these tools work standalone, nothing is saved as a job.</Text>
         </Card>
       </ScrollView>
     </View>

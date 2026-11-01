@@ -527,6 +527,63 @@ export function rainRiskNext24(daily: DailyConsensus[]): { total: number; prob: 
   return { total: round1(total), prob: Math.round(prob), label };
 }
 
+// ─── Sowing window (seeding) ───────────────────────────────────────────────
+// Same shape as findSprayWindows, gated on soil temperature and rain instead
+// of wind/humidity/Delta T — soil needs to be warm enough for germination,
+// and sowing into rain-soaked ground right after is both bad for
+// establishment and hard on the seeder.
+export type SeedingThresholds = {
+  soil_temp_min_c: number;
+  rain_free_hours_after: number;
+};
+
+export const DEFAULT_SEEDING_THRESHOLDS: SeedingThresholds = {
+  soil_temp_min_c: 10,
+  rain_free_hours_after: 6,
+};
+
+export type SeedingWindow = {
+  start: string;
+  end: string;
+  hours: number;
+  soil_temp_range: [number, number];
+  confidence: number;
+};
+
+export function findSeedingWindows(consensus: ConsensusHour[], t: SeedingThresholds): SeedingWindow[] {
+  const ok = (h: ConsensusHour): boolean => {
+    if (h.soil_temp_c == null || h.soil_temp_c < t.soil_temp_min_c) return false;
+    if (h.precip_prob != null && h.precip_prob > 40) return false;
+    if (h.precip_mm != null && h.precip_mm > 0.2) return false;
+    return true;
+  };
+  const nowMs = Date.now();
+  const hs = consensus.filter((c) => new Date(c.valid_time).getTime() >= nowMs - 3600_000);
+  const windows: SeedingWindow[] = [];
+  let cur: ConsensusHour[] = [];
+  const flush = () => {
+    if (cur.length < 2) { cur = []; return; }
+    const temps = cur.map((h) => h.soil_temp_c).filter((v): v is number => v != null);
+    const confs = cur.map((h) => h.confidence.overall);
+    if (temps.length === 0) { cur = []; return; }
+    windows.push({
+      start: cur[0].valid_time,
+      end: cur[cur.length - 1].valid_time,
+      hours: cur.length,
+      soil_temp_range: [Math.round(Math.min(...temps)), Math.round(Math.max(...temps))],
+      confidence: Math.round(mean(confs)),
+    });
+    cur = [];
+  };
+  for (const h of hs) {
+    if (ok(h)) cur.push(h);
+    else flush();
+  }
+  flush();
+  // Only surface the next ~5 upcoming windows to keep the UI focused.
+  return windows.slice(0, 5);
+}
+
 // ─── Persistence ──────────────────────────────────────────────────────────
 export async function persistRun(bundle: ForecastBundle, source: "client" | "cron"): Promise<string | null> {
   const businessId = getActiveBusinessId();
