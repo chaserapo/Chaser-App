@@ -29,15 +29,38 @@ async function softDelete(table: string, id: string) {
 // records keep syncing until the migration is applied.
 const OPTIONAL_COLUMNS = ["weather_source", "weather_station", "rainfast_hours"];
 
+// The business + business_members rows that farms/paddocks/etc. depend on for
+// RLS are created moments earlier in the same signup flow (see bootstrapBusiness
+// in auth-context.tsx). Very occasionally the just-committed membership row isn't
+// yet visible to the very next request — observed in practice as the first
+// onboarding insert failing with a row-level security violation, then succeeding
+// immediately on an identical retry. Rather than surface that as an error to a
+// brand-new user, retry a few times with backoff before giving up; any other
+// kind of error still fails immediately.
+function isTransientRlsError(error: { code?: string; message?: string }): boolean {
+  return error.code === "42501" || /row-level security policy/i.test(error.message ?? "");
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function upsertRow<T extends { id: string }>(table: string, row: T) {
   let payload: any = { ...row, business_id: bid(), deleted_at: null };
+  let rlsAttempt = 0;
   for (;;) {
     const { error } = await supabase.from(table).upsert(payload, { onConflict: "id", defaultToNull: false });
     if (!error) return;
     const missing = error.code === "PGRST204" ? OPTIONAL_COLUMNS.find((c) => c in payload && error.message?.includes(`'${c}'`)) : undefined;
-    if (!missing) throw error;
-    const { [missing]: _dropped, ...rest } = payload;
-    payload = rest;
+    if (missing) {
+      const { [missing]: _dropped, ...rest } = payload;
+      payload = rest;
+      continue;
+    }
+    if (isTransientRlsError(error) && rlsAttempt < 4) {
+      rlsAttempt += 1;
+      await sleep(400 * rlsAttempt);
+      continue;
+    }
+    throw error;
   }
 }
 
@@ -322,8 +345,17 @@ export const cloudRepo = {
           .join(",");
         payload.boundary = `SRID=4326;POLYGON((${ring}))`;
       }
-      const { error } = await supabase.from("paddocks").upsert(payload, { onConflict: "id", defaultToNull: false });
-      if (error) throw error;
+      let rlsAttempt = 0;
+      for (;;) {
+        const { error } = await supabase.from("paddocks").upsert(payload, { onConflict: "id", defaultToNull: false });
+        if (!error) return;
+        if (isTransientRlsError(error) && rlsAttempt < 4) {
+          rlsAttempt += 1;
+          await sleep(400 * rlsAttempt);
+          continue;
+        }
+        throw error;
+      }
     },
     remove: (id: string) => softDelete("paddocks", id),
   },

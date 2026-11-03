@@ -252,14 +252,6 @@ export default function Home() {
             <Icon name="seed-outline" size={20} color={colors.brandPrimary} />
             <Text style={styles.secondaryBtnText}>Seeding Tools</Text>
           </Pressable>
-          <Pressable
-            onPress={() => router.push("/jobs/new")}
-            style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
-            testID="new-job-btn"
-          >
-            <Icon name="plus-circle-outline" size={20} color={colors.brandPrimary} />
-            <Text style={styles.secondaryBtnText}>New Job</Text>
-          </Pressable>
         </View>
 
         <SectionHeader

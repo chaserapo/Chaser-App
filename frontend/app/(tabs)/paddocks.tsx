@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
+import { Swipeable } from "react-native-gesture-handler";
 import { v4 as uuid } from "uuid";
 import * as Location from "expo-location";
 import Icon from "@react-native-vector-icons/material-design-icons";
@@ -10,11 +11,21 @@ import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { useRealtime } from "@/src/lib/realtime";
 import { useAuth } from "@/src/lib/auth-context";
+import { confirm } from "@/src/lib/confirm";
 import { PaddockMap, PaddockMapHandle, FarmPin, IssuePin } from "@/src/features/paddocks/PaddockMap";
 import { supabase } from "@/src/lib/supabase";
 import { issueCategoryIcon, issueCategoryLabel } from "@/src/lib/issue-categories";
 import { geocodeAddress } from "@/src/lib/geocoding";
 import type { Paddock, PaddockBoundary, Farm, FarmIssue } from "@/src/lib/types";
+
+function DeleteAction({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.deleteAction}>
+      <Icon name="trash-can-outline" size={20} color={colors.onBrandPrimary} />
+      <Text style={styles.deleteActionText}>Delete</Text>
+    </Pressable>
+  );
+}
 
 type Mode = "view" | "draw";
 type ViewKind = "map" | "list";
@@ -299,6 +310,20 @@ export default function PaddocksTab() {
     } finally { setSaving(false); }
   }
 
+  function deletePaddock(p: Paddock) {
+    confirm(
+      { title: "Delete paddock", message: `Remove ${p.name}? Existing spray records will remain but no longer link to this paddock.`, confirmLabel: "Delete", destructive: true },
+      async () => { await repo.paddocks.remove(p.id); await load(); },
+    );
+  }
+
+  function deleteFarm(f: Farm) {
+    confirm(
+      { title: "Delete farm", message: `Remove ${f.name}? Its paddocks will stay but become unassigned.`, confirmLabel: "Delete", destructive: true },
+      async () => { await repo.farms.remove(f.id); await load(); },
+    );
+  }
+
   const selectedPaddock = selectedId ? paddocks.find((p) => p.id === selectedId) : null;
   const showList = viewKind === "list" && mode === "view";
   function retryMapLoad() { setMapLoadTimedOut(false); setMapKey((k) => k + 1); }
@@ -311,10 +336,16 @@ export default function PaddocksTab() {
           <Text style={styles.sub}>{paddocks.length} paddock{paddocks.length === 1 ? "" : "s"}{farms.length > 0 ? ` · ${farms.length} farm${farms.length === 1 ? "" : "s"}` : ""}</Text>
         </View>
         {mode === "view" && canEdit ? (
-          <Pressable style={styles.addBtn} onPress={startDraw} testID="draw-paddock-btn">
-            <Icon name="draw" size={18} color={colors.onBrandPrimary} />
-            <Text style={styles.addBtnText}>Add</Text>
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Pressable style={styles.addBtn} onPress={() => router.push("/farms/new")} testID="add-farm-btn">
+              <Icon name="barn" size={18} color={colors.onBrandPrimary} />
+              <Text style={styles.addBtnText}>Farm</Text>
+            </Pressable>
+            <Pressable style={styles.addBtn} onPress={startDraw} testID="draw-paddock-btn">
+              <Icon name="draw" size={18} color={colors.onBrandPrimary} />
+              <Text style={styles.addBtnText}>Paddock</Text>
+            </Pressable>
+          </View>
         ) : null}
       </View>
 
@@ -368,59 +399,74 @@ export default function PaddocksTab() {
           {grouped.map((g) => {
             const farmId = g.farm?.id ?? "__unassigned__";
             const collapsed = !!collapsedFarmIds[farmId];
+            const farmHeader = (
+              <Pressable
+                onPress={() => toggleFarmCollapsed(farmId)}
+                style={styles.farmHeader}
+                testID={`farm-header-${farmId}`}
+              >
+                <Icon
+                  name={collapsed ? "chevron-right" : "chevron-down"}
+                  size={22}
+                  color={colors.muted}
+                />
+                <Icon
+                  name={g.farm ? "barn" : "help-circle-outline"}
+                  size={20}
+                  color={colors.brandPrimary}
+                  style={{ marginRight: 8 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.farmName} numberOfLines={1}>
+                    {g.farm ? g.farm.name : "Unassigned paddocks"}
+                  </Text>
+                  <Text style={styles.farmMeta} numberOfLines={1}>
+                    {g.paddocks.length} paddock{g.paddocks.length === 1 ? "" : "s"}
+                    {g.totalHa > 0 ? ` · ${g.totalHa.toFixed(1)} ha` : ""}
+                    {g.farm?.region ? ` · ${g.farm.region}` : ""}
+                  </Text>
+                </View>
+              </Pressable>
+            );
             return (
               <View key={farmId} style={styles.farmGroup} testID={`farm-group-${farmId}`}>
-                <Pressable
-                  onPress={() => toggleFarmCollapsed(farmId)}
-                  style={styles.farmHeader}
-                  testID={`farm-header-${farmId}`}
-                >
-                  <Icon
-                    name={collapsed ? "chevron-right" : "chevron-down"}
-                    size={22}
-                    color={colors.muted}
-                  />
-                  <Icon
-                    name={g.farm ? "barn" : "help-circle-outline"}
-                    size={20}
-                    color={colors.brandPrimary}
-                    style={{ marginRight: 8 }}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.farmName} numberOfLines={1}>
-                      {g.farm ? g.farm.name : "Unassigned paddocks"}
-                    </Text>
-                    <Text style={styles.farmMeta} numberOfLines={1}>
-                      {g.paddocks.length} paddock{g.paddocks.length === 1 ? "" : "s"}
-                      {g.totalHa > 0 ? ` · ${g.totalHa.toFixed(1)} ha` : ""}
-                      {g.farm?.region ? ` · ${g.farm.region}` : ""}
-                    </Text>
-                  </View>
-                </Pressable>
+                {g.farm && canEdit ? (
+                  <Swipeable renderRightActions={() => <DeleteAction onPress={() => deleteFarm(g.farm!)} />} overshootRight={false}>
+                    {farmHeader}
+                  </Swipeable>
+                ) : farmHeader}
 
                 {!collapsed
-                  ? g.paddocks.map((p) => (
-                      <Pressable
-                        key={p.id}
-                        onPress={() => viewPaddockOnMap(p.id)}
-                        style={({ pressed }) => [styles.paddockRow, pressed && { backgroundColor: colors.surface }]}
-                        testID={`paddock-row-${p.id}`}
-                      >
-                        <View style={styles.paddockDot}>
-                          <Icon name="map-marker-outline" size={18} color={colors.brandPrimary} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.paddockName} numberOfLines={1}>{p.name}</Text>
-                          <Text style={styles.paddockMeta} numberOfLines={1}>
-                            {p.area_ha != null ? `${p.area_ha} ha` : "No area"}
-                            {p.crop ? ` · ${p.crop}` : ""}
-                            {p.variety ? ` (${p.variety})` : ""}
-                            {!p.boundary ? " · no boundary" : ""}
-                          </Text>
-                        </View>
-                        <Icon name="chevron-right" size={22} color={colors.muted} />
-                      </Pressable>
-                    ))
+                  ? g.paddocks.map((p) => {
+                      const row = (
+                        <Pressable
+                          onPress={() => viewPaddockOnMap(p.id)}
+                          style={({ pressed }) => [styles.paddockRow, pressed && { backgroundColor: colors.surface }]}
+                          testID={`paddock-row-${p.id}`}
+                        >
+                          <View style={styles.paddockDot}>
+                            <Icon name="map-marker-outline" size={18} color={colors.brandPrimary} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.paddockName} numberOfLines={1}>{p.name}</Text>
+                            <Text style={styles.paddockMeta} numberOfLines={1}>
+                              {p.area_ha != null ? `${p.area_ha} ha` : "No area"}
+                              {p.crop ? ` · ${p.crop}` : ""}
+                              {p.variety ? ` (${p.variety})` : ""}
+                              {!p.boundary ? " · no boundary" : ""}
+                            </Text>
+                          </View>
+                          <Icon name="chevron-right" size={22} color={colors.muted} />
+                        </Pressable>
+                      );
+                      return canEdit ? (
+                        <Swipeable key={p.id} renderRightActions={() => <DeleteAction onPress={() => deletePaddock(p)} />} overshootRight={false}>
+                          {row}
+                        </Swipeable>
+                      ) : (
+                        <View key={p.id}>{row}</View>
+                      );
+                    })
                   : null}
 
                 {!collapsed && g.paddocks.length === 0 ? (
@@ -694,4 +740,6 @@ const styles = StyleSheet.create({
   paddockName: { fontSize: 14, fontWeight: "700", color: colors.onSurface },
   paddockMeta: { fontSize: 12, color: colors.muted, marginTop: 2 },
   emptyGroupText: { padding: spacing.md, color: colors.muted, fontStyle: "italic", fontSize: 12, textAlign: "center" },
+  deleteAction: { width: 84, backgroundColor: colors.error, alignItems: "center", justifyContent: "center", gap: 2 },
+  deleteActionText: { color: colors.onBrandPrimary, fontSize: 11, fontWeight: "700" },
 });

@@ -9,7 +9,8 @@ import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { useAuth } from "@/src/lib/auth-context";
 import { confirm } from "@/src/lib/confirm";
-import { PaddockMap, PaddockMapHandle } from "@/src/features/paddocks/PaddockMap";
+import { PaddockMap, PaddockMapHandle, FarmPin } from "@/src/features/paddocks/PaddockMap";
+import { supabase } from "@/src/lib/supabase";
 import type { Paddock, SprayJob } from "@/src/lib/types";
 
 export default function PaddockDetail() {
@@ -20,6 +21,7 @@ export default function PaddockDetail() {
   const canEdit = business?.role === "owner" || business?.role === "manager";
   const [p, setP] = useState<Paddock | null>(null);
   const [history, setHistory] = useState<SprayJob[]>([]);
+  const [farmPin, setFarmPin] = useState<FarmPin | null>(null);
   const mapRef = useRef<PaddockMapHandle>(null);
 
   const load = useCallback(async () => {
@@ -32,7 +34,27 @@ export default function PaddockDetail() {
       const jobs = await repo.sprayJobs.completed();
       setHistory(jobs.filter((j) => j.paddock_id === id).sort((a, b) => b.date.localeCompare(a.date)));
     } catch { /* history optional */ }
-  }, [id]);
+
+    // Without a drawn boundary there's nothing for the map to fit to, so it
+    // sits at its hardcoded default view. Fall back to the farm's own
+    // geocoded location so there's at least a pin showing where it is.
+    setFarmPin(null);
+    const businessId = business?.id;
+    if (one && !one.boundary && one.farm_id && businessId) {
+      try {
+        const { data } = await supabase
+          .from("weather_locations")
+          .select("id, lat, lon, label")
+          .eq("business_id", businessId)
+          .eq("farm_id", one.farm_id)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (data && typeof data.lat === "number" && typeof data.lon === "number") {
+          setFarmPin({ id: data.id, lat: data.lat, lon: data.lon, name: data.label || "Farm", farm_id: one.farm_id });
+        }
+      } catch { /* fail-safe */ }
+    }
+  }, [id, business]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -54,6 +76,7 @@ export default function PaddockDetail() {
           <PaddockMap
             ref={mapRef}
             paddocks={[{ id: p.id, name: p.name, area_ha: p.area_ha, crop: p.crop, boundary_geojson: p.boundary ?? null }]}
+            farmPins={farmPin ? [farmPin] : undefined}
           />
         </View>
 
