@@ -12,7 +12,15 @@ export function polygonCentroid(b?: PaddockBoundary | null): { lat: number; lon:
     if (typeof lng === "number" && typeof lat === "number") { sx += lng; sy += lat; n += 1; }
   }
   if (n === 0) return null;
-  return { lat: sy / n, lon: sx / n };
+  const lat = sy / n, lon = sx / n;
+  // A boundary saved with garbled/swapped coordinates can centroid outside
+  // valid Earth ranges. Treat that the same as "no boundary" instead of
+  // handing bogus coordinates to the weather API, which rejects them with a
+  // 400 identically across every model (surfacing as "couldn't load the
+  // forecast" with no indication the real problem is this paddock's drawn
+  // boundary).
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  return { lat, lon };
 }
 
 export function coordsForPaddock(p: Paddock): { lat: number; lon: number } | null {

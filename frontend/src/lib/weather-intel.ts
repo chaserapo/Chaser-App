@@ -174,11 +174,12 @@ const MAP: Record<string, keyof HourlyVars> = {
 // stale model catalog (ecmwf_ifs04 accepted the request but returned null
 // for every hour; bom_access_global did the same on /v1/bom). Confirmed
 // live against the API: /v1/forecast is the actively-maintained endpoint.
-async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: number, timeoutMs: number): Promise<ModelHour[]> {
+async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: number, timeoutMs: number, excludeVars: string[] = []): Promise<ModelHour[]> {
+  const vars = excludeVars.length === 0 ? HOURLY_VARS : HOURLY_VARS.split(",").filter((v) => !excludeVars.includes(v)).join(",");
   const url = openMeteoUrl(
     "api",
     `/v1/forecast?latitude=${lat}&longitude=${lon}` +
-      `&hourly=${HOURLY_VARS}` +
+      `&hourly=${vars}` +
       `&wind_speed_unit=kmh&timezone=auto&forecast_days=${days}` +
       `&models=${model}`,
   );
@@ -186,7 +187,19 @@ async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: numb
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error(`open-meteo ${model} ${res.status}`);
+    if (!res.ok) {
+      // Open-Meteo returns {error: true, reason: "..."} on a 400 — most
+      // commonly because one of our requested hourly variables isn't
+      // published for this particular model (not every model carries soil
+      // moisture/temperature or ET0, for example). Surface that reason on
+      // the thrown error so fetchOne can drop just that variable and retry,
+      // instead of the whole model failing outright every time.
+      let reason = "";
+      try { reason = (await res.json())?.reason ?? ""; } catch { /* body wasn't JSON */ }
+      const err = new Error(`open-meteo ${model} ${res.status}${reason ? `: ${reason}` : ""}`) as Error & { openMeteoReason?: string };
+      err.openMeteoReason = reason;
+      throw err;
+    }
     const j: any = await res.json();
     const hours: ModelHour[] = [];
     const times: string[] = j?.hourly?.time ?? [];
@@ -251,20 +264,34 @@ async function fetchOnceRaw(model: ModelId, lat: number, lon: number, days: numb
 
 async function fetchOne(model: ModelId, lat: number, lon: number, horizonH: number): Promise<ModelHour[]> {
   const days = Math.max(1, Math.ceil(horizonH / 24));
-  try {
-    return await fetchOnceRaw(model, lat, lon, days, 25_000);
-  } catch {
-    // One retry - a single slow/dropped request on mobile shouldn't cost a
-    // model out of the consensus for the next 45 minutes (the stale-refetch
-    // window). If the retry fails too, log why before giving up — a
-    // consistently-failing model (e.g. a renamed/retired Open-Meteo model id)
-    // was previously invisible since this error was swallowed entirely.
+  const excludeVars: string[] = [];
+  let lastErr: any;
+  // Up to 3 attempts: one plain try, plus one retry per hourly variable this
+  // model turns out not to publish (each 400 names at most one unsupported
+  // variable, so a model missing 2 of our 17 fields needs 2 strips to clear).
+  for (let attempt = 0; attempt < 1 + HOURLY_VARS.split(",").length; attempt++) {
     try {
-      return await fetchOnceRaw(model, lat, lon, days, 25_000);
-    } catch (e2: any) {
-      console.warn(`weather model "${model}" failed twice:`, e2?.message ?? e2);
-      throw e2;
+      return await fetchOnceRaw(model, lat, lon, days, 25_000, excludeVars);
+    } catch (e: any) {
+      lastErr = e;
+      const reason: string = e?.openMeteoReason ?? "";
+      const unsupported = /variable '([a-z0-9_]+)'/i.exec(reason)?.[1];
+      if (unsupported && !excludeVars.includes(unsupported)) {
+        excludeVars.push(unsupported);
+        continue;
+      }
+      break;
     }
+  }
+  // Not an unsupported-variable 400 (or we've stripped all we can identify) —
+  // one more plain retry, since a single slow/dropped request on mobile
+  // shouldn't cost a model out of the consensus for the next 45 minutes (the
+  // stale-refetch window).
+  try {
+    return await fetchOnceRaw(model, lat, lon, days, 25_000, excludeVars);
+  } catch (e2: any) {
+    console.warn(`weather model "${model}" failed:`, e2?.message ?? lastErr?.message ?? e2);
+    throw e2;
   }
 }
 
