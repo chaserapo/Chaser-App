@@ -64,7 +64,7 @@ export type Chemical = {
   created_at: string;
 };
 
-export type StockMovementReason = "Purchase" | "Usage" | "Spray Job" | "Correction" | "Spill" | "Transfer" | "Other";
+export type StockMovementReason = "Purchase" | "Usage" | "Spray Job" | "Spread Job" | "Correction" | "Spill" | "Transfer" | "Other";
 
 export type StockMovement = {
   id: ID;
@@ -76,6 +76,7 @@ export type StockMovement = {
   unit?: string;
   reason: StockMovementReason;
   spray_job_id?: ID;
+  spread_job_id?: ID;
   notes?: string;
   created_at: string;
 };
@@ -216,8 +217,8 @@ export type Maintenance = {
   created_at: string;
 };
 
-export type RateUnit = "L/ha" | "mL/ha" | "kg/ha" | "g/ha" | "mL/100 L" | "L/100 L" | "%v/v" | "Custom";
-export const RATE_UNITS: RateUnit[] = ["L/ha", "mL/ha", "kg/ha", "g/ha", "mL/100 L", "L/100 L", "%v/v", "Custom"];
+export type RateUnit = "L/ha" | "mL/ha" | "kg/ha" | "g/ha" | "t/ha" | "mL/100 L" | "L/100 L" | "%v/v" | "Custom";
+export const RATE_UNITS: RateUnit[] = ["L/ha", "mL/ha", "kg/ha", "g/ha", "t/ha", "mL/100 L", "L/100 L", "%v/v", "Custom"];
 
 // Common ag-chem pack sizes, offered as quick-select chips when recording
 // stock so a farmer isn't typing "20 L" by hand every time.
@@ -374,6 +375,129 @@ export type SeedingJob = {
   notes?: string;
   finish_notes?: string;
   products: SeedingJobProduct[];
+  created_at: string;
+};
+
+export type HarvestJobStatus = "draft" | "planned" | "active" | "completed";
+export type HarvestYieldUnit = "t_ha" | "bu_ac";
+
+// A harvest job has no products child table — it doesn't apply a chemical
+// or seed product, it records a result. Unlike SprayJob/SeedingJob's
+// pre-job rate targets, yield/moisture/protein/screenings/grade/destination
+// are only known once the paddock is actually off, so they're populated at
+// Finish, not at job start.
+export type HarvestJob = {
+  id: ID;
+  business_id: ID;
+  status: HarvestJobStatus;
+  farm_id?: ID;
+  farm_name?: string;
+  paddock_id?: ID;
+  paddock_name?: string;
+  crop?: string;
+  variety?: string;
+  date: string;
+  start_time?: string;
+  finish_time?: string;
+  operator_id?: ID;
+  operator?: string;
+  machinery_id?: ID;
+  machinery_name?: string;
+  area_ha?: number;
+  actual_area_ha?: number;
+  header_width_m?: number;
+  ground_speed_kmh?: number;
+  yield_value?: number;
+  yield_unit?: HarvestYieldUnit;
+  moisture_pct?: number;
+  protein_pct?: number;
+  screenings_pct?: number;
+  grade?: string;
+  destination?: string;
+  temperature_c?: number;
+  humidity?: number;
+  wind_speed?: number;
+  wind_direction?: string;
+  weather_captured_at?: string;
+  temperature_c_auto?: number;
+  humidity_auto?: number;
+  wind_speed_auto?: number;
+  wind_direction_auto?: string;
+  weather_edited?: boolean;
+  gps_lat?: number;
+  gps_lon?: number;
+  finish_temperature_c?: number;
+  finish_humidity?: number;
+  finish_wind_speed?: number;
+  finish_wind_direction?: string;
+  finish_weather_captured_at?: string;
+  notes?: string;
+  finish_notes?: string;
+  created_at: string;
+};
+
+// Fertiliser/lime/gypsum products on a spread job — picked from the same
+// Chemical register as spray jobs, same snapshot-at-add-time shape as
+// SprayJobProduct so a later edit to the register never rewrites a past
+// job's recorded rate/cost.
+export type SpreadJobProduct = {
+  id: ID;
+  chemical_id: ID;
+  chemical_name: string;
+  chemical_group?: string;
+  cost_per_unit?: number;
+  cost_unit?: string;
+  rate: number;
+  unit: RateUnit;
+  custom_unit_label?: string;
+  total_qty?: number;
+  total_qty_unit?: string;
+};
+
+export type SpreadJobStatus = "draft" | "planned" | "active" | "completed";
+
+export type SpreadJob = {
+  id: ID;
+  business_id: ID;
+  status: SpreadJobStatus;
+  farm_id?: ID;
+  farm_name?: string;
+  paddock_id?: ID;
+  paddock_name?: string;
+  crop?: string;
+  variety?: string;
+  target?: string;
+  date: string;
+  start_time?: string;
+  finish_time?: string;
+  operator_id?: ID;
+  operator?: string;
+  machinery_id?: ID;
+  machinery_name?: string;
+  area_ha?: number;
+  actual_area_ha?: number;
+  speed_kmh?: number;
+  spread_width_m?: number;
+  temperature_c?: number;
+  humidity?: number;
+  wind_speed?: number;
+  wind_direction?: string;
+  weather_captured_at?: string;
+  temperature_c_auto?: number;
+  humidity_auto?: number;
+  wind_speed_auto?: number;
+  wind_direction_auto?: string;
+  weather_edited?: boolean;
+  gps_lat?: number;
+  gps_lon?: number;
+  finish_temperature_c?: number;
+  finish_humidity?: number;
+  finish_wind_speed?: number;
+  finish_wind_direction?: string;
+  finish_weather_captured_at?: string;
+  notes?: string;
+  finish_notes?: string;
+  products: SpreadJobProduct[];
   created_at: string;
 };
 

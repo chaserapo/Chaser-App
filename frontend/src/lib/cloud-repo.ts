@@ -6,10 +6,13 @@ import { supabase } from "./supabase";
 import { getActiveBusinessId } from "./backend";
 import { offlineQueue } from "./offline-queue";
 import { seedingOfflineQueue } from "./seeding-offline-queue";
+import { harvestOfflineQueue } from "./harvest-offline-queue";
+import { spreadOfflineQueue } from "./spread-offline-queue";
 import { issuesOfflineQueue } from "./issues-offline-queue";
 import type {
   Business, Farm, Paddock, Chemical, ChemicalBatch, ChemicalStockLine, Machinery, Maintenance,
-  MaintenanceCompletion, SprayJob, SprayJobProduct, SeedingJob, SeedingJobProduct, ExternalLink, Operator, StockMovement,
+  MaintenanceCompletion, SprayJob, SprayJobProduct, SeedingJob, SeedingJobProduct, HarvestJob,
+  SpreadJob, SpreadJobProduct, ExternalLink, Operator, StockMovement,
   FarmIssue,
 } from "./types";
 
@@ -234,6 +237,101 @@ async function hydrateSeedingJobs(jobs: any[]): Promise<SeedingJob[]> {
     byJob.set(p.seeding_job_id, list);
   }
   return jobs.map((j) => ({ ...j, products: byJob.get(j.id) ?? [] })) as SeedingJob[];
+}
+
+// ---- Harvest jobs (flat table, no products child table) ----
+async function saveHarvestJob(job: HarvestJob) {
+  const businessId = bid();
+  const jobWithBiz: HarvestJob = { ...job, business_id: businessId };
+  try {
+    await harvestOfflineQueue.mirror(businessId, jobWithBiz);
+  } catch (e) {
+    console.warn("harvest offline mirror failed", e);
+  }
+  try {
+    await upsertRow("harvest_jobs", jobWithBiz as any);
+    await harvestOfflineQueue.markSynced(businessId, jobWithBiz.id);
+  } catch (e) {
+    await harvestOfflineQueue.markFailed(businessId, jobWithBiz.id, e);
+    console.warn("harvest job cloud save failed — kept in offline queue", e);
+  }
+}
+
+// ---- Spread jobs (job + products join) ----
+// Same shape as saveSprayJob/hydrateJobs above, scoped to spread_jobs /
+// spread_job_products and the spread offline queue instead.
+function stripSpreadProducts(job: SpreadJob): Omit<SpreadJob, "products"> {
+  const { products, ...rest } = job;
+  return rest;
+}
+
+async function saveSpreadJob(job: SpreadJob) {
+  const businessId = bid();
+  const jobWithBiz: SpreadJob = { ...job, business_id: businessId };
+  try {
+    await spreadOfflineQueue.mirror(businessId, jobWithBiz);
+  } catch (e) {
+    console.warn("spread offline mirror failed", e);
+  }
+
+  try {
+    await upsertRow("spread_jobs", stripSpreadProducts(jobWithBiz) as any);
+    const productRows = (jobWithBiz.products ?? []).map((p) => ({
+      id: p.id,
+      business_id: businessId,
+      spread_job_id: jobWithBiz.id,
+      chemical_id: p.chemical_id,
+      chemical_name: p.chemical_name,
+      chemical_group: p.chemical_group ?? null,
+      cost_per_unit: p.cost_per_unit ?? null,
+      cost_unit: p.cost_unit ?? null,
+      rate: p.rate,
+      unit: p.unit,
+      custom_unit_label: p.custom_unit_label ?? null,
+      total_qty: p.total_qty ?? null,
+      total_qty_unit: p.total_qty_unit ?? null,
+    }));
+    if (productRows.length > 0) {
+      const { error } = await supabase.from("spread_job_products").upsert(productRows, { onConflict: "id", defaultToNull: false });
+      if (error) throw error;
+    }
+    const keepIds = productRows.map((p) => p.id);
+    let delQ = supabase.from("spread_job_products").delete().eq("spread_job_id", jobWithBiz.id).eq("business_id", businessId);
+    if (keepIds.length > 0) delQ = delQ.not("id", "in", `(${keepIds.map((i) => `"${i}"`).join(",")})`);
+    const { error: delErr } = await delQ;
+    if (delErr) throw delErr;
+
+    await spreadOfflineQueue.markSynced(businessId, jobWithBiz.id);
+  } catch (e) {
+    await spreadOfflineQueue.markFailed(businessId, jobWithBiz.id, e);
+    console.warn("spread job cloud save failed — kept in offline queue", e);
+  }
+}
+
+async function hydrateSpreadJobs(jobs: any[]): Promise<SpreadJob[]> {
+  if (jobs.length === 0) return [];
+  const ids = jobs.map((j) => j.id);
+  const { data: products, error } = await supabase.from("spread_job_products").select("*").in("spread_job_id", ids);
+  if (error) throw error;
+  const byJob = new Map<string, SpreadJobProduct[]>();
+  for (const p of products ?? []) {
+    const list = byJob.get(p.spread_job_id) ?? [];
+    list.push({
+      id: p.id,
+      chemical_id: p.chemical_id,
+      chemical_name: p.chemical_name ?? "",
+      chemical_group: p.chemical_group ?? undefined,
+      cost_per_unit: p.cost_per_unit ?? undefined,
+      cost_unit: p.cost_unit ?? undefined,
+      rate: p.rate ?? 0,
+      unit: p.unit,
+      custom_unit_label: p.custom_unit_label ?? undefined,
+      total_qty: p.total_qty ?? undefined,
+      total_qty_unit: p.total_qty_unit ?? undefined,
+    });
+    byJob.set(p.spread_job_id, list);
+  }
+  return jobs.map((j) => ({ ...j, products: byJob.get(j.id) ?? [] })) as SpreadJob[];
 }
 
 // ---- Maintenance <-> DB field mapping (maintenance_id <-> schedule_id) ----
@@ -505,6 +603,83 @@ export const cloudRepo = {
       return await seedingOfflineQueue.getShadow(bid(), id);
     },
   },
+  harvestJobs: {
+    list: async () => {
+      try { return await listRows<HarvestJob>("harvest_jobs"); }
+      catch (e) {
+        console.warn("harvestJobs.list cloud fail, using shadow", e);
+        const local = await harvestOfflineQueue.findLocalActive(bid());
+        return local ? [local] : [];
+      }
+    },
+    active: async () => {
+      try {
+        const jobs = await listRows<HarvestJob>("harvest_jobs", { extraEq: [["status", "active"]] });
+        if (jobs[0]) return jobs[0];
+      } catch (e) {
+        console.warn("harvestJobs.active cloud fail, using shadow", e);
+      }
+      return await harvestOfflineQueue.findLocalActive(bid());
+    },
+    completed: async () => {
+      try { return await listRows<HarvestJob>("harvest_jobs", { extraEq: [["status", "completed"]] }); }
+      catch (e) { console.warn("harvestJobs.completed cloud fail", e); return []; }
+    },
+    planned: async () => {
+      try { return await listRows<HarvestJob>("harvest_jobs", { extraEq: [["status", "planned"]] }); }
+      catch (e) { console.warn("harvestJobs.planned cloud fail", e); return []; }
+    },
+    save: saveHarvestJob,
+    remove: (id: string) => softDelete("harvest_jobs", id),
+    get: async (id: string) => {
+      try {
+        const rows = await listRows<HarvestJob>("harvest_jobs", { extraEq: [["id", id]] });
+        if (rows[0]) return rows[0];
+      } catch (e) {
+        console.warn("harvestJobs.get cloud fail, using shadow", e);
+      }
+      return await harvestOfflineQueue.getShadow(bid(), id);
+    },
+  },
+  spreadJobs: {
+    list: async () => {
+      try { return await hydrateSpreadJobs(await listRows<any>("spread_jobs")); }
+      catch (e) {
+        console.warn("spreadJobs.list cloud fail, using shadow", e);
+        const local = await spreadOfflineQueue.findLocalActive(bid());
+        return local ? [local] : [];
+      }
+    },
+    active: async () => {
+      try {
+        const jobs = await hydrateSpreadJobs(await listRows<any>("spread_jobs", { extraEq: [["status", "active"]] }));
+        if (jobs[0]) return jobs[0];
+      } catch (e) {
+        console.warn("spreadJobs.active cloud fail, using shadow", e);
+      }
+      return await spreadOfflineQueue.findLocalActive(bid());
+    },
+    completed: async () => {
+      try { return await hydrateSpreadJobs(await listRows<any>("spread_jobs", { extraEq: [["status", "completed"]] })); }
+      catch (e) { console.warn("spreadJobs.completed cloud fail", e); return []; }
+    },
+    planned: async () => {
+      try { return await hydrateSpreadJobs(await listRows<any>("spread_jobs", { extraEq: [["status", "planned"]] })); }
+      catch (e) { console.warn("spreadJobs.planned cloud fail", e); return []; }
+    },
+    save: saveSpreadJob,
+    remove: (id: string) => softDelete("spread_jobs", id),
+    get: async (id: string) => {
+      try {
+        const rows = await listRows<any>("spread_jobs", { extraEq: [["id", id]] });
+        const jobs = await hydrateSpreadJobs(rows);
+        if (jobs[0]) return jobs[0];
+      } catch (e) {
+        console.warn("spreadJobs.get cloud fail, using shadow", e);
+      }
+      return await spreadOfflineQueue.getShadow(bid(), id);
+    },
+  },
   operators: {
     list: () => listRows<Operator>("operators"),
     active: () => listRows<Operator>("operators", { activeOnly: true }),
@@ -596,6 +771,48 @@ export async function flushOfflineSeedingJobs(): Promise<{ attempted: number; sy
       if (!(await seedingOfflineQueue.isPending(business_id, job.id))) synced += 1;
     } catch (e) {
       console.warn("flushOfflineSeedingJobs retry failed", e);
+    }
+  }
+  return { attempted: pending.length, synced };
+}
+
+/**
+ * Retry any harvest jobs that failed to reach Supabase (offline / timeout).
+ * Safe to call on app focus / after sign-in. No-op when nothing pending.
+ */
+export async function flushOfflineHarvestJobs(): Promise<{ attempted: number; synced: number }> {
+  const businessId = getActiveBusinessId();
+  if (!businessId) return { attempted: 0, synced: 0 };
+  const pending = await harvestOfflineQueue.listPending();
+  let synced = 0;
+  for (const { business_id, job } of pending) {
+    if (business_id !== businessId) continue;
+    try {
+      await saveHarvestJob(job);
+      if (!(await harvestOfflineQueue.isPending(business_id, job.id))) synced += 1;
+    } catch (e) {
+      console.warn("flushOfflineHarvestJobs retry failed", e);
+    }
+  }
+  return { attempted: pending.length, synced };
+}
+
+/**
+ * Retry any spread jobs that failed to reach Supabase (offline / timeout).
+ * Safe to call on app focus / after sign-in. No-op when nothing pending.
+ */
+export async function flushOfflineSpreadJobs(): Promise<{ attempted: number; synced: number }> {
+  const businessId = getActiveBusinessId();
+  if (!businessId) return { attempted: 0, synced: 0 };
+  const pending = await spreadOfflineQueue.listPending();
+  let synced = 0;
+  for (const { business_id, job } of pending) {
+    if (business_id !== businessId) continue;
+    try {
+      await saveSpreadJob(job);
+      if (!(await spreadOfflineQueue.isPending(business_id, job.id))) synced += 1;
+    } catch (e) {
+      console.warn("flushOfflineSpreadJobs retry failed", e);
     }
   }
   return { attempted: pending.length, synced };

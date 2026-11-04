@@ -143,7 +143,7 @@ export default function ActiveJob() {
       finish_weather_captured_at: finishWeather.at,
     };
     await repo.sprayJobs.save(completed);
-    if (deductStock) await applyDeductions(previews, completed.id);
+    if (deductStock) await applyDeductions(previews, { sprayJobId: completed.id });
     router.replace({ pathname: "/records/[id]", params: { id: completed.id } });
   }
 

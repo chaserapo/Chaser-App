@@ -13,6 +13,8 @@ import type {
   MaintenanceCompletion,
   SprayJob,
   SeedingJob,
+  HarvestJob,
+  SpreadJob,
   ExternalLink,
   Operator,
   StockMovement,
@@ -32,6 +34,8 @@ const KEYS = {
   maintenance_completions: "as.maintenance_completions",
   spray_jobs: "as.spray_jobs",
   seeding_jobs: "as.seeding_jobs",
+  harvest_jobs: "as.harvest_jobs",
+  spread_jobs: "as.spread_jobs",
   farm_issues: "as.farm_issues",
   links: "as.links",
   operators: "as.operators",
@@ -230,6 +234,42 @@ export const localRepo = {
       await writeList(KEYS.seeding_jobs, list);
     },
     get: async (id: string) => (await readList<SeedingJob>(KEYS.seeding_jobs)).find((j) => j.id === id) ?? null,
+  },
+  harvestJobs: {
+    list: () => readList<HarvestJob>(KEYS.harvest_jobs),
+    active: async () => (await readList<HarvestJob>(KEYS.harvest_jobs)).find((j) => j.status === "active") ?? null,
+    completed: async () => (await readList<HarvestJob>(KEYS.harvest_jobs)).filter((j) => j.status === "completed"),
+    planned: async () => (await readList<HarvestJob>(KEYS.harvest_jobs)).filter((j) => j.status === "planned"),
+    save: async (j: HarvestJob) => {
+      const list = await readList<HarvestJob>(KEYS.harvest_jobs);
+      const idx = list.findIndex((x) => x.id === j.id);
+      if (idx >= 0) list[idx] = j;
+      else list.push(j);
+      await writeList(KEYS.harvest_jobs, list);
+    },
+    remove: async (id: string) => {
+      const list = (await readList<HarvestJob>(KEYS.harvest_jobs)).filter((x) => x.id !== id);
+      await writeList(KEYS.harvest_jobs, list);
+    },
+    get: async (id: string) => (await readList<HarvestJob>(KEYS.harvest_jobs)).find((j) => j.id === id) ?? null,
+  },
+  spreadJobs: {
+    list: () => readList<SpreadJob>(KEYS.spread_jobs),
+    active: async () => (await readList<SpreadJob>(KEYS.spread_jobs)).find((j) => j.status === "active") ?? null,
+    completed: async () => (await readList<SpreadJob>(KEYS.spread_jobs)).filter((j) => j.status === "completed"),
+    planned: async () => (await readList<SpreadJob>(KEYS.spread_jobs)).filter((j) => j.status === "planned"),
+    save: async (j: SpreadJob) => {
+      const list = await readList<SpreadJob>(KEYS.spread_jobs);
+      const idx = list.findIndex((x) => x.id === j.id);
+      if (idx >= 0) list[idx] = j;
+      else list.push(j);
+      await writeList(KEYS.spread_jobs, list);
+    },
+    remove: async (id: string) => {
+      const list = (await readList<SpreadJob>(KEYS.spread_jobs)).filter((x) => x.id !== id);
+      await writeList(KEYS.spread_jobs, list);
+    },
+    get: async (id: string) => (await readList<SpreadJob>(KEYS.spread_jobs)).find((j) => j.id === id) ?? null,
   },
   farmIssues: {
     list: () => readList<FarmIssue>(KEYS.farm_issues),

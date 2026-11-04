@@ -7,9 +7,9 @@ import { colors, radius, spacing } from "@/src/theme";
 
 const JOB_TYPES = [
   { key: "spray", label: "SPRAY", icon: "spray", enabled: true },
-  { key: "spread", label: "SPREAD", icon: "grain", enabled: false },
+  { key: "spread", label: "SPREAD", icon: "grain", enabled: true },
   { key: "seed", label: "SEED", icon: "seed-outline", enabled: true },
-  { key: "harvest", label: "HARVEST", icon: "barley", enabled: false },
+  { key: "harvest", label: "HARVEST", icon: "barley", enabled: true },
   { key: "maintenance", label: "MAINTENANCE / REPAIR", icon: "wrench-outline", enabled: true },
   { key: "transport", label: "TRANSPORT", icon: "truck-outline", enabled: false },
   { key: "other", label: "OTHER", icon: "dots-horizontal-circle-outline", enabled: false },
@@ -24,6 +24,10 @@ export default function StartJobScreen() {
       router.push("/records/new");
     } else if (type.key === "seed") {
       router.push("/seeding-records/new");
+    } else if (type.key === "harvest") {
+      router.push("/harvest-records/new");
+    } else if (type.key === "spread") {
+      router.push("/spread-records/new");
     } else if (type.key === "maintenance") {
       router.push("/jobs/maintenance-pick-machine");
     }

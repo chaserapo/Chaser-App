@@ -1,7 +1,7 @@
 import { v4 as uuid } from "uuid";
 import { repo } from "./storage";
 import { supabase } from "./supabase";
-import type { Chemical, SprayJob, StockMovement, StockMovementReason } from "./types";
+import type { Chemical, SprayJobProduct, StockMovement, StockMovementReason } from "./types";
 
 export const DEFAULT_LOW_STOCK_THRESHOLD = 1;
 
@@ -73,7 +73,10 @@ export type DeductionPreview = {
   note?: string;
 };
 
-export async function previewDeductions(job: SprayJob): Promise<DeductionPreview[]> {
+// Accepts anything with a products array shaped like SprayJobProduct —
+// SpreadJobProduct is structurally identical, so spread jobs (which pick
+// products from the same Chemical register) reuse this unchanged.
+export async function previewDeductions(job: { products: SprayJobProduct[] }): Promise<DeductionPreview[]> {
   const chemMap = new Map<string, Chemical>();
   for (const c of await repo.chemicals.list()) chemMap.set(c.id, c);
 
@@ -111,7 +114,11 @@ export async function previewDeductions(job: SprayJob): Promise<DeductionPreview
   return previews;
 }
 
-export async function applyDeductions(previews: DeductionPreview[], sprayJobId?: string): Promise<void> {
+export async function applyDeductions(
+  previews: DeductionPreview[],
+  opts?: { sprayJobId?: string; spreadJobId?: string; reason?: StockMovementReason },
+): Promise<void> {
+  const reason = opts?.reason ?? "Spray Job";
   for (const d of previews) {
     if (d.packs_used == null) continue;
     const chem = await repo.chemicals.get(d.chemical_id);
@@ -127,8 +134,9 @@ export async function applyDeductions(previews: DeductionPreview[], sprayJobId?:
       ts: new Date().toISOString(),
       delta: -Math.round(d.packs_used * 100) / 100,
       unit: chem.stock_unit ?? "packs",
-      reason: "Spray Job",
-      spray_job_id: sprayJobId,
+      reason,
+      spray_job_id: opts?.sprayJobId,
+      spread_job_id: opts?.spreadJobId,
       created_at: new Date().toISOString(),
     };
     await repo.stockMovements.save(movement);

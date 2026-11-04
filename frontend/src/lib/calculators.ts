@@ -199,6 +199,24 @@ export function blendTotalForArea(
   }
 }
 
+// Spread-job product total for the paddock, at a rate per hectare — same
+// idea as blendTotalForArea but covers the full RateUnit set (t/ha, mL/ha
+// included) since spread products are picked from the Chemical register,
+// not a fixed blend-unit list. Concentration units (mL/100 L, %v/v etc.)
+// aren't meaningful without a water rate to dilute into, so those return
+// null rather than a misleading number.
+export function rateTotalForArea(
+  rate: number,
+  unit: string,
+  area_ha: number,
+  custom_label?: string,
+): { amount: number; unit: string } | null {
+  const amount = (rate || 0) * (area_ha || 0);
+  if (unit === "Custom") return { amount, unit: custom_label ?? "unit" };
+  if (unit.endsWith("/ha")) return { amount, unit: unit.slice(0, -3) };
+  return null;
+}
+
 // Seed treatment / inoculant total, from a rate per tonne of seed.
 export type SeedTreatmentUnit = "mL/t" | "L/t" | "g/t" | "kg/t";
 

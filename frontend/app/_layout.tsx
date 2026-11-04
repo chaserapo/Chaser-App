@@ -12,7 +12,7 @@ import { colors } from "@/src/theme";
 import { AuthProvider, useAuth } from "@/src/lib/auth-context";
 import { AuthScreen } from "@/src/features/auth/AuthScreen";
 import { MigrationScreen } from "@/src/features/auth/MigrationScreen";
-import { flushOfflineSprayJobs, flushOfflineIssues } from "@/src/lib/cloud-repo";
+import { flushOfflineSprayJobs, flushOfflineSeedingJobs, flushOfflineHarvestJobs, flushOfflineSpreadJobs, flushOfflineIssues } from "@/src/lib/cloud-repo";
 import { getBackendMode } from "@/src/lib/backend";
 import { registerPushToken, useNotificationRouting } from "@/src/lib/push-tokens";
 import { useOnboarding } from "@/src/lib/onboarding";
@@ -33,6 +33,9 @@ function AuthGate() {
     const attemptFlush = () => {
       if (getBackendMode() !== "cloud") return;
       flushOfflineSprayJobs().catch((e) => console.warn("flush error", e));
+      flushOfflineSeedingJobs().catch((e) => console.warn("seeding flush error", e));
+      flushOfflineHarvestJobs().catch((e) => console.warn("harvest flush error", e));
+      flushOfflineSpreadJobs().catch((e) => console.warn("spread flush error", e));
       flushOfflineIssues().catch((e) => console.warn("issue flush error", e));
     };
     attemptFlush();
