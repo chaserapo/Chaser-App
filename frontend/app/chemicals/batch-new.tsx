@@ -13,7 +13,7 @@ export default function NewBatch() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { chemicalId } = useLocalSearchParams<{ chemicalId: string }>();
-  const [f, setF] = useState({ batch_number: "", quantity: "", unit: "L", purchase_date: "", expiry_date: "", notes: "" });
+  const [f, setF] = useState({ batch_number: "", quantity: "", unit: "L", purchase_date: new Date().toISOString().slice(0, 10), expiry_date: "", notes: "" });
 
   async function save() {
     const business = await repo.getBusiness();

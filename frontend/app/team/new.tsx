@@ -19,7 +19,7 @@ export default function NewTeamMember() {
   const [employment, setEmployment] = useState<EmploymentType>("employee");
   const [saving, setSaving] = useState(false);
   const [f, setF] = useState({
-    name: "", phone: "", role: "", start_date: "", licences: "", chemical: "", machinery: "",
+    name: "", phone: "", role: "", start_date: new Date().toISOString().slice(0, 10), licences: "", chemical: "", machinery: "",
     emergency_name: "", emergency_phone: "", emergency_relationship: "", availability: "Available", notes: "",
   });
 

@@ -25,7 +25,7 @@ export default function TaskForm() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<TaskStatus>("open");
   const [assignedTo, setAssignedTo] = useState<string | null>(memberId ?? null);
-  const [f, setF] = useState({ title: "", description: "", due_date: "" });
+  const [f, setF] = useState({ title: "", description: "", due_date: new Date().toISOString().slice(0, 10) });
 
   useFocusEffect(useCallback(() => {
     (async () => {

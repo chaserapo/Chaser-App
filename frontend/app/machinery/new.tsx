@@ -48,7 +48,7 @@ export default function NewMachine() {
   const [f, setF] = useState({
     name: "", make: "", model: "", year: "",
     serial_number: "", registration: "",
-    current_hours: "", current_km: "", purchase_date: "", notes: "",
+    current_hours: "", current_km: "", purchase_date: new Date().toISOString().slice(0, 10), notes: "",
     tank_capacity_l: "", boom_width_m: "", nozzle_spacing_m: "", nozzle_positions: "",
     default_speed_kmh: "", default_water_rate_lha: "",
   });
