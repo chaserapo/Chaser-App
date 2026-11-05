@@ -26,6 +26,7 @@ from routes.dpird import router as dpird_router  # noqa: E402
 from routes.weather_cron import weather_cron_loop, _cron_tick  # noqa: E402
 from routes.alerts_cron import alerts_cron_loop, _cron_tick as _alerts_cron_tick  # noqa: E402
 from routes.weather_alerts_cron import weather_alerts_cron_loop, _cron_tick as _weather_alerts_cron_tick  # noqa: E402
+from routes.verify import router as verify_router  # noqa: E402
 api_router.include_router(invitations_router)
 api_router.include_router(account_router)
 api_router.include_router(dpird_router)
@@ -64,6 +65,11 @@ async def weather_alerts_check_now():
 
 # Include the router in the main app
 app.include_router(api_router)
+
+# Public spray sign-off verification page (scanned via the in-app QR code) —
+# kept outside the /api prefix, like /health, so the shareable URL reads as
+# a normal link rather than an API endpoint.
+app.include_router(verify_router)
 
 # Liveness / readiness probe — must be reachable without the /api prefix so
 # an ingress health check doesn't rely on the ingress rewrite.

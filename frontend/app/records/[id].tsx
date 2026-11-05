@@ -15,37 +15,15 @@ import { weatherSourceLabel } from "@/src/lib/weather";
 import { productCost } from "@/src/lib/calculators";
 import type { SprayJob, Operator, Machinery } from "@/src/lib/types";
 
-function buildSignOffPayload(j: SprayJob) {
-  return {
-    v: 1,
-    kind: "hectarehq_spray_signoff",
-    id: j.id,
-    date: j.date,
-    farm: j.farm_name,
-    paddock: j.paddock_name,
-    crop: j.crop,
-    target: j.target,
-    operator: j.operator,
-    machine: j.machinery_name,
-    area_ha: j.actual_area_ha ?? j.area_ha,
-    water_rate_lha: j.water_rate,
-    speed_kmh: j.speed_kmh,
-    nozzle: j.nozzle_type,
-    start_time: j.start_time,
-    finish_time: j.finish_time,
-    start_weather: {
-      t: j.temperature_c, rh: j.humidity, delta_t: j.delta_t,
-      wind: j.wind_speed, dir: j.wind_direction, at: j.weather_captured_at,
-    },
-    finish_weather: {
-      t: j.finish_temperature_c, rh: j.finish_humidity, delta_t: j.finish_delta_t,
-      wind: j.finish_wind_speed, dir: j.finish_wind_direction, at: j.finish_weather_captured_at,
-    },
-    gps: j.gps_lat ? { lat: j.gps_lat, lon: j.gps_lon } : undefined,
-    products: j.products.map((p) => ({ name: p.chemical_name, rate: p.rate, unit: p.unit, total: p.total_qty })),
-    notes: j.notes,
-    finish_notes: j.finish_notes,
-  };
+// The backend serves a public, read-only verification page at this path
+// (routes/verify.py) — scanning the QR opens it like a normal webpage,
+// showing the paddock/chemicals/weather/operator for this job. Previously
+// the QR encoded the job's raw data as JSON directly, which just showed up
+// as unreadable text in any ordinary camera app since nothing resolved it
+// into anything.
+function signOffUrl(j: SprayJob): string {
+  const base = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
+  return `${base}/verify/spray/${j.id}`;
 }
 
 // Editable fields — deliberately excludes farm/paddock (reassigning those has
@@ -173,8 +151,7 @@ export default function RecordDetail() {
 
   if (!j) return <View style={{ flex: 1, backgroundColor: colors.surface, paddingTop: insets.top }}><ScreenHeader title="Spray Record" back /></View>;
 
-  const payload = buildSignOffPayload(j);
-  const payloadStr = JSON.stringify(payload);
+  const qrUrl = signOffUrl(j);
   const isCompleted = j.status === "completed";
 
   async function shareRecord() {
@@ -235,7 +212,7 @@ export default function RecordDetail() {
             {showQR ? (
               <Card style={{ alignItems: "center", paddingVertical: spacing.xl }} testID="qr-card">
                 <View style={styles.qrWrap}>
-                  <QRCode value={payloadStr} size={220} backgroundColor={colors.surfaceSecondary} color={colors.onSurface} />
+                  <QRCode value={qrUrl} size={220} backgroundColor={colors.surfaceSecondary} color={colors.onSurface} />
                 </View>
                 <Text style={styles.qrCaption}>Scan to verify this spray job at the paddock gate.</Text>
                 <Text style={styles.qrId}>Record ID: {j.id.slice(0, 8)}</Text>
