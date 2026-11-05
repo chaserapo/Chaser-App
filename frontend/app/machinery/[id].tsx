@@ -11,7 +11,7 @@ import { confirm } from "@/src/lib/confirm";
 import { resolveFarmIssue, reopenFarmIssue } from "@/src/lib/issues";
 import { issueCategoryIcon, issueCategoryLabel } from "@/src/lib/issue-categories";
 import { MACHINE_TYPES } from "@/src/lib/types";
-import type { Machinery, Maintenance, MaintenanceCompletion, MachineType, FarmIssue } from "@/src/lib/types";
+import type { Machinery, Maintenance, MaintenanceCompletion, MachineType, FarmIssue, PreStartInspection } from "@/src/lib/types";
 import { NOZZLES } from "@/src/lib/nozzles";
 
 const OPEN_ISSUE_STATUSES = ["open", "assigned", "in_progress"];
@@ -23,6 +23,7 @@ export default function MachineDetail() {
   const [m, setM] = useState<Machinery | null>(null);
   const [maints, setMaints] = useState<Maintenance[]>([]);
   const [completions, setCompletions] = useState<MaintenanceCompletion[]>([]);
+  const [prestarts, setPrestarts] = useState<PreStartInspection[]>([]);
   const [issues, setIssues] = useState<FarmIssue[]>([]);
   const [editing, setEditing] = useState(false);
   const [fenceJets, setFenceJets] = useState<0 | 1 | 2>(0);
@@ -70,16 +71,18 @@ export default function MachineDetail() {
   useFocusEffect(useCallback(() => {
     if (!id) return;
     (async () => {
-      const [mach, mm, comps, allIssues] = await Promise.all([
+      const [mach, mm, comps, prestartList, allIssues] = await Promise.all([
         repo.machinery.get(id),
         repo.maintenance.forMachine(id),
         repo.maintenanceCompletions.forMachine(id),
+        repo.prestarts.forMachine(id),
         repo.farmIssues.list(),
       ]);
       setM(mach);
       if (mach) loadFields(mach);
       setMaints(mm.sort((a, b) => (a.next_service_hours ?? Infinity) - (b.next_service_hours ?? Infinity)));
       setCompletions(comps);
+      setPrestarts(prestartList);
       setIssues(allIssues.filter((i) => i.machinery_id === id).sort((a, b) => b.reported_at.localeCompare(a.reported_at)));
     })();
   }, [id]));
@@ -332,6 +335,35 @@ export default function MachineDetail() {
             {resolvedIssuesCount > 0 && openIssues.length > 0 ? (
               <Text style={[styles.subCount, { marginBottom: spacing.sm }]}>{resolvedIssuesCount} resolved — see Faults & Risks for full history.</Text>
             ) : null}
+
+            <View style={styles.sectionRow}>
+              <Text style={styles.sectionTitle}>Pre-Start Checks</Text>
+              <Pressable onPress={() => router.push({ pathname: "/machinery/prestart-new", params: { machineId: m.id } })} testID="add-prestart-btn" hitSlop={8}>
+                <Text style={styles.link}>+ Log Pre-Start</Text>
+              </Pressable>
+            </View>
+            {prestarts.length === 0 ? (
+              <Card><Text style={styles.empty}>No pre-start checks logged yet.</Text></Card>
+            ) : (
+              prestarts.slice(0, 5).map((p) => {
+                const items: { label: string; status: string }[] = (() => { try { return JSON.parse(p.checklist_json); } catch { return []; } })();
+                const failed = items.filter((it) => it.status === "fail");
+                return (
+                  <Card key={p.id} style={{ marginBottom: spacing.sm }} testID={`prestart-${p.id}`}>
+                    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                      <View style={styles.historyIcon}><Icon name={p.passed ? "check-decagram" : "alert-circle"} size={20} color={p.passed ? colors.success : colors.error} /></View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.mnTitle}>{p.passed ? "Passed" : `${failed.length} item${failed.length === 1 ? "" : "s"} failed`}</Text>
+                        <Text style={styles.mnMeta}>{p.date.slice(0, 10)} · {p.operator ?? "—"}</Text>
+                        {failed.length > 0 ? failed.map((it, i) => <Text key={i} style={[styles.historyLine, { color: colors.error }]}>⚠ {it.label}</Text>) : null}
+                        {p.notes ? <Text style={styles.historyLine}>{p.notes}</Text> : null}
+                      </View>
+                    </View>
+                  </Card>
+                );
+              })
+            )}
+            {prestarts.length > 5 ? <Text style={styles.subCount}>+{prestarts.length - 5} earlier check{prestarts.length - 5 === 1 ? "" : "s"}</Text> : null}
 
             <View style={styles.sectionRow}>
               <Text style={styles.sectionTitle}>Maintenance Schedule</Text>

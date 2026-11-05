@@ -15,6 +15,7 @@ import type {
   SeedingJob,
   HarvestJob,
   SpreadJob,
+  PreStartInspection,
   ExternalLink,
   Operator,
   StockMovement,
@@ -36,6 +37,7 @@ const KEYS = {
   seeding_jobs: "as.seeding_jobs",
   harvest_jobs: "as.harvest_jobs",
   spread_jobs: "as.spread_jobs",
+  prestart_inspections: "as.prestart_inspections",
   farm_issues: "as.farm_issues",
   links: "as.links",
   operators: "as.operators",
@@ -197,6 +199,24 @@ export const localRepo = {
     remove: async (id: string) => {
       const list = (await readList<MaintenanceCompletion>(KEYS.maintenance_completions)).filter((x) => x.id !== id);
       await writeList(KEYS.maintenance_completions, list);
+    },
+  },
+  prestarts: {
+    list: () => readList<PreStartInspection>(KEYS.prestart_inspections),
+    forMachine: async (machineId: string) =>
+      (await readList<PreStartInspection>(KEYS.prestart_inspections))
+        .filter((p) => p.machinery_id === machineId)
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    save: async (p: PreStartInspection) => {
+      const list = await readList<PreStartInspection>(KEYS.prestart_inspections);
+      const idx = list.findIndex((x) => x.id === p.id);
+      if (idx >= 0) list[idx] = p;
+      else list.push(p);
+      await writeList(KEYS.prestart_inspections, list);
+    },
+    remove: async (id: string) => {
+      const list = (await readList<PreStartInspection>(KEYS.prestart_inspections)).filter((x) => x.id !== id);
+      await writeList(KEYS.prestart_inspections, list);
     },
   },
   sprayJobs: {

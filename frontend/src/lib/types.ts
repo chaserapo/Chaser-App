@@ -195,9 +195,14 @@ export type PartUsage = {
 export type Attachment = {
   id: ID; business_id: ID; machinery_id: ID; kind: "photo" | "document"; uri: string; label?: string; created_at: string;
 };
+export type PreStartChecklistStatus = "pass" | "fail" | "na";
+export type PreStartChecklistItem = { key: string; label: string; status: PreStartChecklistStatus; note?: string };
+
 export type PreStartInspection = {
-  id: ID; business_id: ID; machinery_id: ID; date: string; operator?: string;
+  id: ID; business_id: ID; machinery_id: ID; date: string;
+  operator_id?: ID; operator?: string;
   checklist_json: string; passed: boolean; notes?: string; created_at: string;
+  deleted_at?: string;
 };
 
 export type MaintenanceStatus = "good" | "due_soon" | "overdue";

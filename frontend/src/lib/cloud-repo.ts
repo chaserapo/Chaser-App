@@ -12,7 +12,7 @@ import { issuesOfflineQueue } from "./issues-offline-queue";
 import type {
   Business, Farm, Paddock, Chemical, ChemicalBatch, ChemicalStockLine, Machinery, Maintenance,
   MaintenanceCompletion, SprayJob, SprayJobProduct, SeedingJob, SeedingJobProduct, HarvestJob,
-  SpreadJob, SpreadJobProduct, ExternalLink, Operator, StockMovement,
+  SpreadJob, SpreadJobProduct, PreStartInspection, ExternalLink, Operator, StockMovement,
   FarmIssue,
 } from "./types";
 
@@ -521,6 +521,15 @@ export const cloudRepo = {
       if (error) throw error;
     },
     remove: (id: string) => softDelete("maintenance_completions", id),
+  },
+  prestarts: {
+    list: () => listRows<PreStartInspection>("prestart_inspections"),
+    forMachine: async (machineId: string) => {
+      const rows = await listRows<PreStartInspection>("prestart_inspections", { extraEq: [["machinery_id", machineId]] });
+      return rows.sort((a, b) => b.date.localeCompare(a.date));
+    },
+    save: (p: PreStartInspection) => upsertRow("prestart_inspections", p),
+    remove: (id: string) => softDelete("prestart_inspections", id),
   },
   sprayJobs: {
     list: async () => {
