@@ -203,7 +203,36 @@ export default function NewMachine() {
               <Pressable onPress={() => setPwm((v) => !v)} style={[styles.toggle, pwm && styles.toggleOn]}><View style={{ flex: 1 }}><Text style={styles.toggleTitle}>PWM / individual nozzle control</Text><Text style={styles.hint}>Used when ranking nozzle suitability.</Text></View><Icon name={pwm ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"} size={24} color={pwm ? colors.brandPrimary : colors.muted} /></Pressable>
               <View style={styles.flowBox}><Text style={styles.flowLabel}>Required flow per active nozzle</Text><Text style={styles.flowValue}>{requiredFlow.toFixed(2)} L/min</Text></View>
 
-              {fittedRecommendations.length > 0 ? <><Text style={styles.pickerLabel}>Best nozzle already fitted</Text>{fittedRecommendations.slice(0, 3).map((r: any, i) => <Pressable key={`fit-${r.position}`} onPress={() => setDefaultPosition(r.position)} style={[styles.recRow, defaultPosition === r.position && styles.recRowActive]}><View style={{ flex: 1 }}><Text style={styles.nozzleName}>{i === 0 ? "★ " : ""}Position {r.position} · {r.nozzle.label}</Text><Text style={styles.nozzleSub}>~{r.check.requiredPressureBar?.toFixed(1)} bar · {r.nozzle.type}</Text></View><Text style={styles.positionBadge}>P{r.position}</Text></Pressable>)}</> : <><Text style={styles.pickerLabel}>Chaser recommendations</Text>{recommendations.slice(0, 3).map((r, i) => <View key={r.nozzle.id} style={styles.recRow}><View style={{ flex: 1 }}><Text style={styles.nozzleName}>{i === 0 ? "★ " : ""}{r.nozzle.label}</Text><Text style={styles.nozzleSub}>~{r.check.requiredPressureBar?.toFixed(1)} bar · {r.nozzle.type}</Text></View></View>)}</>}
+              {requiredFlow <= 0 ? (
+                <Text style={styles.hint}>Enter a typical speed and water rate above to see nozzle suggestions.</Text>
+              ) : fittedRecommendations.length > 0 ? (
+                <>
+                  <Text style={styles.pickerLabel}>Best nozzle already fitted</Text>
+                  {fittedRecommendations.slice(0, 3).map((r: any, i) => (
+                    <Pressable key={`fit-${r.position}`} onPress={() => setDefaultPosition(r.position)} style={[styles.recRow, defaultPosition === r.position && styles.recRowActive]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.nozzleName}>{i === 0 ? "★ " : ""}Position {r.position} · {r.nozzle.label}</Text>
+                        <Text style={styles.nozzleSub}>~{r.check.requiredPressureBar?.toFixed(1)} bar · {r.nozzle.type}</Text>
+                        {!r.inRange ? <Text style={styles.warnText}>{r.check.message}</Text> : null}
+                      </View>
+                      <Text style={styles.positionBadge}>P{r.position}</Text>
+                    </Pressable>
+                  ))}
+                </>
+              ) : recommendations.length > 0 ? (
+                <>
+                  <Text style={styles.pickerLabel}>Chaser recommendations</Text>
+                  {recommendations.slice(0, 3).map((r, i) => (
+                    <View key={r.nozzle.id} style={styles.recRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.nozzleName}>{i === 0 ? "★ " : ""}{r.nozzle.label}</Text>
+                        <Text style={styles.nozzleSub}>~{r.check.requiredPressureBar?.toFixed(1)} bar · {r.nozzle.type}</Text>
+                        {!r.inRange ? <Text style={styles.warnText}>{r.check.message}</Text> : null}
+                      </View>
+                    </View>
+                  ))}
+                </>
+              ) : null}
               {activeNozzle ? <Text style={styles.activeSummary}>Default active position: {defaultPosition} · {activeNozzle.label}</Text> : null}
               <Text style={styles.disclaimer}>Recommendation aid only. Confirm current manufacturer charts, droplet classification and chemical label/permit requirements before application.</Text>
             </Card>
@@ -237,6 +266,7 @@ const styles = StyleSheet.create({
   flowBox: { alignItems: "center", backgroundColor: colors.brandSecondary, borderRadius: radius.md, padding: 14, marginTop: spacing.md }, flowLabel: { fontSize: 11, fontWeight: "800", color: colors.onBrandSecondary, textTransform: "uppercase" }, flowValue: { fontSize: 28, fontWeight: "900", color: colors.onBrandSecondary, marginTop: 2 },
   pickerLabel: { fontSize: 12, color: colors.muted, marginBottom: 6, marginTop: 14, fontWeight: "800" },
   recRow: { flexDirection: "row", alignItems: "center", padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, marginBottom: 8 }, recRowActive: { borderColor: colors.brandPrimary, backgroundColor: colors.brandSecondary },
+  warnText: { fontSize: 11, color: colors.warning, fontWeight: "700", marginTop: 2 },
   nozzleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, borderRadius: radius.sm, paddingHorizontal: 12, minHeight: 46, gap: 8 }, nozzleBtnText: { flex: 1, fontSize: 13, color: colors.onSurface, fontWeight: "600" },
   nozzlePickerWrap: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radius.sm, marginTop: 4, padding: 4 }, nozzleRow: { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: radius.sm, gap: 8 }, nozzleName: { fontSize: 13, fontWeight: "700", color: colors.onSurface }, nozzleSub: { fontSize: 11, color: colors.muted, marginTop: 2 },
   positionBlock: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.divider }, positionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }, positionTitle: { fontSize: 12, fontWeight: "800", color: colors.onSurface }, makeDefault: { fontSize: 11, fontWeight: "800", color: colors.brandPrimary }, positionBadge: { fontSize: 12, fontWeight: "900", color: colors.brandPrimary },

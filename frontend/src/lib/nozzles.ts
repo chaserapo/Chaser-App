@@ -108,6 +108,14 @@ export function checkNozzle(nozzle: Nozzle, requiredFlowLpm: number, refPressure
   return { ratedFlowAtRefLpm: rated, requiredPressureBar: reqP, suitability: "good", message: `Suitable at about ${reqP.toFixed(2)} bar.`, tolerancePct: tolerance };
 }
 
+// Always returns the best available matches, ranked — never an empty list
+// just because nothing hits the ideal pressure window. An unusual required
+// flow (still mid-entry, or a genuinely edge-case setup) used to make every
+// nozzle fail the in-range check and the whole recommendation list vanish,
+// silently leaving the screen with nothing to show. In-range nozzles still
+// score far higher so they sort to the top when any exist; out-of-range
+// ones are kept (with `inRange: false`, and `check.message` explaining why)
+// so the caller can flag them rather than pretend they don't exist.
 export function recommendNozzles(requiredFlowLpm: number, goal: ApplicationGoal = "systemic", pwm = false, spot = false, limit = 5) {
   if (requiredFlowLpm <= 0) return [];
   return NOZZLES.map((nozzle) => {
@@ -120,5 +128,5 @@ export function recommendNozzles(requiredFlowLpm: number, goal: ApplicationGoal 
     if (spot && ["systemic","drift"].includes(goal) && /air-induction|drift/i.test(nozzle.type)) score += 8;
     if (check.requiredPressureBar != null) score -= Math.abs(check.requiredPressureBar - 3) * 3;
     return { nozzle, check, score, inRange };
-  }).filter((x) => x.inRange).sort((a, b) => b.score - a.score).slice(0, limit);
+  }).sort((a, b) => b.score - a.score).slice(0, limit);
 }
