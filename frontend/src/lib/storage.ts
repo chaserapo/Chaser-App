@@ -354,6 +354,6 @@ export function maintenanceStatus(
   if (currentHours == null || nextServiceHours == null) return "good";
   const remaining = nextServiceHours - currentHours;
   if (remaining <= 0) return "overdue";
-  if (remaining <= 25) return "due_soon";
+  if (remaining <= 50) return "due_soon";
   return "good";
 }
