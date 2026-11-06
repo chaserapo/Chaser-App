@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, TextInput } from "react-native";
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, TextInput, Platform, KeyboardAvoidingView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Swipeable } from "react-native-gesture-handler";
@@ -550,65 +550,75 @@ export default function PaddocksTab() {
 
         {/* Draw controls overlay */}
         {mode === "draw" ? (
-          <View style={[styles.drawOverlay, { paddingBottom: insets.bottom + 12 }]} testID="draw-overlay">
-            <Card style={{ marginBottom: 8 }}>
-              <Input label="Paddock name*" value={name} onChangeText={setName} placeholder="e.g. North 40" testID="draw-name" />
-              <Input label="Crop (optional)" value={crop} onChangeText={setCrop} placeholder="e.g. Wheat" testID="draw-crop" />
-              {farms.length > 0 ? (
-                <>
-                  <Text style={styles.drawFieldLabel}>Farm</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.farmChipRow}>
-                    <Pressable
-                      onPress={() => setDrawFarmId(null)}
-                      style={[styles.farmChip, drawFarmId === null && styles.farmChipActive]}
-                      testID="draw-farm-unassigned"
-                    >
-                      <Text style={[styles.farmChipText, drawFarmId === null && styles.farmChipTextActive]}>Unassigned</Text>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kbWrap} testID="draw-overlay">
+            <View style={[styles.drawOverlay, { paddingBottom: insets.bottom + 12 }]}>
+              <Card style={{ marginBottom: 8 }}>
+                <ScrollView style={styles.drawFormScroll} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                  <Input label="Paddock name*" value={name} onChangeText={setName} placeholder="e.g. North 40" testID="draw-name" />
+
+                  {/* Boundary status comes right after the name — it's the
+                      main thing this overlay is for, so it stays visible
+                      before the keyboard opens on a field further down. */}
+                  <View style={styles.boundarySection}>
+                    <Text style={styles.drawMeta}>
+                      {drawInfo.count === 0
+                        ? "Tap the map to add corner points, or hit Drive to record while driving the boundary."
+                        : `${drawInfo.count} point${drawInfo.count === 1 ? "" : "s"} · ${drawInfo.areaHa.toFixed(2)} ha${driving ? "  •  RECORDING" : ""}`}
+                    </Text>
+                    <Text style={styles.drawHint}>Drag a point to move it · long-press to remove it</Text>
+                    <Pressable onPress={toggleDrive} style={[styles.driveBtn, driving && styles.driveBtnOn]} testID="drive-toggle-btn">
+                      <Icon name={driving ? "stop-circle-outline" : "car-connected"} size={18} color={driving ? colors.onBrandPrimary : colors.brandPrimary} />
+                      <Text style={[styles.driveBtnText, driving && { color: colors.onBrandPrimary }]}>
+                        {driving ? "Stop recording" : "Drive boundary (GPS)"}
+                      </Text>
                     </Pressable>
-                    {farms.map((fm) => (
-                      <Pressable
-                        key={fm.id}
-                        onPress={() => setDrawFarmId(fm.id)}
-                        style={[styles.farmChip, drawFarmId === fm.id && styles.farmChipActive]}
-                        testID={`draw-farm-${fm.id}`}
-                      >
-                        <Text style={[styles.farmChipText, drawFarmId === fm.id && styles.farmChipTextActive]}>{fm.name}</Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </>
-              ) : null}
-              <Text style={styles.drawMeta}>
-                {drawInfo.count === 0
-                  ? "Tap the map to add corner points, or hit Drive to record while driving the boundary."
-                  : `${drawInfo.count} point${drawInfo.count === 1 ? "" : "s"} · ${drawInfo.areaHa.toFixed(2)} ha${driving ? "  •  RECORDING" : ""}`}
-              </Text>
-              <Text style={styles.drawHint}>Drag a point to move it · long-press to remove it</Text>
-              <View style={{ height: 8 }} />
-              <Pressable onPress={toggleDrive} style={[styles.driveBtn, driving && styles.driveBtnOn]} testID="drive-toggle-btn">
-                <Icon name={driving ? "stop-circle-outline" : "car-connected"} size={18} color={driving ? colors.onBrandPrimary : colors.brandPrimary} />
-                <Text style={[styles.driveBtnText, driving && { color: colors.onBrandPrimary }]}>
-                  {driving ? "Stop recording" : "Drive boundary (GPS)"}
-                </Text>
-              </Pressable>
-            </Card>
-            <View style={styles.drawRow}>
-              <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.undo()} disabled={drawInfo.count === 0} testID="draw-undo-btn">
-                <Icon name="undo-variant" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
-                <Text style={styles.iconBtnText}>Undo</Text>
-              </Pressable>
-              <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.clear()} disabled={drawInfo.count === 0} testID="draw-clear-btn">
-                <Icon name="close-thick" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
-                <Text style={styles.iconBtnText}>Clear</Text>
-              </Pressable>
-              <View style={{ flex: 1 }}>
-                <Button title={saving ? "Saving…" : "Save Paddock"} icon="content-save-outline" onPress={requestSaveGeometry} loading={saving} disabled={drawInfo.count < 3 || saving || !name.trim()} testID="draw-save-btn" />
+                  </View>
+
+                  <Input label="Crop (optional)" value={crop} onChangeText={setCrop} placeholder="e.g. Wheat" testID="draw-crop" />
+                  {farms.length > 0 ? (
+                    <>
+                      <Text style={styles.drawFieldLabel}>Farm</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.farmChipRow}>
+                        <Pressable
+                          onPress={() => setDrawFarmId(null)}
+                          style={[styles.farmChip, drawFarmId === null && styles.farmChipActive]}
+                          testID="draw-farm-unassigned"
+                        >
+                          <Text style={[styles.farmChipText, drawFarmId === null && styles.farmChipTextActive]}>Unassigned</Text>
+                        </Pressable>
+                        {farms.map((fm) => (
+                          <Pressable
+                            key={fm.id}
+                            onPress={() => setDrawFarmId(fm.id)}
+                            style={[styles.farmChip, drawFarmId === fm.id && styles.farmChipActive]}
+                            testID={`draw-farm-${fm.id}`}
+                          >
+                            <Text style={[styles.farmChipText, drawFarmId === fm.id && styles.farmChipTextActive]}>{fm.name}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </>
+                  ) : null}
+                </ScrollView>
+              </Card>
+              <View style={styles.drawRow}>
+                <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.undo()} disabled={drawInfo.count === 0} testID="draw-undo-btn">
+                  <Icon name="undo-variant" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
+                  <Text style={styles.iconBtnText}>Undo</Text>
+                </Pressable>
+                <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.clear()} disabled={drawInfo.count === 0} testID="draw-clear-btn">
+                  <Icon name="close-thick" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
+                  <Text style={styles.iconBtnText}>Clear</Text>
+                </Pressable>
+                <View style={{ flex: 1 }}>
+                  <Button title={saving ? "Saving…" : "Save Paddock"} icon="content-save-outline" onPress={requestSaveGeometry} loading={saving} disabled={drawInfo.count < 3 || saving || !name.trim()} testID="draw-save-btn" />
+                </View>
               </View>
+              <Pressable onPress={cancelDraw} style={{ alignItems: "center", marginTop: 6 }} testID="draw-cancel-btn">
+                <Text style={{ color: colors.muted, fontWeight: "700" }}>Cancel</Text>
+              </Pressable>
             </View>
-            <Pressable onPress={cancelDraw} style={{ alignItems: "center", marginTop: 6 }} testID="draw-cancel-btn">
-              <Text style={{ color: colors.muted, fontWeight: "700" }}>Cancel</Text>
-            </Pressable>
-          </View>
+          </KeyboardAvoidingView>
         ) : null}
 
         {/* Selected paddock summary */}
@@ -708,8 +718,11 @@ const styles = StyleSheet.create({
   farmChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
   farmChipText: { color: colors.onSurfaceTertiary, fontSize: 12, fontWeight: "700" },
   farmChipTextActive: { color: colors.onBrandPrimary },
-  drawOverlay: { position: "absolute", left: 12, right: 12, bottom: 0 },
-  drawMeta: { fontSize: 13, color: colors.onSurface, fontWeight: "600", marginTop: spacing.sm },
+  kbWrap: { position: "absolute", left: 0, right: 0, bottom: 0 },
+  drawOverlay: { paddingHorizontal: 12 },
+  drawFormScroll: { maxHeight: 300 },
+  boundarySection: { marginTop: spacing.sm, marginBottom: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.sm, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border },
+  drawMeta: { fontSize: 13, color: colors.onSurface, fontWeight: "600" },
   drawHint: { fontSize: 12, color: colors.muted, marginTop: 2, fontStyle: "italic" },
   drawRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   iconBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, height: 44, borderRadius: radius.md, paddingHorizontal: 10 },
@@ -723,7 +736,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
   emptyBody: { color: colors.muted, marginTop: 4, fontSize: 13, lineHeight: 18 },
   savingOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.4)" },
-  driveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 40, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.brandPrimary, backgroundColor: colors.surface },
+  driveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 40, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.brandPrimary, backgroundColor: colors.surface, marginTop: spacing.sm },
   driveBtnOn: { backgroundColor: colors.error, borderColor: colors.error },
   driveBtnText: { fontWeight: "700", color: colors.brandPrimary, fontSize: 13 },
   toggleWrap: { flexDirection: "row", alignSelf: "center", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 999, padding: 3, marginBottom: spacing.sm, gap: 2 },
