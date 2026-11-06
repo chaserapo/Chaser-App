@@ -10,7 +10,7 @@ import { colors, radius, spacing } from "@/src/theme";
 import { repo } from "@/src/lib/storage";
 import { nozzleFlowLpm } from "@/src/lib/calculators";
 import { MACHINE_TYPES, MachineType, type Machinery, type SprayerApplicationGoal, type SprayerApplicationMode } from "@/src/lib/types";
-import { NOZZLES, recommendNozzles } from "@/src/lib/nozzles";
+import { NOZZLES, recommendNozzles, checkNozzle } from "@/src/lib/nozzles";
 
 type NozzleBodyType = "single" | "tri" | "quad" | "five";
 
@@ -208,10 +208,16 @@ export default function NewMachine() {
               ) : fittedRecommendations.length > 0 ? (
                 <>
                   <Text style={styles.pickerLabel}>Best nozzle already fitted</Text>
+                  {!fittedRecommendations[0].inRange ? (
+                    <View style={styles.noMatchBanner}>
+                      <Icon name="alert-circle" size={16} color={colors.onError} />
+                      <Text style={styles.noMatchBannerText}>None of your fitted nozzles suit this required flow at a safe pressure. Closest options are shown below, but none are actually suitable — check your rate, speed and nozzle spacing, or fit a different nozzle.</Text>
+                    </View>
+                  ) : null}
                   {fittedRecommendations.slice(0, 3).map((r: any, i) => (
                     <Pressable key={`fit-${r.position}`} onPress={() => setDefaultPosition(r.position)} style={[styles.recRow, defaultPosition === r.position && styles.recRowActive]}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.nozzleName}>{i === 0 ? "★ " : ""}Position {r.position} · {r.nozzle.label}</Text>
+                        <Text style={styles.nozzleName}>{i === 0 && r.inRange ? "★ " : ""}Position {r.position} · {r.nozzle.label}</Text>
                         <Text style={styles.nozzleSub}>~{r.check.requiredPressureBar?.toFixed(1)} bar · {r.nozzle.type}</Text>
                         {!r.inRange ? <Text style={styles.warnText}>{r.check.message}</Text> : null}
                       </View>
@@ -222,10 +228,16 @@ export default function NewMachine() {
               ) : recommendations.length > 0 ? (
                 <>
                   <Text style={styles.pickerLabel}>Chaser recommendations</Text>
+                  {!recommendations[0].inRange ? (
+                    <View style={styles.noMatchBanner}>
+                      <Icon name="alert-circle" size={16} color={colors.onError} />
+                      <Text style={styles.noMatchBannerText}>No nozzle in our catalog suits this required flow at a safe pressure. Closest options are shown below, but none are actually suitable — check your rate, speed and nozzle spacing.</Text>
+                    </View>
+                  ) : null}
                   {recommendations.slice(0, 3).map((r, i) => (
                     <View key={r.nozzle.id} style={styles.recRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.nozzleName}>{i === 0 ? "★ " : ""}{r.nozzle.label}</Text>
+                        <Text style={styles.nozzleName}>{i === 0 && r.inRange ? "★ " : ""}{r.nozzle.label}</Text>
                         <Text style={styles.nozzleSub}>~{r.check.requiredPressureBar?.toFixed(1)} bar · {r.nozzle.type}</Text>
                         {!r.inRange ? <Text style={styles.warnText}>{r.check.message}</Text> : null}
                       </View>
@@ -233,7 +245,16 @@ export default function NewMachine() {
                   ))}
                 </>
               ) : null}
-              {activeNozzle ? <Text style={styles.activeSummary}>Default active position: {defaultPosition} · {activeNozzle.label}</Text> : null}
+              {activeNozzle ? (() => {
+                const activeCheck = requiredFlow > 0 ? checkNozzle(activeNozzle, requiredFlow) : null;
+                const unsuitable = activeCheck && activeCheck.suitability !== "good";
+                return (
+                  <View style={[styles.activeSummary, unsuitable && styles.activeSummaryWarn]}>
+                    <Text style={[styles.activeSummaryText, unsuitable && styles.activeSummaryTextWarn]}>Default active position: {defaultPosition} · {activeNozzle.label}</Text>
+                    {unsuitable ? <Text style={styles.activeSummaryTextWarn}>⚠ {activeCheck!.message}</Text> : null}
+                  </View>
+                );
+              })() : null}
               <Text style={styles.disclaimer}>Recommendation aid only. Confirm current manufacturer charts, droplet classification and chemical label/permit requirements before application.</Text>
             </Card>
           </> : null}
@@ -270,6 +291,11 @@ const styles = StyleSheet.create({
   nozzleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary, borderRadius: radius.sm, paddingHorizontal: 12, minHeight: 46, gap: 8 }, nozzleBtnText: { flex: 1, fontSize: 13, color: colors.onSurface, fontWeight: "600" },
   nozzlePickerWrap: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radius.sm, marginTop: 4, padding: 4 }, nozzleRow: { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: radius.sm, gap: 8 }, nozzleName: { fontSize: 13, fontWeight: "700", color: colors.onSurface }, nozzleSub: { fontSize: 11, color: colors.muted, marginTop: 2 },
   positionBlock: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.divider }, positionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }, positionTitle: { fontSize: 12, fontWeight: "800", color: colors.onSurface }, makeDefault: { fontSize: 11, fontWeight: "800", color: colors.brandPrimary }, positionBadge: { fontSize: 12, fontWeight: "900", color: colors.brandPrimary },
-  activeSummary: { fontSize: 12, fontWeight: "800", color: colors.onBrandSecondary, backgroundColor: colors.brandSecondary, padding: 10, borderRadius: radius.sm, marginTop: 8 },
+  activeSummary: { backgroundColor: colors.brandSecondary, padding: 10, borderRadius: radius.sm, marginTop: 8, gap: 2 },
+  activeSummaryWarn: { backgroundColor: "#FEF3C7" },
+  activeSummaryText: { fontSize: 12, fontWeight: "800", color: colors.onBrandSecondary },
+  activeSummaryTextWarn: { fontSize: 12, fontWeight: "800", color: colors.warning },
+  noMatchBanner: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: colors.error, padding: 10, borderRadius: radius.md, marginBottom: 8 },
+  noMatchBannerText: { color: colors.onError, fontWeight: "600", fontSize: 12, flex: 1, lineHeight: 16 },
   disclaimer: { fontSize: 10, color: colors.muted, lineHeight: 14, fontStyle: "italic", marginTop: spacing.md },
 });

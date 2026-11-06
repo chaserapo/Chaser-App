@@ -100,7 +100,17 @@ export default function NozzleGuide() {
           </Card>
 
           <Text style={styles.section}>Recommended</Text>
-          {recommended.length ? recommended.map((r, i) => <Card key={r.nozzle.id} style={[styles.recCard, i === 0 && styles.recTop]}><View style={styles.row}><View style={[styles.swatch, { backgroundColor: SWATCH[r.nozzle.colour] ?? colors.surfaceTertiary }]} /><View style={{ flex: 1 }}><Text style={styles.nozzleName}>{i === 0 ? "★ " : ""}{r.nozzle.label}</Text><Text style={styles.nozzleMeta}>Target pressure ~{fmt(r.check.requiredPressureBar ?? 0, 2)} bar · {r.nozzle.minPressureBar}–{r.nozzle.maxPressureBar} bar family range</Text><Text style={styles.nozzleMeta}>{r.nozzle.type}{r.nozzle.pwmApproved ? " · PWM approved" : ""}</Text>{r.nozzle.dropletRange ? <Text style={styles.nozzleMeta}>Droplet range: {r.nozzle.dropletRange}</Text> : null}{!r.inRange ? <Text style={styles.warnText}>{r.check.message}</Text> : null}</View></View></Card>) : <Card><Text style={styles.hint}>Enter a valid rate, speed and width to see recommendations.</Text></Card>}
+          {recommended.length ? (
+            <>
+              {!recommended[0].inRange ? (
+                <View style={styles.noMatchBanner}>
+                  <Icon name="alert-circle" size={16} color={colors.onError} />
+                  <Text style={styles.noMatchBannerText}>No nozzle in our catalog suits this required flow at a safe pressure. Closest options are shown below, but none are actually suitable — check your rate, speed and width.</Text>
+                </View>
+              ) : null}
+              {recommended.map((r, i) => <Card key={r.nozzle.id} style={[styles.recCard, i === 0 && r.inRange && styles.recTop]}><View style={styles.row}><View style={[styles.swatch, { backgroundColor: SWATCH[r.nozzle.colour] ?? colors.surfaceTertiary }]} /><View style={{ flex: 1 }}><Text style={styles.nozzleName}>{i === 0 && r.inRange ? "★ " : ""}{r.nozzle.label}</Text><Text style={styles.nozzleMeta}>Target pressure ~{fmt(r.check.requiredPressureBar ?? 0, 2)} bar · {r.nozzle.minPressureBar}–{r.nozzle.maxPressureBar} bar family range</Text><Text style={styles.nozzleMeta}>{r.nozzle.type}{r.nozzle.pwmApproved ? " · PWM approved" : ""}</Text>{r.nozzle.dropletRange ? <Text style={styles.nozzleMeta}>Droplet range: {r.nozzle.dropletRange}</Text> : null}{!r.inRange ? <Text style={styles.warnText}>{r.check.message}</Text> : null}</View></View></Card>)}
+            </>
+          ) : <Card><Text style={styles.hint}>Enter a valid rate, speed and width to see recommendations.</Text></Card>}
 
           <Pressable onPress={() => setShowManual((v) => !v)} style={styles.manualToggle}><Icon name="format-list-bulleted" size={20} color={colors.brandPrimary} /><Text style={styles.manualText}>{showManual ? "Hide full nozzle library" : `Browse full nozzle library (${NOZZLES.length})`}</Text><Icon name={showManual ? "chevron-up" : "chevron-down"} size={20} color={colors.muted} /></Pressable>
           {showManual ? manual.map((r) => <Card key={r.nozzle.id} style={{ marginBottom: 8 }}><Text style={styles.nozzleName}>{r.nozzle.label}</Text><Text style={styles.nozzleMeta}>{r.nozzle.type} · {r.nozzle.minPressureBar}–{r.nozzle.maxPressureBar} bar · {r.check.requiredPressureBar ? `${fmt(r.check.requiredPressureBar, 2)} bar required` : "enter setup"}</Text></Card>) : null}
@@ -145,6 +155,8 @@ const styles = StyleSheet.create({
   nozzleName: { fontSize: 13, fontWeight: "800", color: colors.onSurface },
   nozzleMeta: { fontSize: 11, color: colors.muted, marginTop: 2 },
   warnText: { fontSize: 11, color: colors.warning, fontWeight: "700", marginTop: 2 },
+  noMatchBanner: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: colors.error, padding: 10, borderRadius: radius.md, marginBottom: 8 },
+  noMatchBannerText: { color: colors.onError, fontWeight: "600", fontSize: 12, flex: 1, lineHeight: 16 },
   manualToggle: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: spacing.lg, padding: 12, borderRadius: radius.md, backgroundColor: colors.brandSecondary },
   manualText: { flex: 1, fontSize: 13, color: colors.brandPrimary, fontWeight: "800" },
   disclaimer: { fontSize: 10, color: colors.muted, textAlign: "center", lineHeight: 14, fontStyle: "italic", marginTop: spacing.lg, paddingHorizontal: 12 },
