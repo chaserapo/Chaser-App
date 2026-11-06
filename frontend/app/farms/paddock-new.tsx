@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, Platform, ScrollView, KeyboardAvoidingView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { v4 as uuid } from "uuid";
@@ -135,51 +135,67 @@ export default function NewPaddock() {
           onSaveGeometry={(geojson, areaHa) => persistPaddock(geojson, areaHa)}
         />
 
-        <View style={[styles.overlay, { paddingBottom: insets.bottom + 12 }]} testID="paddock-new-overlay">
-          <Card style={{ marginBottom: 8 }}>
-            <Input label="Paddock name*" value={f.name} onChangeText={(v) => setF({ ...f, name: v })} placeholder="e.g. North 40" testID="input-paddock-name" />
-            <Input label="Crop (optional)" value={f.crop} onChangeText={(v) => setF({ ...f, crop: v })} placeholder="e.g. Wheat" testID="input-paddock-crop" />
-            <Input label="Variety" value={f.variety} onChangeText={(v) => setF({ ...f, variety: v })} testID="input-paddock-variety" />
-            <Input label="Notes" value={f.notes} onChangeText={(v) => setF({ ...f, notes: v })} testID="input-paddock-notes" />
-            <Text style={styles.meta}>
-              {drawInfo.count === 0
-                ? "Tap the map to trace this paddock's boundary, or hit Drive to record while driving it — or skip and enter an area below."
-                : `${drawInfo.count} point${drawInfo.count === 1 ? "" : "s"} · ${drawInfo.areaHa.toFixed(2)} ha${driving ? "  •  RECORDING" : ""}`}
-            </Text>
-            {drawInfo.count === 0 ? (
-              <Input label="Area (if not drawing a boundary)" value={f.area} onChangeText={(v) => setF({ ...f, area: v })} keyboardType="decimal-pad" suffix="ha" placeholder="Optional" testID="input-paddock-area" />
-            ) : null}
-            <View style={{ height: 8 }} />
-            <Pressable onPress={toggleDrive} style={[styles.driveBtn, driving && styles.driveBtnOn]} testID="drive-toggle-btn">
-              <Icon name={driving ? "stop-circle-outline" : "car-connected"} size={18} color={driving ? colors.onBrandPrimary : colors.brandPrimary} />
-              <Text style={[styles.driveBtnText, driving && { color: colors.onBrandPrimary }]}>
-                {driving ? "Stop recording" : "Drive boundary (GPS)"}
-              </Text>
-            </Pressable>
-          </Card>
-          <View style={styles.row}>
-            <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.undo()} disabled={drawInfo.count === 0} testID="draw-undo-btn">
-              <Icon name="undo-variant" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
-              <Text style={styles.iconBtnText}>Undo</Text>
-            </Pressable>
-            <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.clear()} disabled={drawInfo.count === 0} testID="draw-clear-btn">
-              <Icon name="close-thick" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
-              <Text style={styles.iconBtnText}>Clear</Text>
-            </Pressable>
-            <View style={{ flex: 1 }}>
-              <Button title={saving ? "Saving…" : "Save Paddock"} icon="content-save-outline" onPress={handleSave} loading={saving} disabled={saving || !f.name.trim()} testID="save-paddock-btn" />
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kbWrap} testID="paddock-new-overlay">
+          <View style={[styles.overlay, { paddingBottom: insets.bottom + 12 }]}>
+            <Card style={{ marginBottom: 8 }}>
+              <ScrollView style={styles.formScroll} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                <Input label="Paddock name*" value={f.name} onChangeText={(v) => setF({ ...f, name: v })} placeholder="e.g. North 40" testID="input-paddock-name" />
+
+                {/* Boundary comes right after the name — it's the main thing
+                    this screen is for, so it needs to stay visible before the
+                    keyboard opens on a field further down. */}
+                <View style={styles.boundarySection}>
+                  <Text style={styles.meta}>
+                    {drawInfo.count === 0
+                      ? "Tap the map to trace this paddock's boundary, or hit Drive to record it — or skip and enter an area below."
+                      : `${drawInfo.count} point${drawInfo.count === 1 ? "" : "s"} · ${drawInfo.areaHa.toFixed(2)} ha${driving ? "  •  RECORDING" : ""}`}
+                  </Text>
+                  <Pressable onPress={toggleDrive} style={[styles.driveBtn, driving && styles.driveBtnOn]} testID="drive-toggle-btn">
+                    <Icon name={driving ? "stop-circle-outline" : "car-connected"} size={18} color={driving ? colors.onBrandPrimary : colors.brandPrimary} />
+                    <Text style={[styles.driveBtnText, driving && { color: colors.onBrandPrimary }]}>
+                      {driving ? "Stop recording" : "Drive boundary (GPS)"}
+                    </Text>
+                  </Pressable>
+                  {drawInfo.count === 0 ? (
+                    <Input label="Area (if not drawing a boundary)" value={f.area} onChangeText={(v) => setF({ ...f, area: v })} keyboardType="decimal-pad" suffix="ha" placeholder="Optional" testID="input-paddock-area" />
+                  ) : null}
+                </View>
+
+                <View style={styles.twoCol}>
+                  <View style={{ flex: 1 }}><Input label="Crop (optional)" value={f.crop} onChangeText={(v) => setF({ ...f, crop: v })} placeholder="e.g. Wheat" testID="input-paddock-crop" /></View>
+                  <View style={{ flex: 1 }}><Input label="Variety" value={f.variety} onChangeText={(v) => setF({ ...f, variety: v })} testID="input-paddock-variety" /></View>
+                </View>
+                <Input label="Notes" value={f.notes} onChangeText={(v) => setF({ ...f, notes: v })} testID="input-paddock-notes" />
+              </ScrollView>
+            </Card>
+            <View style={styles.row}>
+              <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.undo()} disabled={drawInfo.count === 0} testID="draw-undo-btn">
+                <Icon name="undo-variant" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
+                <Text style={styles.iconBtnText}>Undo</Text>
+              </Pressable>
+              <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.clear()} disabled={drawInfo.count === 0} testID="draw-clear-btn">
+                <Icon name="close-thick" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
+                <Text style={styles.iconBtnText}>Clear</Text>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Button title={saving ? "Saving…" : "Save Paddock"} icon="content-save-outline" onPress={handleSave} loading={saving} disabled={saving || !f.name.trim()} testID="save-paddock-btn" />
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { position: "absolute", left: 12, right: 12, bottom: 0 },
-  meta: { fontSize: 13, color: colors.onSurface, fontWeight: "600", marginTop: spacing.sm },
-  driveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 40, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.brandPrimary, backgroundColor: colors.surface },
+  kbWrap: { position: "absolute", left: 0, right: 0, bottom: 0 },
+  overlay: { paddingHorizontal: 12 },
+  formScroll: { maxHeight: 300 },
+  boundarySection: { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  twoCol: { flexDirection: "row", gap: 8 },
+  meta: { fontSize: 13, color: colors.onSurface, fontWeight: "600" },
+  driveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 40, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.brandPrimary, backgroundColor: colors.surface, marginTop: spacing.sm },
   driveBtnOn: { backgroundColor: colors.error, borderColor: colors.error },
   driveBtnText: { fontWeight: "700", color: colors.brandPrimary, fontSize: 13 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
