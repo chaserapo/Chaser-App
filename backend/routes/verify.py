@@ -19,12 +19,15 @@ a normal link, not an API endpoint.
 from __future__ import annotations
 
 import html
+import logging
 import os
 from typing import Any, Dict, List, Optional
 
 import httpx
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
+
+logger = logging.getLogger("chaser.verify")
 
 router = APIRouter()
 
@@ -88,33 +91,62 @@ def _row(label: str, value: Any) -> str:
     return f'<div class="row"><div class="k">{html.escape(label)}</div><div class="v">{v}</div></div>'
 
 
+def _error_page(job_id: str) -> HTMLResponse:
+    body = f"""
+  <h1>Couldn't load this record</h1>
+  <p class="sub">Something went wrong generating this page. Please try again in a moment.</p>
+"""
+    return HTMLResponse(_page("Unavailable · Chaser", body), status_code=500)
+
+
 @router.get("/verify/spray/{job_id}", response_class=HTMLResponse)
 async def verify_spray_job(job_id: str) -> HTMLResponse:
     conf = _supabase_conf()
     if not conf:
         return HTMLResponse(_page("Unavailable · Chaser", "<h1>Verification unavailable</h1><p class=\"sub\">Please try again shortly.</p>"), status_code=503)
 
-    async with httpx.AsyncClient() as client:
-        headers = {"apikey": conf["key"], "Authorization": f"Bearer {conf['key']}"}
-        job_r = await client.get(
-            f"{conf['url']}/rest/v1/spray_jobs",
-            params={"id": f"eq.{job_id}", "deleted_at": "is.null", "select": "*"},
-            headers=headers, timeout=15,
-        )
-        job_r.raise_for_status()
-        jobs: List[Dict[str, Any]] = job_r.json()
-        if not jobs:
-            return _not_found(job_id)
-        j = jobs[0]
+    # Any failure here (bad/blocked network call, an unexpected response
+    # shape from Supabase, a rendering bug) must never surface as a raw,
+    # unstyled 500 — that's what made this a bare "Internal Server Error"
+    # with no clue what broke. Log the real exception server-side (visible
+    # in Railway's logs) and show a clean page to whoever scanned the code.
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = {"apikey": conf["key"], "Authorization": f"Bearer {conf['key']}"}
+            job_r = await client.get(
+                f"{conf['url']}/rest/v1/spray_jobs",
+                params={"id": f"eq.{job_id}", "deleted_at": "is.null", "select": "*"},
+                headers=headers, timeout=15,
+            )
+            if not job_r.is_success:
+                logger.error("verify_spray_job: spray_jobs query failed job_id=%s status=%s body=%s", job_id, job_r.status_code, job_r.text[:500])
+                return _error_page(job_id)
+            jobs: List[Dict[str, Any]] = job_r.json()
+            if not jobs:
+                return _not_found(job_id)
+            j = jobs[0]
 
-        prod_r = await client.get(
-            f"{conf['url']}/rest/v1/spray_job_products",
-            params={"spray_job_id": f"eq.{job_id}", "select": "*"},
-            headers=headers, timeout=15,
-        )
-        prod_r.raise_for_status()
-        products: List[Dict[str, Any]] = prod_r.json()
+            prod_r = await client.get(
+                f"{conf['url']}/rest/v1/spray_job_products",
+                params={"spray_job_id": f"eq.{job_id}", "select": "*"},
+                headers=headers, timeout=15,
+            )
+            if not prod_r.is_success:
+                logger.error("verify_spray_job: spray_job_products query failed job_id=%s status=%s body=%s", job_id, prod_r.status_code, prod_r.text[:500])
+                return _error_page(job_id)
+            products: List[Dict[str, Any]] = prod_r.json()
+    except Exception:
+        logger.exception("verify_spray_job: request to Supabase failed job_id=%s", job_id)
+        return _error_page(job_id)
 
+    try:
+        return _render_spray_job(j, products)
+    except Exception:
+        logger.exception("verify_spray_job: rendering failed job_id=%s", job_id)
+        return _error_page(job_id)
+
+
+def _render_spray_job(j: Dict[str, Any], products: List[Dict[str, Any]]) -> HTMLResponse:
     status = j.get("status")
     badge = '<div class="badge">✓ Completed</div>' if status == "completed" else f'<div class="badge" style="background:#FEF3C7;color:#92400E;">{html.escape((status or "draft").upper())}</div>'
 
