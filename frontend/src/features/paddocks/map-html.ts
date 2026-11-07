@@ -369,10 +369,23 @@ export const MAP_HTML = `<!doctype html>
       lastRaw = raw; lastRawAt = now;
       let msg; try { msg = JSON.parse(raw); } catch (e) { return; }
       switch (msg.type) {
-        case 'resize': if (map.loaded()) { map.resize(); map.triggerRepaint(); } break;
-        case 'setPaddocks': paddocks = msg.paddocks || []; if (map.loaded()) { renderPaddocks(); fitToPaddocks(); } break;
-        case 'setFarmPins': farmPins = msg.pins || []; if (map.loaded()) { renderFarmPins(); fitToPaddocks(); } break;
-        case 'setIssuePins': issuePins = msg.pins || []; if (map.loaded()) renderIssuePins(); break;
+        // mapLoaded (set once, inside map.on('load')) means the sources/layers
+        // these render functions touch are guaranteed to exist. map.loaded()
+        // is a different thing entirely — it also reflects whether tiles for
+        // the current viewport are still being fetched, so it can read false
+        // for a little while right after the style loads (new sources just
+        // added here, fitToPaddocks()'s camera move still settling), even
+        // though it's completely safe to render by then. Gating on it meant
+        // the very first setPaddocks/setFarmPins — which usually arrives in
+        // that window, straight after this WebView's own 'ready' — silently
+        // updated the local paddocks/farmPins variables but never actually
+        // drew them, leaving the map blank until some later update (e.g.
+        // creating another paddock) happened to arrive once map.loaded()
+        // was back to true.
+        case 'resize': if (mapLoaded) { map.resize(); map.triggerRepaint(); } break;
+        case 'setPaddocks': paddocks = msg.paddocks || []; if (mapLoaded) { renderPaddocks(); fitToPaddocks(); } break;
+        case 'setFarmPins': farmPins = msg.pins || []; if (mapLoaded) { renderFarmPins(); fitToPaddocks(); } break;
+        case 'setIssuePins': issuePins = msg.pins || []; if (mapLoaded) renderIssuePins(); break;
         case 'setReportPin':
           if (typeof msg.lon === 'number' && typeof msg.lat === 'number') {
             reportPin = [msg.lon, msg.lat];
