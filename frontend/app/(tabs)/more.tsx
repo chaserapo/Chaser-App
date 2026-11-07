@@ -236,11 +236,19 @@ export default function More() {
             <Text style={styles.rowText}>Chemicals</Text>
             <Icon name="chevron-right" size={22} color={colors.muted} />
           </Pressable>
-          <Pressable onPress={() => router.push("/records/history")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-spray-history-btn">
+          <Pressable onPress={() => router.push("/records/history")} style={({ pressed }) => [styles.row, styles.rowBorder, pressed && { backgroundColor: colors.surface }]} testID="open-spray-history-btn">
             <Icon name="clipboard-clock-outline" size={22} color={colors.brandPrimary} />
             <View style={{ flex: 1 }}>
               <Text style={styles.rowText}>Spray History</Text>
               <Text style={styles.rowSub}>Browse past jobs by farm, paddock, and month</Text>
+            </View>
+            <Icon name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+          <Pressable onPress={() => router.push("/reports")} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]} testID="open-reports-btn">
+            <Icon name="chart-box-outline" size={22} color={colors.brandPrimary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowText}>Reports</Text>
+              <Text style={styles.rowSub}>Select completed jobs by type & date range, view totals, and export</Text>
             </View>
             <Icon name="chevron-right" size={22} color={colors.muted} />
           </Pressable>
