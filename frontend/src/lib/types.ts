@@ -30,6 +30,10 @@ export type Paddock = {
   variety?: string;
   notes?: string;
   boundary?: PaddockBoundary | null;
+  // Set when the paddock's location was captured by dropping a pin instead
+  // of drawing a boundary. Only meaningful when `boundary` is unset.
+  pin_lat?: number | null;
+  pin_lon?: number | null;
   archived_at?: string;
   created_at: string;
 };

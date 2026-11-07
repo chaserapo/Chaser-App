@@ -56,7 +56,10 @@ export default function NewIssueScreen() {
 
   const shownPaddocks = useMemo(() => farmId ? paddocks.filter((p) => p.farm_id === farmId) : paddocks, [paddocks, farmId]);
   const mapPaddocks = useMemo(
-    () => paddocks.map((p) => ({ id: p.id, name: p.name, area_ha: p.area_ha, crop: p.crop, boundary_geojson: p.boundary ?? null })),
+    () => paddocks.map((p) => ({
+      id: p.id, name: p.name, area_ha: p.area_ha, crop: p.crop, boundary_geojson: p.boundary ?? null,
+      location: p.pin_lat != null && p.pin_lon != null ? { lat: p.pin_lat, lon: p.pin_lon } : null,
+    })),
     [paddocks],
   );
 

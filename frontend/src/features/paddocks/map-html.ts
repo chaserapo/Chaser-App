@@ -6,6 +6,9 @@
 // - GPS blue-dot: React Native forwards `setPosition` messages.
 //
 // Communication protocol (JSON strings):
+//   Each paddock in setPaddocks may carry boundary_geojson (a drawn polygon)
+//   or, if that's null, a location: {lat,lon} (a dropped pin) — paddocks with
+//   neither simply don't appear on the map.
 //   RN  -> WebView: { type: "setPaddocks", paddocks: [...] } |
 //                    { type: "setFarmPins", pins: [...] } |
 //                    { type: "setIssuePins", pins: [{id,lat,lon,icon,severity}] } |
@@ -68,6 +71,23 @@ export const MAP_HTML = `<!doctype html>
       width:0; height:0; margin-top:-2px;
       border-left:6px solid transparent; border-right:6px solid transparent;
       border-top:8px solid #3B6E3B;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25));
+    }
+    .paddock-pin {
+      display:flex; flex-direction:column; align-items:center; cursor:pointer;
+      transform: translateY(-14px);
+    }
+    .paddock-pin .bubble {
+      background:#92400E; color:#fff; padding:3px 7px; border-radius:6px;
+      font: 700 10px -apple-system, system-ui, sans-serif;
+      white-space:nowrap; border:2px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35); max-width:140px;
+      overflow:hidden; text-overflow:ellipsis;
+    }
+    .paddock-pin .tail {
+      width:0; height:0; margin-top:-2px;
+      border-left:5px solid transparent; border-right:5px solid transparent;
+      border-top:7px solid #92400E;
       filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25));
     }
     .issue-pin {
@@ -145,6 +165,7 @@ export const MAP_HTML = `<!doctype html>
     let paddocks = [];
     let farmPins = [];      // [{ id, name, lat, lon }]
     let farmMarkers = [];   // parallel maplibre markers
+    let paddockPinMarkers = []; // markers for paddocks located by a dropped pin (no boundary)
     let issuePins = [];     // [{ id, lat, lon, icon, severity }]
     let issueMarkers = [];
     let reportPin = null;   // [lng, lat] | null — the pin being placed for a new report
@@ -184,6 +205,30 @@ export const MAP_HTML = `<!doctype html>
     function renderPaddocks() {
       const src = map.getSource('paddocks');
       if (src) src.setData(paddockGeoJSON());
+    }
+
+    // Paddocks with no drawn boundary but a dropped pin — shown as a small
+    // bubble marker (same pattern as farm pins, distinct color) so they're
+    // still visible on the map instead of just vanishing.
+    function renderPaddockPins() {
+      paddockPinMarkers.forEach(m => m.remove());
+      paddockPinMarkers = paddocks
+        .filter(p => !p.boundary_geojson && p.location)
+        .map(p => {
+          const wrap = document.createElement('div');
+          wrap.className = 'paddock-pin';
+          const bubble = document.createElement('div');
+          bubble.className = 'bubble';
+          bubble.textContent = p.name || 'Paddock';
+          const tail = document.createElement('div');
+          tail.className = 'tail';
+          wrap.appendChild(bubble);
+          wrap.appendChild(tail);
+          wrap.addEventListener('click', () => post({ type: 'select', id: p.id }));
+          return new maplibregl.Marker({ element: wrap, anchor: 'bottom' })
+            .setLngLat([p.location.lon, p.location.lat])
+            .addTo(map);
+        });
     }
 
     // Renders one green "farm" bubble marker per weather_locations pin so
@@ -290,12 +335,15 @@ export const MAP_HTML = `<!doctype html>
     function fitToPaddocks() {
       if (fitted) return;
       const g = paddockGeoJSON();
+      const pinFeatures = paddocks
+        .filter(p => !p.boundary_geojson && p.location)
+        .map(p => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.location.lon, p.location.lat] }, properties: {} }));
       let bboxSource = null;
-      if (g.features.length > 0) {
-        bboxSource = g;
+      if (g.features.length > 0 || pinFeatures.length > 0) {
+        bboxSource = { type: 'FeatureCollection', features: [...g.features, ...pinFeatures] };
       } else if (farmPins.length > 0) {
-        // No paddock polygons yet — fit around the farm pins instead so the
-        // user sees their properties on first open.
+        // No paddock polygons or pins yet — fit around the farm pins instead
+        // so the user sees their properties on first open.
         bboxSource = {
           type: 'FeatureCollection',
           features: farmPins.map(p => ({
@@ -306,7 +354,8 @@ export const MAP_HTML = `<!doctype html>
       if (!bboxSource) return;
       try {
         const bbox = turf.bbox(bboxSource);
-        map.fitBounds(bbox, { padding: 60, duration: 0, maxZoom: farmPins.length && !g.features.length ? 12 : 15 });
+        const noPaddockData = g.features.length === 0 && pinFeatures.length === 0;
+        map.fitBounds(bbox, { padding: 60, duration: 0, maxZoom: farmPins.length && noPaddockData ? 12 : 15 });
         fitted = true;
       } catch (e) { log(e); }
     }
@@ -383,7 +432,7 @@ export const MAP_HTML = `<!doctype html>
         // creating another paddock) happened to arrive once map.loaded()
         // was back to true.
         case 'resize': if (mapLoaded) { map.resize(); map.triggerRepaint(); } break;
-        case 'setPaddocks': paddocks = msg.paddocks || []; if (mapLoaded) { renderPaddocks(); fitToPaddocks(); } break;
+        case 'setPaddocks': paddocks = msg.paddocks || []; if (mapLoaded) { renderPaddocks(); renderPaddockPins(); fitToPaddocks(); } break;
         case 'setFarmPins': farmPins = msg.pins || []; if (mapLoaded) { renderFarmPins(); fitToPaddocks(); } break;
         case 'setIssuePins': issuePins = msg.pins || []; if (mapLoaded) renderIssuePins(); break;
         case 'setReportPin':

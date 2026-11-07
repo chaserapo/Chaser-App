@@ -9,6 +9,9 @@ export type PaddockOnMap = {
   area_ha?: number | null;
   crop?: string | null;
   boundary_geojson: { type: "Polygon"; coordinates: number[][][] } | null;
+  // Shown as a pin marker when set and boundary_geojson is null — a paddock
+  // located by dropping a pin instead of drawing its boundary.
+  location?: { lat: number; lon: number } | null;
 };
 
 export type FarmPin = { id: string; name: string; lat: number; lon: number; farm_id?: string };

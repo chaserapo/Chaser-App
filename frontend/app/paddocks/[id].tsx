@@ -40,7 +40,7 @@ export default function PaddockDetail() {
     // geocoded location so there's at least a pin showing where it is.
     setFarmPin(null);
     const businessId = business?.id;
-    if (one && !one.boundary && one.farm_id && businessId) {
+    if (one && !one.boundary && one.pin_lat == null && one.farm_id && businessId) {
       try {
         const { data } = await supabase
           .from("weather_locations")
@@ -75,7 +75,10 @@ export default function PaddockDetail() {
         <View style={{ height: 260 }}>
           <PaddockMap
             ref={mapRef}
-            paddocks={[{ id: p.id, name: p.name, area_ha: p.area_ha, crop: p.crop, boundary_geojson: p.boundary ?? null }]}
+            paddocks={[{
+              id: p.id, name: p.name, area_ha: p.area_ha, crop: p.crop, boundary_geojson: p.boundary ?? null,
+              location: p.pin_lat != null && p.pin_lon != null ? { lat: p.pin_lat, lon: p.pin_lon } : null,
+            }]}
             farmPins={farmPin ? [farmPin] : undefined}
           />
         </View>

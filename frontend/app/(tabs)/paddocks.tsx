@@ -58,6 +58,10 @@ export default function PaddocksTab() {
   const [crop, setCrop] = useState("");
   const [drawFarmId, setDrawFarmId] = useState<string | null>(null);
   const [gpsOn, setGpsOn] = useState(false);
+  const [locateMode, setLocateMode] = useState<"draw" | "pin">("draw");
+  const [pin, setPin] = useState<{ lat: number; lon: number } | null>(null);
+  const locateModeRef = useRef(locateMode);
+  useEffect(() => { locateModeRef.current = locateMode; }, [locateMode]);
   const [searchText, setSearchText] = useState("");
   const [searching, setSearching] = useState(false);
   const [mapLoadTimedOut, setMapLoadTimedOut] = useState(false);
@@ -252,8 +256,8 @@ export default function PaddocksTab() {
 
   function startDraw() {
     if (!canEdit) return;
-    setSelectedId(null); setName(""); setCrop(""); setDrawFarmId(null);
-    setMode("draw"); mapRef.current?.setMode("draw");
+    setSelectedId(null); setName(""); setCrop(""); setDrawFarmId(null); setPin(null);
+    setMode("draw"); setLocateMode("draw"); mapRef.current?.setMode("draw");
     mapRef.current?.clear();
   }
   function cancelDraw() {
@@ -261,10 +265,23 @@ export default function PaddocksTab() {
     lastDrivePoint.current = null;
     setDriving(false);
     mapRef.current?.clear();
+    mapRef.current?.clearReportPin();
     mapRef.current?.setMode("view");
-    setMode("view"); setDrawInfo({ count: 0, areaHa: 0 });
+    setMode("view"); setDrawInfo({ count: 0, areaHa: 0 }); setLocateMode("draw"); setPin(null);
   }
   function requestSaveGeometry() { mapRef.current?.save(); }
+  function switchLocateMode(next: "draw" | "pin") {
+    if (next === locateMode) return;
+    setLocateMode(next);
+    if (next === "pin") {
+      mapRef.current?.clear();
+      mapRef.current?.setMode("pin");
+    } else {
+      mapRef.current?.clearReportPin();
+      setPin(null);
+      mapRef.current?.setMode("draw");
+    }
+  }
 
   function viewPaddockOnMap(id: string) {
     setSelectedIssueId(null);
@@ -276,13 +293,16 @@ export default function PaddocksTab() {
       // Covers the case where the map is already visible/ready (no remount,
       // so onReady won't fire again) — harmless no-op otherwise.
       mapRef.current?.focusPaddock(id);
+    } else if (paddock?.pin_lat != null && paddock?.pin_lon != null) {
+      pendingFocusRef.current = { lat: paddock.pin_lat, lon: paddock.pin_lon };
+      mapRef.current?.flyTo(paddock.pin_lat, paddock.pin_lon, 15);
     } else {
-      // No boundary drawn yet, so there's nothing to fit to — fly toward its
+      // No boundary or pin, so there's nothing to fit to — fly toward its
       // farm's pin instead of leaving the map wherever it happened to be.
-      const pin = paddock?.farm_id ? farmPins.find((fp) => fp.farm_id === paddock.farm_id) : null;
-      if (pin) {
-        pendingFocusRef.current = { lat: pin.lat, lon: pin.lon };
-        mapRef.current?.flyTo(pin.lat, pin.lon, 14);
+      const farmPin = paddock?.farm_id ? farmPins.find((fp) => fp.farm_id === paddock.farm_id) : null;
+      if (farmPin) {
+        pendingFocusRef.current = { lat: farmPin.lat, lon: farmPin.lon };
+        mapRef.current?.flyTo(farmPin.lat, farmPin.lon, 14);
       }
     }
   }
@@ -300,6 +320,29 @@ export default function PaddocksTab() {
         area_ha: Math.round(areaHa * 100) / 100,
         crop: crop.trim() || undefined,
         boundary: geojson,
+        created_at: new Date().toISOString(),
+      };
+      await repo.paddocks.save(p);
+      await load();
+      cancelDraw();
+    } catch (e: any) {
+      alert("Save failed: " + (e?.message ?? e));
+    } finally { setSaving(false); }
+  }
+
+  async function persistPinPaddock() {
+    if (!business || !pin) return;
+    if (!name.trim()) { alert("Please give the paddock a name before saving."); return; }
+    setSaving(true);
+    try {
+      const p: Paddock = {
+        id: uuid(),
+        business_id: business.id,
+        farm_id: drawFarmId,
+        name: name.trim(),
+        crop: crop.trim() || undefined,
+        pin_lat: pin.lat,
+        pin_lon: pin.lon,
         created_at: new Date().toISOString(),
       };
       await repo.paddocks.save(p);
@@ -453,7 +496,7 @@ export default function PaddocksTab() {
                               {p.area_ha != null ? `${p.area_ha} ha` : "No area"}
                               {p.crop ? ` · ${p.crop}` : ""}
                               {p.variety ? ` (${p.variety})` : ""}
-                              {!p.boundary ? " · no boundary" : ""}
+                              {!p.boundary && p.pin_lat == null ? " · no location" : !p.boundary ? " · pin only" : ""}
                             </Text>
                           </View>
                           <Icon name="chevron-right" size={22} color={colors.muted} />
@@ -486,6 +529,7 @@ export default function PaddocksTab() {
           ref={mapRef}
           paddocks={paddocks.map((p) => ({
             id: p.id, name: p.name, area_ha: p.area_ha, crop: p.crop, boundary_geojson: p.boundary ?? null,
+            location: p.pin_lat != null && p.pin_lon != null ? { lat: p.pin_lat, lon: p.pin_lon } : null,
           }))}
           farmPins={farmPins}
           issuePins={issuePins}
@@ -493,9 +537,10 @@ export default function PaddocksTab() {
           onIssueSelect={(id) => { if (mode === "view") { setSelectedId(null); setSelectedIssueId(id); } }}
           onPointsUpdate={(count, areaHa) => setDrawInfo({ count, areaHa })}
           onSaveGeometry={persistPaddock}
+          onPinPlaced={(lat, lon) => setPin({ lat, lon })}
           onReady={() => {
             setMapLoadTimedOut(false);
-            if (modeRef.current === "draw") mapRef.current?.setMode("draw");
+            if (modeRef.current === "draw") mapRef.current?.setMode(locateModeRef.current);
             const target = pendingFocusRef.current;
             if (target) {
               if ("paddockId" in target) mapRef.current?.focusPaddock(target.paddockId);
@@ -560,18 +605,44 @@ export default function PaddocksTab() {
                       main thing this overlay is for, so it stays visible
                       before the keyboard opens on a field further down. */}
                   <View style={styles.boundarySection}>
-                    <Text style={styles.drawMeta}>
-                      {drawInfo.count === 0
-                        ? "Tap the map to add corner points, or hit Drive to record while driving the boundary."
-                        : `${drawInfo.count} point${drawInfo.count === 1 ? "" : "s"} · ${drawInfo.areaHa.toFixed(2)} ha${driving ? "  •  RECORDING" : ""}`}
-                    </Text>
-                    <Text style={styles.drawHint}>Drag a point to move it · long-press to remove it</Text>
-                    <Pressable onPress={toggleDrive} style={[styles.driveBtn, driving && styles.driveBtnOn]} testID="drive-toggle-btn">
-                      <Icon name={driving ? "stop-circle-outline" : "car-connected"} size={18} color={driving ? colors.onBrandPrimary : colors.brandPrimary} />
-                      <Text style={[styles.driveBtnText, driving && { color: colors.onBrandPrimary }]}>
-                        {driving ? "Stop recording" : "Drive boundary (GPS)"}
-                      </Text>
-                    </Pressable>
+                    <View style={styles.modeToggle}>
+                      <Pressable onPress={() => switchLocateMode("draw")} style={[styles.modeBtn, locateMode === "draw" && styles.modeBtnActive]} testID="locate-mode-draw">
+                        <Icon name="vector-polygon" size={16} color={locateMode === "draw" ? colors.onBrandPrimary : colors.brandPrimary} />
+                        <Text style={[styles.modeBtnText, locateMode === "draw" && { color: colors.onBrandPrimary }]}>Draw boundary</Text>
+                      </Pressable>
+                      <Pressable onPress={() => switchLocateMode("pin")} style={[styles.modeBtn, locateMode === "pin" && styles.modeBtnActive]} testID="locate-mode-pin">
+                        <Icon name="map-marker-outline" size={16} color={locateMode === "pin" ? colors.onBrandPrimary : colors.brandPrimary} />
+                        <Text style={[styles.modeBtnText, locateMode === "pin" && { color: colors.onBrandPrimary }]}>Drop a pin</Text>
+                      </Pressable>
+                    </View>
+                    {locateMode === "draw" ? (
+                      <>
+                        <Text style={styles.drawMeta}>
+                          {drawInfo.count === 0
+                            ? "Tap the map to add corner points, or hit Drive to record while driving the boundary."
+                            : `${drawInfo.count} point${drawInfo.count === 1 ? "" : "s"} · ${drawInfo.areaHa.toFixed(2)} ha${driving ? "  •  RECORDING" : ""}`}
+                        </Text>
+                        <Text style={styles.drawHint}>Drag a point to move it · long-press to remove it</Text>
+                        <Pressable onPress={toggleDrive} style={[styles.driveBtn, driving && styles.driveBtnOn]} testID="drive-toggle-btn">
+                          <Icon name={driving ? "stop-circle-outline" : "car-connected"} size={18} color={driving ? colors.onBrandPrimary : colors.brandPrimary} />
+                          <Text style={[styles.driveBtnText, driving && { color: colors.onBrandPrimary }]}>
+                            {driving ? "Stop recording" : "Drive boundary (GPS)"}
+                          </Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.drawMeta}>
+                          {pin ? `Pin dropped · ${pin.lat.toFixed(5)}, ${pin.lon.toFixed(5)}` : "Tap the map to drop a pin at this paddock's location."}
+                        </Text>
+                        {pin ? (
+                          <Pressable onPress={() => { mapRef.current?.clearReportPin(); setPin(null); }} style={styles.driveBtn} testID="clear-pin-btn">
+                            <Icon name="close" size={18} color={colors.brandPrimary} />
+                            <Text style={styles.driveBtnText}>Clear pin</Text>
+                          </Pressable>
+                        ) : null}
+                      </>
+                    )}
                   </View>
 
                   <Input label="Crop (optional)" value={crop} onChangeText={setCrop} placeholder="e.g. Wheat" testID="draw-crop" />
@@ -602,16 +673,23 @@ export default function PaddocksTab() {
                 </ScrollView>
               </Card>
               <View style={styles.drawRow}>
-                <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.undo()} disabled={drawInfo.count === 0} testID="draw-undo-btn">
-                  <Icon name="undo-variant" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
+                <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.undo()} disabled={locateMode !== "draw" || drawInfo.count === 0} testID="draw-undo-btn">
+                  <Icon name="undo-variant" size={20} color={locateMode !== "draw" || drawInfo.count === 0 ? colors.muted : colors.onSurface} />
                   <Text style={styles.iconBtnText}>Undo</Text>
                 </Pressable>
-                <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.clear()} disabled={drawInfo.count === 0} testID="draw-clear-btn">
-                  <Icon name="close-thick" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
+                <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.clear()} disabled={locateMode !== "draw" || drawInfo.count === 0} testID="draw-clear-btn">
+                  <Icon name="close-thick" size={20} color={locateMode !== "draw" || drawInfo.count === 0 ? colors.muted : colors.onSurface} />
                   <Text style={styles.iconBtnText}>Clear</Text>
                 </Pressable>
                 <View style={{ flex: 1 }}>
-                  <Button title={saving ? "Saving…" : "Save Paddock"} icon="content-save-outline" onPress={requestSaveGeometry} loading={saving} disabled={drawInfo.count < 3 || saving || !name.trim()} testID="draw-save-btn" />
+                  <Button
+                    title={saving ? "Saving…" : "Save Paddock"}
+                    icon="content-save-outline"
+                    onPress={locateMode === "pin" ? persistPinPaddock : requestSaveGeometry}
+                    loading={saving}
+                    disabled={saving || !name.trim() || (locateMode === "pin" ? !pin : drawInfo.count < 3)}
+                    testID="draw-save-btn"
+                  />
                 </View>
               </View>
               <Pressable onPress={cancelDraw} style={{ alignItems: "center", marginTop: 6 }} testID="draw-cancel-btn">
@@ -722,6 +800,10 @@ const styles = StyleSheet.create({
   drawOverlay: { paddingHorizontal: 12 },
   drawFormScroll: { maxHeight: 300 },
   boundarySection: { marginTop: spacing.sm, marginBottom: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.sm, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border },
+  modeToggle: { flexDirection: "row", gap: 8, marginBottom: spacing.sm },
+  modeBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 36, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.brandPrimary, backgroundColor: colors.surface },
+  modeBtnActive: { backgroundColor: colors.brandPrimary },
+  modeBtnText: { fontWeight: "700", color: colors.brandPrimary, fontSize: 12 },
   drawMeta: { fontSize: 13, color: colors.onSurface, fontWeight: "600" },
   drawHint: { fontSize: 12, color: colors.muted, marginTop: 2, fontStyle: "italic" },
   drawRow: { flexDirection: "row", alignItems: "center", gap: 8 },

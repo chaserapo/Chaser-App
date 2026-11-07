@@ -30,7 +30,7 @@ async function softDelete(table: string, id: string) {
 // Columns added by migrations a Supabase project may not have run yet. If the
 // database rejects one as unknown (PGRST204), the save is retried without it so
 // records keep syncing until the migration is applied.
-const OPTIONAL_COLUMNS = ["weather_source", "weather_station", "rainfast_hours"];
+const OPTIONAL_COLUMNS = ["weather_source", "weather_station", "rainfast_hours", "pin_lat", "pin_lon"];
 
 // The business + business_members rows that farms/paddocks/etc. depend on for
 // RLS are created moments earlier in the same signup flow (see bootstrapBusiness
@@ -65,6 +65,29 @@ async function upsertRow<T extends { id: string }>(table: string, row: T) {
     }
     throw error;
   }
+}
+
+// pin_lat/pin_lon are newer, additive columns that list_paddocks_with_boundary
+// (a hand-authored Supabase function, not tracked in this repo) may predate
+// and so not return — fetched separately and merged in by id rather than
+// risking a change to that function's definition. Fails soft (paddocks still
+// load, just without pin coordinates) if the column migration hasn't run yet.
+async function fetchPaddocksWithPins(activeOnly: boolean): Promise<Paddock[]> {
+  const { data, error } = await supabase.rpc("list_paddocks_with_boundary", { p_business_id: bid() });
+  if (error) throw error;
+  let rows = (data ?? []) as any[];
+  if (activeOnly) rows = rows.filter((r) => !r.archived_at && !r.deleted_at);
+  try {
+    const { data: pinRows, error: pinError } = await supabase.from("paddocks").select("id, pin_lat, pin_lon").eq("business_id", bid());
+    if (!pinError && pinRows) {
+      const pinMap = new Map(pinRows.map((r: any) => [r.id, r]));
+      rows = rows.map((r) => {
+        const pin = pinMap.get(r.id);
+        return pin ? { ...r, pin_lat: pin.pin_lat, pin_lon: pin.pin_lon } : r;
+      });
+    }
+  } catch { /* fail-safe */ }
+  return rows.map((r) => ({ ...r, boundary: r.boundary_geojson ?? null })) as Paddock[];
 }
 
 async function listRows<T>(table: string, opts?: { activeOnly?: boolean; extraEq?: [string, any][] }): Promise<T[]> {
@@ -419,21 +442,11 @@ export const cloudRepo = {
     remove: (id: string) => softDelete("farms", id),
   },
   paddocks: {
-    list: async () => {
-      const { data, error } = await supabase.rpc("list_paddocks_with_boundary", { p_business_id: bid() });
-      if (error) throw error;
-      return ((data ?? []) as any[]).map((r) => ({ ...r, boundary: r.boundary_geojson ?? null })) as Paddock[];
-    },
-    active: async () => {
-      const { data, error } = await supabase.rpc("list_paddocks_with_boundary", { p_business_id: bid() });
-      if (error) throw error;
-      return ((data ?? []) as any[])
-        .filter((r) => !r.archived_at && !r.deleted_at)
-        .map((r) => ({ ...r, boundary: r.boundary_geojson ?? null })) as Paddock[];
-    },
+    list: () => fetchPaddocksWithPins(false),
+    active: () => fetchPaddocksWithPins(true),
     save: async (p: Paddock) => {
       const { boundary, ...rest } = p as any;
-      const payload: any = { ...rest, business_id: bid(), deleted_at: null };
+      let payload: any = { ...rest, business_id: bid(), deleted_at: null };
       // Encode boundary as EWKT if provided, or explicit null to clear.
       if (boundary === null) {
         payload.boundary = null;
@@ -447,6 +460,12 @@ export const cloudRepo = {
       for (;;) {
         const { error } = await supabase.from("paddocks").upsert(payload, { onConflict: "id", defaultToNull: false });
         if (!error) return;
+        const missing = error.code === "PGRST204" ? OPTIONAL_COLUMNS.find((c) => c in payload && error.message?.includes(`'${c}'`)) : undefined;
+        if (missing) {
+          const { [missing]: _dropped, ...restPayload } = payload;
+          payload = restPayload;
+          continue;
+        }
         if (isTransientRlsError(error) && rlsAttempt < 4) {
           rlsAttempt += 1;
           await sleep(400 * rlsAttempt);

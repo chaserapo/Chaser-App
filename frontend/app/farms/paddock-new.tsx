@@ -26,6 +26,8 @@ export default function NewPaddock() {
   const [drawInfo, setDrawInfo] = useState<{ count: number; areaHa: number }>({ count: 0, areaHa: 0 });
   const [driving, setDriving] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [locateMode, setLocateMode] = useState<"draw" | "pin">("draw");
+  const [pin, setPin] = useState<{ lat: number; lon: number } | null>(null);
 
   useFocusEffect(useCallback(() => {
     if (!farmId) return;
@@ -46,7 +48,7 @@ export default function NewPaddock() {
   }
 
   function onMapReady() {
-    mapRef.current?.setMode("draw");
+    mapRef.current?.setMode(locateMode);
     // Jump the map to the farm's address (if it has one) so the user isn't
     // stuck staring at a world map before they can start tracing a boundary.
     if (farm?.address) {
@@ -84,7 +86,20 @@ export default function NewPaddock() {
     );
   }
 
-  async function persistPaddock(geojson?: PaddockBoundary, areaHa?: number) {
+  function switchLocateMode(next: "draw" | "pin") {
+    if (next === locateMode) return;
+    setLocateMode(next);
+    if (next === "pin") {
+      mapRef.current?.clear();
+      mapRef.current?.setMode("pin");
+    } else {
+      mapRef.current?.clearReportPin();
+      setPin(null);
+      mapRef.current?.setMode("draw");
+    }
+  }
+
+  async function persistPaddock(opts?: { geojson?: PaddockBoundary; areaHa?: number; pin?: { lat: number; lon: number } }) {
     const business = await repo.getBusiness();
     if (!business || !farmId || !f.name.trim()) return;
     setSaving(true);
@@ -94,11 +109,13 @@ export default function NewPaddock() {
         business_id: business.id,
         farm_id: farmId,
         name: f.name.trim(),
-        area_ha: geojson ? Math.round((areaHa ?? 0) * 100) / 100 : (f.area ? parseFloat(f.area) : undefined),
+        area_ha: opts?.geojson ? Math.round((opts.areaHa ?? 0) * 100) / 100 : (f.area ? parseFloat(f.area) : undefined),
         crop: f.crop.trim() || undefined,
         variety: f.variety.trim() || undefined,
         notes: f.notes.trim() || undefined,
-        boundary: geojson,
+        boundary: opts?.geojson,
+        pin_lat: opts?.pin?.lat,
+        pin_lon: opts?.pin?.lon,
         created_at: new Date().toISOString(),
       };
       await repo.paddocks.save(p);
@@ -112,9 +129,11 @@ export default function NewPaddock() {
 
   function handleSave() {
     if (!f.name.trim()) { alert("Please give the paddock a name."); return; }
-    if (drawInfo.count >= 3) {
+    if (locateMode === "pin" && pin) {
+      persistPaddock({ pin });
+    } else if (locateMode === "draw" && drawInfo.count >= 3) {
       // Async round-trip: the map computes the polygon + area and posts it
-      // back via onSaveGeometry, which calls persistPaddock(geojson, areaHa).
+      // back via onSaveGeometry, which calls persistPaddock({geojson, areaHa}).
       mapRef.current?.save();
     } else {
       persistPaddock();
@@ -129,10 +148,12 @@ export default function NewPaddock() {
           ref={mapRef}
           paddocks={otherPaddocks.map((p) => ({
             id: p.id, name: p.name, area_ha: p.area_ha, crop: p.crop, boundary_geojson: p.boundary ?? null,
+            location: p.pin_lat != null && p.pin_lon != null ? { lat: p.pin_lat, lon: p.pin_lon } : null,
           }))}
           onReady={onMapReady}
           onPointsUpdate={(count, areaHa) => setDrawInfo({ count, areaHa })}
-          onSaveGeometry={(geojson, areaHa) => persistPaddock(geojson, areaHa)}
+          onSaveGeometry={(geojson, areaHa) => persistPaddock({ geojson, areaHa })}
+          onPinPlaced={(lat, lon) => setPin({ lat, lon })}
         />
 
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kbWrap} testID="paddock-new-overlay">
@@ -145,20 +166,47 @@ export default function NewPaddock() {
                     this screen is for, so it needs to stay visible before the
                     keyboard opens on a field further down. */}
                 <View style={styles.boundarySection}>
-                  <Text style={styles.meta}>
-                    {drawInfo.count === 0
-                      ? "Tap the map to trace this paddock's boundary, or hit Drive to record it — or skip and enter an area below."
-                      : `${drawInfo.count} point${drawInfo.count === 1 ? "" : "s"} · ${drawInfo.areaHa.toFixed(2)} ha${driving ? "  •  RECORDING" : ""}`}
-                  </Text>
-                  <Pressable onPress={toggleDrive} style={[styles.driveBtn, driving && styles.driveBtnOn]} testID="drive-toggle-btn">
-                    <Icon name={driving ? "stop-circle-outline" : "car-connected"} size={18} color={driving ? colors.onBrandPrimary : colors.brandPrimary} />
-                    <Text style={[styles.driveBtnText, driving && { color: colors.onBrandPrimary }]}>
-                      {driving ? "Stop recording" : "Drive boundary (GPS)"}
-                    </Text>
-                  </Pressable>
-                  {drawInfo.count === 0 ? (
-                    <Input label="Area (if not drawing a boundary)" value={f.area} onChangeText={(v) => setF({ ...f, area: v })} keyboardType="decimal-pad" suffix="ha" placeholder="Optional" testID="input-paddock-area" />
-                  ) : null}
+                  <View style={styles.modeToggle}>
+                    <Pressable onPress={() => switchLocateMode("draw")} style={[styles.modeBtn, locateMode === "draw" && styles.modeBtnActive]} testID="locate-mode-draw">
+                      <Icon name="vector-polygon" size={16} color={locateMode === "draw" ? colors.onBrandPrimary : colors.brandPrimary} />
+                      <Text style={[styles.modeBtnText, locateMode === "draw" && { color: colors.onBrandPrimary }]}>Draw boundary</Text>
+                    </Pressable>
+                    <Pressable onPress={() => switchLocateMode("pin")} style={[styles.modeBtn, locateMode === "pin" && styles.modeBtnActive]} testID="locate-mode-pin">
+                      <Icon name="map-marker-outline" size={16} color={locateMode === "pin" ? colors.onBrandPrimary : colors.brandPrimary} />
+                      <Text style={[styles.modeBtnText, locateMode === "pin" && { color: colors.onBrandPrimary }]}>Drop a pin</Text>
+                    </Pressable>
+                  </View>
+                  {locateMode === "draw" ? (
+                    <>
+                      <Text style={styles.meta}>
+                        {drawInfo.count === 0
+                          ? "Tap the map to trace this paddock's boundary, or hit Drive to record it — or skip and enter an area below."
+                          : `${drawInfo.count} point${drawInfo.count === 1 ? "" : "s"} · ${drawInfo.areaHa.toFixed(2)} ha${driving ? "  •  RECORDING" : ""}`}
+                      </Text>
+                      <Pressable onPress={toggleDrive} style={[styles.driveBtn, driving && styles.driveBtnOn]} testID="drive-toggle-btn">
+                        <Icon name={driving ? "stop-circle-outline" : "car-connected"} size={18} color={driving ? colors.onBrandPrimary : colors.brandPrimary} />
+                        <Text style={[styles.driveBtnText, driving && { color: colors.onBrandPrimary }]}>
+                          {driving ? "Stop recording" : "Drive boundary (GPS)"}
+                        </Text>
+                      </Pressable>
+                      {drawInfo.count === 0 ? (
+                        <Input label="Area (if not drawing a boundary)" value={f.area} onChangeText={(v) => setF({ ...f, area: v })} keyboardType="decimal-pad" suffix="ha" placeholder="Optional" testID="input-paddock-area" />
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.meta}>
+                        {pin ? `Pin dropped · ${pin.lat.toFixed(5)}, ${pin.lon.toFixed(5)}` : "Tap the map to drop a pin at this paddock's location."}
+                      </Text>
+                      {pin ? (
+                        <Pressable onPress={() => { mapRef.current?.clearReportPin(); setPin(null); }} style={styles.driveBtn} testID="clear-pin-btn">
+                          <Icon name="close" size={18} color={colors.brandPrimary} />
+                          <Text style={styles.driveBtnText}>Clear pin</Text>
+                        </Pressable>
+                      ) : null}
+                      <Input label="Area (optional)" value={f.area} onChangeText={(v) => setF({ ...f, area: v })} keyboardType="decimal-pad" suffix="ha" placeholder="Optional" testID="input-paddock-area" />
+                    </>
+                  )}
                 </View>
 
                 <View style={styles.twoCol}>
@@ -169,12 +217,12 @@ export default function NewPaddock() {
               </ScrollView>
             </Card>
             <View style={styles.row}>
-              <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.undo()} disabled={drawInfo.count === 0} testID="draw-undo-btn">
-                <Icon name="undo-variant" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
+              <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.undo()} disabled={locateMode !== "draw" || drawInfo.count === 0} testID="draw-undo-btn">
+                <Icon name="undo-variant" size={20} color={locateMode !== "draw" || drawInfo.count === 0 ? colors.muted : colors.onSurface} />
                 <Text style={styles.iconBtnText}>Undo</Text>
               </Pressable>
-              <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.clear()} disabled={drawInfo.count === 0} testID="draw-clear-btn">
-                <Icon name="close-thick" size={20} color={drawInfo.count === 0 ? colors.muted : colors.onSurface} />
+              <Pressable style={styles.iconBtn} onPress={() => mapRef.current?.clear()} disabled={locateMode !== "draw" || drawInfo.count === 0} testID="draw-clear-btn">
+                <Icon name="close-thick" size={20} color={locateMode !== "draw" || drawInfo.count === 0 ? colors.muted : colors.onSurface} />
                 <Text style={styles.iconBtnText}>Clear</Text>
               </Pressable>
               <View style={{ flex: 1 }}>
@@ -193,6 +241,10 @@ const styles = StyleSheet.create({
   overlay: { paddingHorizontal: 12 },
   formScroll: { maxHeight: 300 },
   boundarySection: { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  modeToggle: { flexDirection: "row", gap: 8, marginBottom: spacing.sm },
+  modeBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 36, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.brandPrimary, backgroundColor: colors.surface },
+  modeBtnActive: { backgroundColor: colors.brandPrimary },
+  modeBtnText: { fontWeight: "700", color: colors.brandPrimary, fontSize: 12 },
   twoCol: { flexDirection: "row", gap: 8 },
   meta: { fontSize: 13, color: colors.onSurface, fontWeight: "600" },
   driveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 40, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.brandPrimary, backgroundColor: colors.surface, marginTop: spacing.sm },
