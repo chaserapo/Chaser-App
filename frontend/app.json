@@ -18,7 +18,7 @@
       "url": "https://u.expo.dev/74bd6554-949b-4fd4-8945-2c8cadf61908"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "au.com.chaserag.chaser",
       "buildNumber": "50",
       "infoPlist": {
