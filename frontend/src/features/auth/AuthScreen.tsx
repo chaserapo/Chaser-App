@@ -36,6 +36,21 @@ export function AuthScreen() {
     setResetCode("");
   }
 
+  async function resendCode() {
+    if (busy) return;
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      await requestPasswordReset(email);
+      setNotice("Code re-sent — check your email.");
+    } catch (e: any) {
+      setError(e?.message ?? "Couldn't resend the code");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit() {
     setError(null);
     setNotice(null);
@@ -196,8 +211,8 @@ export function AuthScreen() {
               testID="submit-auth-btn"
             />
             {mode === "forgot-verify" ? (
-              <Pressable onPress={() => requestPasswordReset(email).then(() => setNotice("Code re-sent — check your email.")).catch((e: any) => setError(e?.message ?? "Couldn't resend the code"))} hitSlop={8} style={{ alignSelf: "center", marginTop: spacing.md }} testID="resend-code-link">
-                <Text style={styles.footerLink}>Resend code</Text>
+              <Pressable onPress={resendCode} disabled={busy} hitSlop={8} style={{ alignSelf: "center", marginTop: spacing.md }} testID="resend-code-link">
+                <Text style={[styles.footerLink, busy && { opacity: 0.5 }]}>Resend code</Text>
               </Pressable>
             ) : null}
             {mode === "forgot-request" || mode === "forgot-verify" ? (
