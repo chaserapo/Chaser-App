@@ -125,25 +125,41 @@ async def _purge_business(client: httpx.AsyncClient, business_id: str, service_h
     endpoint can do about it besides log it for follow-up.
     """
     for table in BUSINESS_SCOPED_TABLES:
-        r = await client.delete(
-            f"{SUPABASE_URL}/rest/v1/{table}",
-            params={"business_id": f"eq.{business_id}"},
+        try:
+            r = await client.delete(
+                f"{SUPABASE_URL}/rest/v1/{table}",
+                params={"business_id": f"eq.{business_id}"},
+                headers=service_headers,
+            )
+            if r.status_code >= 400:
+                logger.warning("account deletion: purge of %s failed for business %s: %s", table, business_id, r.text[:300])
+        except httpx.HTTPError as e:
+            logger.warning("account deletion: purge of %s errored for business %s: %s", table, business_id, e)
+
+    try:
+        biz_r = await client.delete(
+            f"{SUPABASE_URL}/rest/v1/businesses",
+            params={"id": f"eq.{business_id}"},
             headers=service_headers,
         )
-        if r.status_code >= 400:
-            logger.warning("account deletion: purge of %s failed for business %s: %s", table, business_id, r.text[:300])
-
-    biz_r = await client.delete(
-        f"{SUPABASE_URL}/rest/v1/businesses",
-        params={"id": f"eq.{business_id}"},
-        headers=service_headers,
-    )
-    if biz_r.status_code >= 400:
-        logger.error("account deletion: business row delete failed for %s: %s", business_id, biz_r.text[:300])
+        if biz_r.status_code >= 400:
+            logger.error("account deletion: business row delete failed for %s: %s", business_id, biz_r.text[:300])
+    except httpx.HTTPError as e:
+        logger.error("account deletion: business row delete errored for %s: %s", business_id, e)
 
 
 @router.delete("/account")
 async def delete_account(authorization: str | None = Header(default=None)):
+    try:
+        return await _delete_account(authorization)
+    except HTTPException:
+        raise
+    except httpx.HTTPError as e:
+        logger.exception("account deletion: unhandled network error")
+        raise HTTPException(status_code=502, detail="Account deletion failed — please try again.") from e
+
+
+async def _delete_account(authorization: str | None) -> dict:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
 
