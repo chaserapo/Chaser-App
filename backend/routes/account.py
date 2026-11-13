@@ -78,6 +78,12 @@ def _service_role_key() -> str:
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
     if not key:
         raise HTTPException(status_code=503, detail="Account deletion is not configured on this server")
+    # A key pasted with a stray newline or space (from a wrapped copy/paste in
+    # whatever set the env var) is otherwise a valid-looking string that only
+    # blows up later as an "Illegal header value" deep inside httpx.
+    key = "".join(key.split())
+    if not key:
+        raise HTTPException(status_code=503, detail="Account deletion is not configured on this server")
     return key
 
 
