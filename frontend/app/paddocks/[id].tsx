@@ -102,6 +102,8 @@ export default function PaddockDetail() {
           {canEdit ? (
             <>
               <View style={{ height: spacing.sm }} />
+              <Button title="Edit Paddock" variant="secondary" icon="pencil-outline" onPress={() => router.push({ pathname: "/farms/paddock-edit", params: { id: p.id } })} testID="detail-edit-btn" />
+              <View style={{ height: spacing.sm }} />
               <Button title="Delete Paddock" variant="danger" icon="trash-can-outline" onPress={confirmDelete} testID="detail-delete-btn" />
             </>
           ) : null}
