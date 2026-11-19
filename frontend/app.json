@@ -86,7 +86,8 @@
       "@react-native-vector-icons/material-design-icons",
       "expo-sharing",
       "expo-notifications",
-      "expo-updates"
+      "expo-updates",
+      "./plugins/withAndroidOptionalScreenOrientation.js"
     ],
     "experiments": {
       "typedRoutes": true
