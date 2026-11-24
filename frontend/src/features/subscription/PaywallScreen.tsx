@@ -6,7 +6,7 @@ import Icon from "@react-native-vector-icons/material-design-icons";
 import { ScreenHeader } from "@/src/components/header";
 import { Button, Card } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";
-import { getOfferings, purchasePackage, purchaseFirst100Package, checkFirst100Eligible, restorePurchases, TRIAL_DAYS } from "@/src/lib/purchases";
+import { getOfferings, purchasePackage, restorePurchases, TRIAL_DAYS } from "@/src/lib/purchases";
 
 const ICON = require("../../../assets/images/chaser-icon.png");
 
@@ -37,19 +37,17 @@ export function PaywallScreen({ back }: { back?: boolean }) {
   const router = useRouter();
   const [offering, setOffering] = useState<any | null>(null);
   const [loadingOffering, setLoadingOffering] = useState(true);
-  const [first100, setFirst100] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getOfferings().then((o) => { setOffering(o); setLoadingOffering(false); });
-    checkFirst100Eligible().then(setFirst100);
   }, []);
 
   async function subscribe(pkg: any) {
     setBusy(true);
     setError(null);
-    const result = first100 ? await purchaseFirst100Package(pkg) : await purchasePackage(pkg);
+    const result = await purchasePackage(pkg);
     setBusy(false);
     if (!result.ok && result.message) setError(result.message);
     // On success, the RevenueCat customer-info listener (useEntitlement) picks
@@ -70,17 +68,8 @@ export function PaywallScreen({ back }: { back?: boolean }) {
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl + insets.bottom }}>
         <View style={styles.brand}>
           <Image source={ICON} style={styles.logo} resizeMode="contain" />
-          {first100 ? (
-            <>
-              <Text style={styles.title}>You're one of our first 100 — 30 days free</Text>
-              <Text style={styles.sub}>Launch offer: 30 days free, then continue for the price below — cancel anytime before it ends and you won&apos;t be charged.</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.title}>Start your free trial</Text>
-              <Text style={styles.sub}>{TRIAL_DAYS} days free, then continue for the price below — cancel anytime before the trial ends and you won&apos;t be charged.</Text>
-            </>
-          )}
+          <Text style={styles.title}>Start your free trial</Text>
+          <Text style={styles.sub}>{TRIAL_DAYS} days free, then continue for the price below — cancel anytime before the trial ends and you won&apos;t be charged.</Text>
         </View>
 
         <Card>
@@ -107,7 +96,7 @@ export function PaywallScreen({ back }: { back?: boolean }) {
           offering.availablePackages.map((pkg: any) => (
             <View key={pkg.identifier} style={{ marginBottom: spacing.sm }}>
               <Button
-                title={busy ? "Please wait…" : first100 ? `Claim 30 days free — then ${pkg.product.priceString}${periodSuffix(pkg)}` : `Start free trial — then ${pkg.product.priceString}${periodSuffix(pkg)}`}
+                title={busy ? "Please wait…" : `Start free trial — then ${pkg.product.priceString}${periodSuffix(pkg)}`}
                 icon="star-outline"
                 onPress={() => subscribe(pkg)}
                 loading={busy}
@@ -125,9 +114,7 @@ export function PaywallScreen({ back }: { back?: boolean }) {
         </Pressable>
 
         <Text style={styles.disclaimer}>
-          {first100
-            ? "Launch offer: 30 days free for a limited number of new subscribers."
-            : `New subscribers get a ${TRIAL_DAYS}-day free trial.`} Subscription auto-renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel any time in your device&apos;s App Store or Google Play account settings.
+          New subscribers get a {TRIAL_DAYS}-day free trial. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel any time in your device&apos;s App Store or Google Play account settings.
         </Text>
 
         <View style={styles.legalLinks}>
