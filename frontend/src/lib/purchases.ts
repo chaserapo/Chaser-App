@@ -106,7 +106,7 @@ export async function purchasePackage(pkg: any): Promise<{ ok: boolean; message?
 // time, so update these constants once those offers exist:
 //   - iOS: the Promotional Offer's identifier in App Store Connect.
 //   - Android: a tag you set on the Play "Developer determined" offer.
-export const FIRST_100_IOS_OFFER_IDENTIFIER = "first_100_promo";
+export const FIRST_100_IOS_OFFER_IDENTIFIER = "first100";
 export const FIRST_100_ANDROID_OFFER_TAG = "first100promo";
 
 export async function checkFirst100Eligible(): Promise<boolean> {
